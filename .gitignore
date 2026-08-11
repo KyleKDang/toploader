@@ -1,0 +1,13 @@
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json
+
+# Playwright MCP session output (page snapshots, console logs)
+.playwright-mcp/
+
+# OS
+.DS_Store
+
+# Secrets
+.env
+.env.*
