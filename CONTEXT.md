@@ -75,6 +75,11 @@ _Avoid_: receipt, history entry
 **No-show**:
 The terminal state of a Trade in which one Trader failed to appear at the Meetup.
 
+**Trade Night**:
+A scheduled in-person gathering at a public venue where many Traders of a City trade at once.
+Distinct from a Meetup, which is the scheduled phase of a single two-Trader Trade; a Trade Night is where many Trades can happen.
+_Avoid_: event, group meetup
+
 ### Trust
 
 **Safety Program**:
