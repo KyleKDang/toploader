@@ -149,6 +149,32 @@ Every policy and RPC ships with a test proving what a foreign user cannot do.
 | Chat message | yes | no |
 | Verification result | yes | yes |
 
+## Testing decisions
+
+Confirmed by the founders on 2026-08-22.
+Implementation tickets cite these seams; a seam is the interface a test exercises a module through.
+Three seams, chosen highest-first, with no test-only indirection layers.
+
+1. **Database interface seam (primary).**
+   Vitest suites using supabase-js clients signed in as seeded test Traders, run against the local stack (`supabase start`).
+   This path exercises Auth (real JWTs), PostgREST, RLS, and the named RPCs exactly as the production client does.
+   All business rules are tested here: the Trade state machine, Matching, Reputation counters, Trade Record immutability, and every policy/RPC's foreign-user denial test.
+   pgTAP was considered and rejected as the primary seam: it runs below Auth/PostgREST (login claims must be simulated) and adds a second toolchain.
+2. **Edge/scheduled function seam.**
+   Functions whose side effects leave the database (price sync, web push, email) are invoked against the local stack with external HTTP faked at the network edge: recorded TCGCSV/catalog fixtures in, captured Resend/push requests out.
+   Assertions are on database state and outbound calls.
+3. **Browser seam (Playwright), kept thin.**
+   One happy-path tracer per primary flow above, plus a PWA installability smoke check.
+   Business rules are proven at seam 1; the browser tests prove wiring only.
+   No component unit-test layer unless real client-side logic appears.
+
+What makes a good test here:
+
+- Two-Trader adversarial pairs are the default shape: the actor, the counterparty, and a foreign Trader in the same test file, asserting both what succeeds and what is denied.
+- Real Postgres always; nothing below a seam is mocked.
+  The only fakes anywhere sit at the external HTTP edge.
+- Test names use the domain vocabulary of [CONTEXT.md](../CONTEXT.md) so the suite reads as this spec.
+
 ## Build sequence
 
 1. Foundation: repo scaffold, Supabase project, migrations pipeline, CI, auth + profile + City.
