@@ -1,6 +1,6 @@
-# MVP spec: local card trading app
+# MVP spec: Toploader
 
-Working title pending the partner's name pick; the app is never named or branded "Pokemon"-anything.
+The app is named Toploader, decided by the partner on ticket [#33](https://github.com/KyleKDang/pokemon/issues/33); it is never named or branded "Pokemon"-anything.
 This spec resolves wayfinder ticket [#10](https://github.com/KyleKDang/pokemon/issues/10) and is written so a fresh build effort can start from it alone.
 It builds on the [viability brief](viability-brief.md), the five research reports in [docs/research/](research/), the decisions in Founder Questionnaires [#1](https://github.com/KyleKDang/pokemon/issues/7) and [#2](https://github.com/KyleKDang/pokemon/issues/9), and the grilling session recorded on ticket #10.
 Domain vocabulary is defined in [CONTEXT.md](../CONTEXT.md); this spec uses those terms exactly.
@@ -11,7 +11,7 @@ Architectural decisions are recorded in [docs/adr/](adr/).
 An app that organizes safe, in-person Pokemon TCG trades for adult collector-investors, launched one City at a time.
 No money ever moves through the app.
 The heart of v1 is meetup coordination: propose a Trade, chat, agree a time at a Safe Spot.
-The differentiator is the Safety Program: Verified Traders, a Safe Spot directory, immutable Trade Records, and Reputation.
+The differentiator is the Safety Program, public-facing name **Verified Trading**: Verified Traders, a Safe Spot directory, immutable Trade Records, and Reputation.
 
 ## Locked constraints (decided upstream, not revisitable here)
 
@@ -201,6 +201,5 @@ Each step is independently usable and testable; the heart lands at step 6 becaus
 
 ## Open items
 
-- App name and Safety Program name: partner is mulling; neutral working title until then.
 - Launch City: ticket #11.
 - LLC and founder split: ticket #12.

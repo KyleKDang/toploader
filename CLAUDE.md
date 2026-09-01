@@ -1,4 +1,4 @@
-# Local Card Trading (working title pending the partner's name pick)
+# Toploader
 
 A city-by-city app for organizing safe, in-person Pokemon TCG trades between adult collectors.
 No money ever moves through the app.

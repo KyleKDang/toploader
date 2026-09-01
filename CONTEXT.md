@@ -1,4 +1,4 @@
-# Local Card Trading (working title pending partner's name pick)
+# Toploader
 
 The domain of an app that organizes safe, in-person Pokemon TCG trades for adult collectors, city by city.
 No money ever moves through the app.
@@ -88,7 +88,8 @@ _Avoid_: event, group meetup
 
 **Safety Program**:
 The named bundle of mechanics that replaces any guarantee language: Verified Traders, Safe Spots, Trade Records, and Reputation.
-Its public-facing name is chosen with the app name.
+Its public-facing name is **Verified Trading**, decided on ticket [#33](https://github.com/KyleKDang/pokemon/issues/33); "Safety Program" stays the internal term for the bundle.
+Verified Trading names the whole bundle, while a Verified Trader is one of the four mechanics inside it; the two are not interchangeable.
 _Avoid_: guarantee, protection plan
 
 **Reputation**:
