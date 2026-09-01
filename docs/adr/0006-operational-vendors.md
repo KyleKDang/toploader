@@ -23,7 +23,8 @@ That second path is not optional and was not previously written down anywhere: S
 Mail is sent from a **subdomain**, `mail.<domain>`, with SPF, DKIM and DMARC on that subdomain rather than the apex.
 This isolates trade-notification deliverability from anything the partner later sends from the apex, so a complaint rate on announcements can never sink a meetup-confirmed email.
 DMARC starts at `p=none` with reporting and tightens to `p=quarantine` once DKIM alignment is confirmed in the wild.
-The From address is `noreply@mail.<domain>`; the Reply-To is the support address, which is a [#36](https://github.com/KyleKDang/pokemon/issues/36) question.
+The From address is `noreply@mail.<domain>`; the Reply-To is the shared venture inbox created in [#32](https://github.com/KyleKDang/pokemon/issues/32), which [#36](https://github.com/KyleKDang/pokemon/issues/36) settled as the support address.
+That one inbox is also the contact address on the Terms of Service and Privacy Policy and the email on the DMCA registration, so a stranger who cannot log in, a copyright complaint, and a reply to a trade notification all arrive in the same place that both founders can read.
 
 ### Considered options
 
@@ -35,11 +36,14 @@ The From address is `noreply@mail.<domain>`; the Reply-To is the support address
 ## Error monitoring: Sentry, free Developer plan
 
 A failing trade RPC in production is currently invisible, which for the heart of the product is not acceptable at any price including free.
-Sentry's Developer plan is $0 forever at 5,000 errors/month and one dashboard user, which is enough for one City and one reviewing founder.
+Sentry's Developer plan is $0 forever at 5,000 errors/month and one dashboard user, which is enough for one City.
 Events past the cap are silently dropped rather than billed, so the free plan cannot generate a surprise invoice.
 Sentry covers the SPA and the edge functions; Postgres RPC failures surface as errors on the calling client, which is the seam that matters because it is where a Trader experiences them.
 
-The single-user limit is a real constraint worth stating: only one founder can triage in the dashboard, which lines up with the same founder holding admin rights in [ADR-0007](0007-admin-authorization.md), and is another decision that resolves once [#36](https://github.com/KyleKDang/pokemon/issues/36) names people.
+The single-user limit is a real constraint worth stating: only one founder can triage in the dashboard.
+This ADR first assumed that would be the same founder holding admin rights in [ADR-0007](0007-admin-authorization.md), and [#36](https://github.com/KyleKDang/pokemon/issues/36) broke that assumption: the founder reviewing IDs is the non-technical one, while Sentry reports production stack traces from the SPA and the edge functions.
+The seat is Kyle's.
+The two roles are unrelated, and pairing them was an artifact of not yet knowing who did what.
 
 ## Backups: self-managed, because the free tier has none
 

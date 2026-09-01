@@ -38,9 +38,27 @@ Both are therefore **edge functions**, which is precisely the boundary ADR-0001 
 
 Without this written down, both would be attempted as RPCs and fail late in the ticket.
 
+## Who the founders are
+
+Settled with the partner on [#36](https://github.com/KyleKDang/pokemon/issues/36).
+Both founders are seeded into `founders`; the review work is Tate's.
+
+- **Tate Nguyen** reviews verification requests, reads reports, and bans, and owns the support inbox, so the Trader who writes in and the Trader who gets banned are handled by the same person.
+- **Kyle Dang** holds the same rights and does not exercise them day to day.
+
+Both are seeded rather than the reviewer alone, because `approve_verification` rejects self-approval.
+A sole Founder could never become a Verified Trader, since the only account permitted to approve them would be their own, and this ADR already assumes both founders trade to seed liquidity in the launch City.
+Two rows also means neither verification nor moderation stops when one founder is unavailable.
+
+Admin rights and the error-monitoring seat come apart here, against what this ADR and [ADR-0006](0006-operational-vendors.md) first assumed.
+The reviewing founder is the non-technical one, and Sentry reports production stack traces, so that single seat is Kyle's.
+
+The seed migration names concrete `trader_id`s, so it can only run once both founders hold accounts on the deployed app.
+That ordering belongs to [#26](https://github.com/KyleKDang/pokemon/issues/26).
+
 ## Consequences
 
 - The spec's RPC list gains a note that ban and account deletion are edge functions, so the next reader does not try to write them in PL/pgSQL.
 - Admin rights are visible in git history and cannot be granted from inside the running app, including by a Founder.
-- Naming the founders is deferred to #36 and lands as a seed migration; until it lands, seam-1 fixtures seed their own Founder and the tests do not wait on the answer.
-- Sentry's free plan allows one dashboard user ([ADR-0006](0006-operational-vendors.md)), so the same #36 answer that names the reviewing founder should name the monitoring user.
+- The founders are named above and land as a seed migration owned by #26; seam-1 fixtures still seed their own Founder, so the tests never depend on who the real founders are.
+- Sentry's free plan allows one dashboard user ([ADR-0006](0006-operational-vendors.md)), and that seat is Kyle's rather than the reviewing founder's, for the reason given above.

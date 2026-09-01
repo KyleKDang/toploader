@@ -27,7 +27,7 @@ The differentiator is the Safety Program: Verified Traders, a Safe Spot director
 
 ### v1 (launch, one City)
 
-- Email auth, Trader profiles, City selection.
+- Email auth, Trader profiles, City selection, and a self-attested 18-or-over checkbox at signup.
 - Catalog of ~20k Cards with Variants, images, and daily Market Prices, synced into our own database ([ADR-0003](adr/0003-price-data-sources.md)).
 - Card search with autocomplete as the only card-entry mechanism (no scanning).
 - Collection, minimal: Copies owned (Variant + Condition + quantity), each with Market Price, plus a total-value line. No charts, no history view.
@@ -44,6 +44,7 @@ The differentiator is the Safety Program: Verified Traders, a Safe Spot director
 - Notifications: web push (Android/desktop), Add-to-Home-Screen onboarding step for iOS, email floor via a free transactional tier for new proposal / proposal accepted / meetup confirmed. Chat is push-only.
 - Moderation minimum: report Trader or Listing, block Trader, founder admin ban view, in-app account deletion.
 - PWA installability (manifest, service worker, offline shell).
+- Published Terms of Service and Privacy Policy, a DMCA designated agent, a CSAM reporting posture, and a support address a Trader who cannot log in can write to.
 
 ### v1.5 (trigger: first-city traction, or measured iOS notification pain)
 
@@ -70,7 +71,9 @@ The differentiator is the Safety Program: Verified Traders, a Safe Spot director
 
 ### Onboarding
 
-1. Sign up with email (Supabase Auth), set display name, pick City.
+1. Sign up with email (Supabase Auth), attest to being 18 or over, set display name, pick City.
+The attestation is a checkbox, not a date of birth: the product is scoped to adult collectors and the real age check is the founder ID review that gates proposals, so the checkbox exists to make an under-age signup the signer's misrepresentation rather than our collection, at no cost in signups.
+Settled on [#36](https://github.com/KyleKDang/pokemon/issues/36).
 2. Prompted (skippable) to install: Add-to-Home-Screen instructions on iOS ("install to get trade alerts"), browser install prompt elsewhere; push permission requested on that gesture.
 3. Landing view is Matches (empty state points to building Wants and Listings).
 
