@@ -15,6 +15,10 @@ _Avoid_: user, member, customer
 A Trader whose government ID and selfie have been checked and approved.
 _Avoid_: trusted user, KYC'd user
 
+**Founder**:
+A Trader who also holds administrative rights over the app: reviewing verification requests, reading reports, and banning.
+_Avoid_: admin, moderator, staff
+
 ### Cards and inventory
 
 **Card**:

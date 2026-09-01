@@ -105,6 +105,7 @@ The differentiator is the Safety Program: Verified Traders, a Safe Spot director
 1. Trader submits government ID photo + selfie to a private locked bucket.
 2. A founder reviews in the admin view and approves or rejects; Stripe Identity replaces this step at v1.5.
 3. On approval: `verified` status set, ID and selfie images deleted; we store only the boolean and timestamp, never documents.
+4. On rejection the images are deleted too, and the Trader re-submits fresh ones. Holding rejected strangers' government IDs is the largest avoidable data liability in the app, so no path stores a document past its review.
 
 ### Safety and moderation
 
@@ -117,15 +118,16 @@ The differentiator is the Safety Program: Verified Traders, a Safe Spot director
 ## Data model sketch
 
 Catalog tables (synced, read-only to clients): `cards`, `card_variants`, `price_snapshots` (daily, per variant; compacted per the runway plan in the delivery research).
-Trader tables: `traders` (profile, city_id, verified_at, ban status, denormalized reputation counters), `cities`, `push_subscriptions`.
+Trader tables: `traders` (profile, city_id, verified_at, `banned_at`, denormalized reputation counters), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
 Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (trader, variant, condition, photos, status: active / in_trade / traded / withdrawn; asking_price nullable), `wants` (trader, card, variant nullable, min_condition nullable).
 Matching: a SQL view joining active `listings` x `wants` within a City, plus a `match_events` table so notifications fire once per new pair.
 Trading: `trades` (proposer, recipient, status: proposed / accepted / scheduled / completed / cancelled / no_show, scheduled_at, safe_spot_id, completed_at), `trade_items` (trade, side, listing snapshot, cash_amount nullable), `messages` (trade, sender, body), `trade_feedback` (trade, from, to, thumb).
 Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks`.
 
 RLS posture: every table deny-by-default.
-Reads are policy-scoped (own rows for private tables; city-scoped for listings/matches; participants-only for trades/messages).
+Reads are policy-scoped (own rows for private tables; city-scoped for listings/matches; participants-only for trades/messages; all rows for a Founder, via additive policies calling `is_founder()`).
 All state changes go through named RPCs - `create_trade`, `counter_trade`, `accept_trade`, `schedule_meetup`, `complete_trade`, `cancel_trade`, `mark_no_show`, `leave_feedback`, `submit_verification`, `approve_verification` - or edge functions when side effects leave the database.
+Ban and account deletion are edge functions rather than RPCs, because both must write `auth.users` through the Auth admin API, which a function running as the calling Trader cannot reach ([ADR-0007](adr/0007-admin-authorization.md)).
 Every policy and RPC ships with a test proving what a foreign user cannot do.
 
 ## Architecture
@@ -134,9 +136,14 @@ Every policy and RPC ships with a test proving what a foreign user cannot do.
 - Frontend: Vite + React + TypeScript SPA, Tailwind, TanStack Query + TanStack Router, vite-plugin-pwa; deployed on Render free static hosting.
 - Languages: TypeScript everywhere plus SQL/PL/pgSQL; Python only if the pre-planned FastAPI-on-Fly escape hatch ever fires.
 - Price sync: scheduled function pulling TCGCSV daily (primary) with pokemontcg.io/TCGdex as catalog source and cross-check ([ADR-0003](adr/0003-price-data-sources.md)).
-- Notifications: web push via self-generated VAPID keys; email via a free transactional tier (e.g. Resend, 3k/month).
+- Notifications: web push via self-generated VAPID keys; email via Resend, which also serves as Supabase Auth's custom SMTP, sending from a `mail.` subdomain with SPF/DKIM/DMARC ([ADR-0006](adr/0006-operational-vendors.md)).
+- Domain and DNS: registered at Cloudflare Registrar with DNS hosted at Cloudflare, where the Render, Resend, and DMARC records all live ([ADR-0006](adr/0006-operational-vendors.md)).
+- Error monitoring: Sentry (free Developer plan), covering the SPA and the edge functions ([ADR-0006](adr/0006-operational-vendors.md)).
+- Backups and uptime: the Supabase free tier has no backups and pauses after 7 days of database inactivity, so a nightly GitHub Actions `pg_dump` job stores an encrypted dump and doubles as the keepalive ([ADR-0006](adr/0006-operational-vendors.md)).
+- Listing photos: resized and re-encoded to WebP client-side before upload (1600px long edge, plus a 400px thumbnail for browse and Matches), with the storage bucket's own file-size and MIME limits as the enforcement a client cannot bypass.
+- Search-engine visibility: the deployment is `noindex` from the first deploy until launch, since it is publicly reachable from build-sequence step 1 onward.
 - Migrations-as-code via the Supabase CLI; the full stack runs locally (`supabase start`) for validation.
-- Cost: $0/month at launch; first paid line is Supabase Pro ($25/month) only after real growth.
+- Cost: $0/month at launch; first paid line is Supabase Pro ($25/month) only after real growth. The named triggers that precede it are Resend's 100 emails/day, Sentry's 5,000 errors/month, and the 1 GB storage ceiling described under Listing photos.
 
 ## Notification matrix
 
