@@ -43,7 +43,7 @@ Build-sequence order is spec order; do not jump ahead.
 
 ### Issue tracker
 
-GitHub Issues on KyleKDang/pokemon via the `gh` CLI; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+GitHub Issues on KyleKDang/toploader via the `gh` CLI; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

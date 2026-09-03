@@ -1,8 +1,8 @@
 # Operational vendors, and self-managed backups on the free tier
 
-The spec named a vendor for hosting, the database, and price data, but left the operational surface unpinned: transactional email was "e.g. Resend", the registrar lived only in ticket [#34](https://github.com/KyleKDang/pokemon/issues/34)'s body, error monitoring did not exist anywhere, and nothing said what happens when the Supabase free tier loses the database.
+The spec named a vendor for hosting, the database, and price data, but left the operational surface unpinned: transactional email was "e.g. Resend", the registrar lived only in ticket [#34](https://github.com/KyleKDang/toploader/issues/34)'s body, error monitoring did not exist anywhere, and nothing said what happens when the Supabase free tier loses the database.
 This ADR pins all four, keeping the $0/month launch constraint of [ADR-0002](0002-web-first-pwa.md).
-Decided in the operational grilling on ticket [#35](https://github.com/KyleKDang/pokemon/issues/35).
+Decided in the operational grilling on ticket [#35](https://github.com/KyleKDang/toploader/issues/35).
 
 ## Registrar: Cloudflare Registrar
 
@@ -23,7 +23,7 @@ That second path is not optional and was not previously written down anywhere: S
 Mail is sent from a **subdomain**, `mail.<domain>`, with SPF, DKIM and DMARC on that subdomain rather than the apex.
 This isolates trade-notification deliverability from anything the partner later sends from the apex, so a complaint rate on announcements can never sink a meetup-confirmed email.
 DMARC starts at `p=none` with reporting and tightens to `p=quarantine` once DKIM alignment is confirmed in the wild.
-The From address is `noreply@mail.<domain>`; the Reply-To is the shared venture inbox created in [#32](https://github.com/KyleKDang/pokemon/issues/32), which [#36](https://github.com/KyleKDang/pokemon/issues/36) settled as the support address.
+The From address is `noreply@mail.<domain>`; the Reply-To is the shared venture inbox created in [#32](https://github.com/KyleKDang/toploader/issues/32), which [#36](https://github.com/KyleKDang/toploader/issues/36) settled as the support address.
 That one inbox is also the contact address on the Terms of Service and Privacy Policy and the email on the DMCA registration, so a stranger who cannot log in, a copyright complaint, and a reply to a trade notification all arrive in the same place that both founders can read.
 
 ### Considered options
@@ -41,7 +41,7 @@ Events past the cap are silently dropped rather than billed, so the free plan ca
 Sentry covers the SPA and the edge functions; Postgres RPC failures surface as errors on the calling client, which is the seam that matters because it is where a Trader experiences them.
 
 The single-user limit is a real constraint worth stating: only one founder can triage in the dashboard.
-This ADR first assumed that would be the same founder holding admin rights in [ADR-0007](0007-admin-authorization.md), and [#36](https://github.com/KyleKDang/pokemon/issues/36) broke that assumption: the founder reviewing IDs is the non-technical one, while Sentry reports production stack traces from the SPA and the edge functions.
+This ADR first assumed that would be the same founder holding admin rights in [ADR-0007](0007-admin-authorization.md), and [#36](https://github.com/KyleKDang/toploader/issues/36) broke that assumption: the founder reviewing IDs is the non-technical one, while Sentry reports production stack traces from the SPA and the edge functions.
 The seat is Kyle's.
 The two roles are unrelated, and pairing them was an artifact of not yet knowing who did what.
 

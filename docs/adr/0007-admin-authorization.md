@@ -1,8 +1,8 @@
 # A Founder is a row in a table only migrations can write
 
-Tickets [#26](https://github.com/KyleKDang/pokemon/issues/26) and [#28](https://github.com/KyleKDang/pokemon/issues/28) both assert that a non-founder cannot reach the founder admin view, and #26 ships a database-seam test for it, but the spec's `traders` table had no admin field and no document said how a founder is designated.
+Tickets [#26](https://github.com/KyleKDang/toploader/issues/26) and [#28](https://github.com/KyleKDang/toploader/issues/28) both assert that a non-founder cannot reach the founder admin view, and #26 ships a database-seam test for it, but the spec's `traders` table had no admin field and no document said how a founder is designated.
 This ADR defines the mechanism.
-Who the founders actually are is a person question and belongs to [#36](https://github.com/KyleKDang/pokemon/issues/36); this decision is written so that answer becomes a one-line seed migration.
+Who the founders actually are is a person question and belongs to [#36](https://github.com/KyleKDang/toploader/issues/36); this decision is written so that answer becomes a one-line seed migration.
 
 ## Designation
 
@@ -40,7 +40,7 @@ Without this written down, both would be attempted as RPCs and fail late in the 
 
 ## Who the founders are
 
-Settled with the partner on [#36](https://github.com/KyleKDang/pokemon/issues/36).
+Settled with the partner on [#36](https://github.com/KyleKDang/toploader/issues/36).
 Both founders are seeded into `founders`; the review work is Tate's.
 
 - **Tate Nguyen** reviews verification requests, reads reports, and bans, and owns the support inbox, so the Trader who writes in and the Trader who gets banned are handled by the same person.
@@ -54,7 +54,7 @@ Admin rights and the error-monitoring seat come apart here, against what this AD
 The reviewing founder is the non-technical one, and Sentry reports production stack traces, so that single seat is Kyle's.
 
 The seed migration names concrete `trader_id`s, so it can only run once both founders hold accounts on the deployed app.
-That ordering belongs to [#26](https://github.com/KyleKDang/pokemon/issues/26).
+That ordering belongs to [#26](https://github.com/KyleKDang/toploader/issues/26).
 
 ## Consequences
 

@@ -1,8 +1,8 @@
 # MVP spec: Toploader
 
-The app is named Toploader, decided by the partner on ticket [#33](https://github.com/KyleKDang/pokemon/issues/33); it is never named or branded "Pokemon"-anything.
-This spec resolves wayfinder ticket [#10](https://github.com/KyleKDang/pokemon/issues/10) and is written so a fresh build effort can start from it alone.
-It builds on the [viability brief](viability-brief.md), the five research reports in [docs/research/](research/), the decisions in Founder Questionnaires [#1](https://github.com/KyleKDang/pokemon/issues/7) and [#2](https://github.com/KyleKDang/pokemon/issues/9), and the grilling session recorded on ticket #10.
+The app is named Toploader, decided by the partner on ticket [#33](https://github.com/KyleKDang/toploader/issues/33); it is never named or branded "Pokemon"-anything.
+This spec resolves wayfinder ticket [#10](https://github.com/KyleKDang/toploader/issues/10) and is written so a fresh build effort can start from it alone.
+It builds on the [viability brief](viability-brief.md), the five research reports in [docs/research/](research/), the decisions in Founder Questionnaires [#1](https://github.com/KyleKDang/toploader/issues/7) and [#2](https://github.com/KyleKDang/toploader/issues/9), and the grilling session recorded on ticket #10.
 Domain vocabulary is defined in [CONTEXT.md](../CONTEXT.md); this spec uses those terms exactly.
 Architectural decisions are recorded in [docs/adr/](adr/).
 
@@ -20,8 +20,8 @@ The differentiator is the Safety Program, public-facing name **Verified Trading*
 - Scam-loss policy: no cash payouts, stated honestly - ban the scammer, give the victim their Trade Record, mark reputation publicly.
 - Neutral branding; "for Pokemon TCG collectors" only in descriptive text, plus a visible non-affiliation disclaimer.
 - Web-first PWA at $0/month; Expo/React Native + both stores at a named trigger ([ADR-0002](adr/0002-web-first-pwa.md)).
-- One launch City, chosen in ticket [#11](https://github.com/KyleKDang/pokemon/issues/11); pre-launch community is the partner's Discord.
-- Entity formation and founder split are ticket [#12](https://github.com/KyleKDang/pokemon/issues/12), not this spec.
+- One launch City, chosen in ticket [#11](https://github.com/KyleKDang/toploader/issues/11); pre-launch community is the partner's Discord.
+- Entity formation and founder split are ticket [#12](https://github.com/KyleKDang/toploader/issues/12), not this spec.
 
 ## Feature list and cut lines
 
@@ -73,7 +73,7 @@ The differentiator is the Safety Program, public-facing name **Verified Trading*
 
 1. Sign up with email (Supabase Auth), attest to being 18 or over, set display name, pick City.
 The attestation is a checkbox, not a date of birth: the product is scoped to adult collectors and the real age check is the founder ID review that gates proposals, so the checkbox exists to make an under-age signup the signer's misrepresentation rather than our collection, at no cost in signups.
-Settled on [#36](https://github.com/KyleKDang/pokemon/issues/36).
+Settled on [#36](https://github.com/KyleKDang/toploader/issues/36).
 2. Prompted (skippable) to install: Add-to-Home-Screen instructions on iOS ("install to get trade alerts"), browser install prompt elsewhere; push permission requested on that gesture.
 3. Landing view is Matches (empty state points to building Wants and Listings).
 
