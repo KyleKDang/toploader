@@ -128,10 +128,15 @@ These are tokens too, because the whole direction rests on them.
 | Token | Value | What |
 |---|---|---|
 | `--size-tap` | 56px | The minimum square for anything tappable |
-| `--size-btn` | 52px | Button and text field height |
+| `--size-btn` | 56px | Button and text field height |
 | `--size-chip` | 40px | Filter chip and segmented control height |
 | `--size-row` | 72px | Minimum list row height |
 | `--size-thumb` | 54px | Card thumbnail width; avatars are this square |
+
+`--size-btn` was 52px when this file was written, which contradicted the touch-target rule below, since a button is the most tappable thing in the app.
+Raised to 56px in [#40](https://github.com/KyleKDang/toploader/issues/40), the ticket that first had to build a button and could not satisfy both lines.
+The mockups draw 52px, and this file wins over a mockup by its own rule; 4px is invisible to the eye and the direction resolves tensions toward accessibility, which is the whole reason it is called Large Print.
+`--size-chip` stays at 40px because a chip is meant to read small: it gets its 56px by sitting inside a 56px box, per the touch-target rule.
 
 ### Tokens this file states in prose
 
@@ -221,9 +226,12 @@ Above 640px the content column is capped at 480px and centered, and that is the 
 
 **Touch targets.**
 Nothing tappable is smaller than `--size-tap`, 56px, in either dimension.
-That is above the 44px platform minimum on purpose.
-Where a control looks smaller - a chip, a checkbox - the hit area is padded out to 56px.
+That is above the 44px platform minimum on purpose, and it has no exceptions: a control that is tappable is 56px, including the ones the table above sizes for their looks.
+Where a control should *look* smaller - a chip, a checkbox - the visual sits inside a 56px box rather than the box shrinking to the visual.
 Two adjacent targets are at least 8px apart.
+
+The hit area cannot be padded out with an overflowing pseudo-element; that was tried in [#40](https://github.com/KyleKDang/toploader/issues/40) and does not extend hit-testing, with or without a stacking context.
+A 56px box around a smaller visual is the pattern that works.
 
 **Contrast.**
 WCAG AA is the floor, not the goal: 4.5:1 for text, 3:1 for large text and for non-text indicators like the alert dot and control borders.
