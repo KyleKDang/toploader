@@ -1,0 +1,77 @@
+/*
+ * Tailwind scans for class names itself by default, which sweeps up prose
+ * that only talks about classes - the design-tokens lint rule documents the
+ * arbitrary utilities it bans, and Tailwind was compiling them into the
+ * bundle. The sources are named explicitly instead.
+ */
+@import 'tailwindcss' source(none);
+@source '../../index.html';
+@source '../../src';
+
+@import './theme.css';
+@import './fonts.css';
+
+/*
+ * Base layer. Everything here is a token; see theme.css.
+ */
+@layer base {
+  :root {
+    /* Lets the browser paint form controls and scrollbars to match, which
+       it cannot infer from our own custom properties. */
+    color-scheme: light dark;
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Numbers line up in a column: prices, counts, stat figures. */
+  :where(
+    input[type='number'],
+    input[inputmode='decimal'],
+    input[inputmode='numeric'],
+    [data-numeric]
+  ) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus is always visible, and is never removed. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Icons inherit the line weight the mockups draw them at. */
+  svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+@layer utilities {
+  /* Prices, counts and any other figure that sits in a column. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

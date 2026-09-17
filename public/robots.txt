@@ -1,0 +1,4 @@
+# The deployment is publicly reachable from the first deploy and stays out of
+# search results until launch. Lifted in #30, not before.
+User-agent: *
+Disallow: /
