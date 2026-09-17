@@ -133,6 +133,22 @@ These are tokens too, because the whole direction rests on them.
 | `--size-row` | 72px | Minimum list row height |
 | `--size-thumb` | 54px | Card thumbnail width; avatars are this square |
 
+### Tokens this file states in prose
+
+Five values above are named in a sentence rather than a table, and the code needs a token name for each of them, because a component may not inline a value.
+They were added to the theme in [#40](https://github.com/KyleKDang/toploader/issues/40) and carry the values this file already gives them; none of them is a new decision.
+
+| Token | Value | Stated in |
+|---|---|---|
+| `--leading-body` | 1.35 | Type, "Body line height is 1.35" |
+| `--leading-prose` | 1.5 | Type, "Prose that runs longer than two lines uses 1.5" |
+| `--text-tab-icon` | 26px | Bottom tab bar, "a 26px icon over a 13px label" |
+| `--shadow-focus` | 3px accent glow at 18% | Text input, the focused state |
+| `--container-content` | 480px | Mobile first, "the content column is capped at 480px" |
+
+One token is renamed rather than added.
+Tailwind derives `rounded-*` from the suffix of a `--radius-*` name, so this file's `--radius` is `--radius-md` in the theme, and `--radius` remains as an alias.
+
 ## Primitives
 
 The components every screen composes from.

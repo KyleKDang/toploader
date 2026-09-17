@@ -35,17 +35,17 @@ type BottomTabBarProps = {
   active: TabKey;
   onSelect?: (tab: TabKey) => void;
   /** Tabs with something new. An alert dot rides the icon. */
-  unread?: readonly TabKey[];
+  unreadTabs?: readonly TabKey[];
   /** Tabs not yet reachable. Visibly inactive rather than broken. */
-  unavailable?: readonly TabKey[];
+  unavailableTabs?: readonly TabKey[];
   className?: string;
 };
 
 export function BottomTabBar({
   active,
   onSelect,
-  unread = [],
-  unavailable = [],
+  unreadTabs = [],
+  unavailableTabs = [],
   className,
 }: BottomTabBarProps) {
   return (
@@ -58,7 +58,7 @@ export function BottomTabBar({
     >
       {TABS.map(({ key, label, Icon }) => {
         const isActive = key === active;
-        const isUnavailable = unavailable.includes(key);
+        const isUnavailable = unavailableTabs.includes(key);
 
         return (
           <button
@@ -76,7 +76,7 @@ export function BottomTabBar({
           >
             <span className="relative text-tab-icon">
               <Icon />
-              {unread.includes(key) ? (
+              {unreadTabs.includes(key) ? (
                 <span
                   aria-hidden="true"
                   className="absolute -top-0.5 -right-1.5 size-3 rounded-full border-2 border-bg bg-alert"

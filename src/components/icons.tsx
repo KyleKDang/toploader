@@ -13,14 +13,14 @@ import type { SVGProps } from 'react';
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, 'viewBox' | 'children'>;
 
-function Icon({ size, ...props }: IconProps & { size?: string }) {
+function Icon(props: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
       focusable="false"
-      width={size ?? '1em'}
-      height={size ?? '1em'}
+      width="1em"
+      height="1em"
       {...props}
     />
   );
