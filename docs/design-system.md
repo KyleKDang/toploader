@@ -1,7 +1,7 @@
 # Toploader design system
 
 The design language every screen is built in.
-Decided in ticket [#39](https://github.com/KyleKDang/toploader/issues/39) before the first screen existed, so that the fifteen build tickets after [#13](https://github.com/KyleKDang/toploader/issues/13) copy something deliberate instead of copying whatever the scaffold happened to look like.
+Decided in ticket [#39](https://github.com/KyleKDang/toploader/issues/39) before the first screen existed, so that the build tickets after the foundation copy something deliberate instead of copying whatever the scaffold happened to look like.
 
 The token names in this file are the names the code uses.
 When a screen needs a color, a size, or a radius, it names a token; it does not write a hex code or a pixel value of its own.

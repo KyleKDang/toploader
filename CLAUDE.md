@@ -30,8 +30,8 @@ The repo is private, so GitHub cannot enforce this - hold it as convention anywa
 Docs, ADRs, and config one-liners go straight to `main`, as the research-findings convention already did.
 
 **Validation green.**
-Ticket #13 stands up the toolchain, so until it lands the following is intent rather than runnable commands: typecheck, lint/format check, `vitest` for the seam-1 and seam-2 suites against a running local stack (`supabase start`), the Playwright tracer, and the production build.
-Once `.github/workflows/ci.yml` exists it is the authority on all of it, and this section is rewritten to name the exact commands #13 landed.
+Ticket #40 stands up the toolchain and #42 lands CI, so until they land the following is intent rather than runnable commands: typecheck, lint/format check, `vitest` for the seam-1 and seam-2 suites against a running local stack (`supabase start`), the Playwright tracer, and the production build.
+Once `.github/workflows/ci.yml` exists it is the authority on all of it, and this section is rewritten to name the exact commands #42 landed.
 
 **Code review** means `mattpocock-skills:code-review`, named in full.
 The bare `code-review` is Claude Code's built-in, which fans out sub-agents at the session effort level and is not the review this flow asks for.
