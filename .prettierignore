@@ -1,0 +1,8 @@
+dist
+node_modules
+src/assets
+package-lock.json
+
+# Markdown in this repo is written one sentence per line, which Prettier's
+# prose wrapping would undo.
+*.md

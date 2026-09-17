@@ -11,3 +11,8 @@
 # Secrets
 .env
 .env.*
+
+# Node / Vite
+node_modules/
+dist/
+*.local

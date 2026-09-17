@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+
+    <!--
+      The deployment is publicly reachable from the first deploy, long before
+      launch. It stays out of search results until #30 says otherwise; the
+      robots.txt in public/ says the same thing to crawlers that never parse
+      this document.
+    -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!--
+      No icon yet. The app icon and the rest of the PWA manifest land with
+      installability in #29; this declares the absence so the browser stops
+      asking for a favicon that is not there.
+    -->
+    <link rel="icon" href="data:," />
+
+    <title>Toploader</title>
+    <meta
+      name="description"
+      content="Organize in-person trades with other Pokemon TCG collectors in your city."
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
