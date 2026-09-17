@@ -13,14 +13,10 @@ import { cx } from '../lib/cx';
  * `flex-1` below does - the parent decides the direction, the button just
  * fills its share of it.
  *
- * OPEN: the design system asks for two things that do not quite fit. A button
- * is --size-btn tall, 52px, which is what the control-size table and the
- * chosen mockups both say. Its touch-target rule then says nothing tappable
- * is smaller than --size-tap, 56px, in either dimension. The table wins here
- * because it is the more specific statement and it is what the approved
- * mockups show, and 52px still clears the 44px platform minimum. The
- * contradiction itself belongs in docs/design-system.md rather than in a
- * comment, and should be settled there before #13 places real buttons.
+ * --size-btn and --size-tap are both 56px, so a button needs nothing extra to
+ * clear the touch-target floor. They used to differ by 4px, which no button
+ * could satisfy both of; the design system was corrected rather than worked
+ * around, in #40.
  */
 
 type ButtonProps = {
