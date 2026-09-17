@@ -9,19 +9,29 @@
  */
 
 @theme {
-  /* Color - light palette. The dark palette redefines these same names
-     below, so nothing downstream ever branches on theme. */
-  --color-bg: #ffffff;
-  --color-surface: #f4f4f5;
-  --color-surface-2: #eaeaec;
-  --color-ink: #111111;
-  --color-muted: #4a4f57;
-  --color-line: #c8ccd2;
-  --color-accent: #1b7a4a;
-  --color-accent-ink: #ffffff;
-  --color-alert: #d4552b;
-  --color-ok-ink: #0b5d33;
-  --color-ok-bg: #ddf2e5;
+  /*
+   * Color. Each token carries both palettes in one declaration, light first,
+   * and light-dark() picks between them from the element's color-scheme -
+   * which follows the system by default and is pinned by data-theme on the
+   * root element (see global.css).
+   *
+   * Dark mode is not a later enhancement: a Trader standing in a card shop at
+   * night is the case the whole direction was chosen for. Holding both values
+   * on one line is what makes that true - there is no second block of eleven
+   * tokens free to drift from this one, and no component ever branches on
+   * theme, because the name it asks for is the same name in both palettes.
+   */
+  --color-bg: light-dark(#ffffff, #0b0b0c);
+  --color-surface: light-dark(#f4f4f5, #1a1a1d);
+  --color-surface-2: light-dark(#eaeaec, #242428);
+  --color-ink: light-dark(#111111, #ffffff);
+  --color-muted: light-dark(#4a4f57, #b8bcc4);
+  --color-line: light-dark(#c8ccd2, #3c3f46);
+  --color-accent: light-dark(#1b7a4a, #4cc38a);
+  --color-accent-ink: light-dark(#ffffff, #08170f);
+  --color-alert: light-dark(#d4552b, #ff8a5e);
+  --color-ok-ink: light-dark(#0b5d33, #7fe0a8);
+  --color-ok-bg: light-dark(#ddf2e5, #123a25);
 
   /* Type. Atkinson Hyperlegible is self-hosted; see fonts.css for why.
      13px is the floor; nothing in the app is smaller. */
@@ -101,42 +111,4 @@
      what `rounded-md` compiles from and this alias keeps the contract's
      own name available. */
   --radius: var(--radius-md);
-}
-
-/*
- * Dark mode. The same token names, different values - a Trader standing in
- * a card shop at night is the case the whole direction was chosen for, so
- * this is not a later enhancement.
- *
- * Follows the system by default and can be pinned either way with
- * data-theme on the root element.
- */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --color-bg: #0b0b0c;
-    --color-surface: #1a1a1d;
-    --color-surface-2: #242428;
-    --color-ink: #ffffff;
-    --color-muted: #b8bcc4;
-    --color-line: #3c3f46;
-    --color-accent: #4cc38a;
-    --color-accent-ink: #08170f;
-    --color-alert: #ff8a5e;
-    --color-ok-ink: #7fe0a8;
-    --color-ok-bg: #123a25;
-  }
-}
-
-:root[data-theme='dark'] {
-  --color-bg: #0b0b0c;
-  --color-surface: #1a1a1d;
-  --color-surface-2: #242428;
-  --color-ink: #ffffff;
-  --color-muted: #b8bcc4;
-  --color-line: #3c3f46;
-  --color-accent: #4cc38a;
-  --color-accent-ink: #08170f;
-  --color-alert: #ff8a5e;
-  --color-ok-ink: #7fe0a8;
-  --color-ok-bg: #123a25;
 }

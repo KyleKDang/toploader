@@ -131,9 +131,7 @@ export function App() {
       />
 
       <SectionHeading>Non-affiliation disclaimer</SectionHeading>
-      <div className="p-4">
-        <Disclaimer className="border-t-0 px-0 pt-0" />
-      </div>
+      <Disclaimer />
     </AppShell>
   );
 }

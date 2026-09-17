@@ -17,15 +17,22 @@
 /** A hex color: #fff, #ffff, #ffffff, #ffffffff. */
 const HEX_COLOR = /#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b/i;
 
+/** A bare CSS length, which is what makes any of the below a raw value. */
+const LENGTH = String.raw`\d*\.?\d+(?:px|pt|em|rem)`;
+
+/** The same, where a percentage is also a legal way to write it. */
+const LENGTH_OR_PCT = String.raw`\d*\.?\d+(?:px|pt|em|rem|%)`;
+
 /**
- * A px font size, in either notation the codebase can express one:
- * a CSS declaration (`font-size: 15px`), a style-object key (`fontSize`
- * followed by a px string), or a Tailwind arbitrary type utility
- * (`text-[15px]`, `text-[0.9rem]`).
+ * A px font size, in either notation a string can express one: a CSS
+ * declaration (`font-size: 15px`) or a Tailwind arbitrary type utility
+ * (`text-[15px]`, `text-[0.9rem]`). The style-object form (`fontSize:
+ * '15px'`) is not a string at all - it is a property whose key names the
+ * offence - so STYLE_PROPERTIES below catches that one.
  */
 const PX_FONT_SIZE = [
-  /font-size\s*:\s*[^;]*\b\d*\.?\d+(?:px|pt|em|rem)/i,
-  /\btext-\[[^\]]*\b\d*\.?\d+(?:px|pt|em|rem)/i,
+  new RegExp(String.raw`font-size\s*:\s*[^;]*\b${LENGTH}`, 'i'),
+  new RegExp(String.raw`\btext-\[[^\]]*\b${LENGTH}`, 'i'),
 ];
 
 /**
@@ -33,9 +40,29 @@ const PX_FONT_SIZE = [
  * utility (`rounded-[10px]`, `rounded-t-[6px]`).
  */
 const HARDCODED_RADIUS = [
-  /border-radius\s*:\s*[^;]*\b\d*\.?\d+(?:px|pt|em|rem|%)/i,
-  /\brounded(?:-[a-z]{1,2})?-\[[^\]]*\b\d*\.?\d+(?:px|pt|em|rem|%)/i,
+  new RegExp(String.raw`border-radius\s*:\s*[^;]*\b${LENGTH_OR_PCT}`, 'i'),
+  new RegExp(
+    String.raw`\brounded(?:-[a-z]{1,2})?-\[[^\]]*\b${LENGTH_OR_PCT}`,
+    'i',
+  ),
 ];
+
+/**
+ * Style-object keys that carry the same three offences as a class string.
+ * `style={{ fontSize: '15px' }}` never produces a string the checks above
+ * would see, so the property itself is what gets inspected.
+ */
+const STYLE_PROPERTIES = new Map([
+  ['fontSize', 'pxFontSize'],
+  ['borderRadius', 'hardcodedRadius'],
+  ['borderTopLeftRadius', 'hardcodedRadius'],
+  ['borderTopRightRadius', 'hardcodedRadius'],
+  ['borderBottomLeftRadius', 'hardcodedRadius'],
+  ['borderBottomRightRadius', 'hardcodedRadius'],
+]);
+
+/** Any length or percentage sitting in a style-object value. */
+const RAW_LENGTH_VALUE = new RegExp(String.raw`\b${LENGTH_OR_PCT}`, 'i');
 
 const CHECKS = [
   { test: (text) => HEX_COLOR.test(text), messageId: 'hexColor' },
@@ -99,6 +126,34 @@ const noRawValues = {
       },
       JSXText(node) {
         check(node, node.value);
+      },
+
+      /*
+       * `style={{ fontSize: '15px' }}`. The value '15px' on its own says
+       * nothing - plenty of legitimate strings hold a length - so it is the
+       * key that decides whether this is a font size or a radius, and the
+       * value only has to prove it is raw rather than a var() reference.
+       */
+      Property(node) {
+        const key =
+          node.key.type === 'Identifier'
+            ? node.key.name
+            : node.key.type === 'Literal'
+              ? String(node.key.value)
+              : null;
+
+        const messageId = key && STYLE_PROPERTIES.get(key);
+        if (!messageId) return;
+
+        const { value } = node;
+        if (value.type !== 'Literal' || typeof value.value !== 'string') return;
+        if (!RAW_LENGTH_VALUE.test(value.value)) return;
+
+        context.report({
+          node: value,
+          messageId,
+          data: { value: `${key}: '${value.value}'` },
+        });
       },
     };
   },

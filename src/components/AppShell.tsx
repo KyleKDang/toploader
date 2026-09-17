@@ -47,8 +47,8 @@ export function AppShell({
         <BottomTabBar
           active={tab}
           onSelect={onSelectTab}
-          unread={unreadTabs}
-          unavailable={unavailableTabs}
+          unreadTabs={unreadTabs}
+          unavailableTabs={unavailableTabs}
         />
       </div>
     </div>

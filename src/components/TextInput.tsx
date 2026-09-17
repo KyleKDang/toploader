@@ -10,6 +10,12 @@ import { cx } from '../lib/cx';
  * lives on the wrapper via focus-within, so the icon and the field light up
  * together the way the mockups draw them.
  *
+ * The 2px accent outline at 2px offset rides the wrapper for the same reason.
+ * Focus styles are never removed, so the inner input drops its own outline
+ * only because the control it sits inside has taken it over - otherwise the
+ * ring would be drawn inside the field's border, against the fill rather
+ * than the page.
+ *
  * Every input has a visible label, or an aria-label where the placeholder is
  * unambiguous as in the Catalog search. The `label` prop takes the first
  * route and `aria-label` the second; one of them is required by the type.
@@ -46,6 +52,7 @@ export function TextInput({
         className={cx(
           'flex min-h-btn items-center gap-2.5 rounded-md border-2 border-line bg-surface px-3.5',
           'focus-within:border-accent focus-within:shadow-focus',
+          'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
         )}
       >
         {icon ? <span className="text-muted">{icon}</span> : null}

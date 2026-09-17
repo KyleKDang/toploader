@@ -78,7 +78,7 @@ export function ListRow({
             {title}
           </span>
           {trailing ? (
-            <span className="tabular shrink-0 whitespace-nowrap font-bold text-ink">
+            <span className="shrink-0 whitespace-nowrap font-bold text-ink">
               {trailing}
             </span>
           ) : null}

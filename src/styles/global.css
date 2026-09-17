@@ -41,15 +41,13 @@
     font-size: var(--text-base);
     line-height: var(--leading-body);
     -webkit-font-smoothing: antialiased;
-  }
 
-  /* Numbers line up in a column: prices, counts, stat figures. */
-  :where(
-    input[type='number'],
-    input[inputmode='decimal'],
-    input[inputmode='numeric'],
-    [data-numeric]
-  ) {
+    /*
+     * Tabular numerals are on for numbers everywhere, not opt-in per figure:
+     * a column of prices only lines up if nothing has to remember to ask.
+     * Prices, Trade counts, collector numbers and stat figures all inherit
+     * it, and the design system names no case that wants proportional ones.
+     */
     font-variant-numeric: tabular-nums;
   }
 
@@ -66,12 +64,5 @@
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
-  }
-}
-
-@layer utilities {
-  /* Prices, counts and any other figure that sits in a column. */
-  .tabular {
-    font-variant-numeric: tabular-nums;
   }
 }
