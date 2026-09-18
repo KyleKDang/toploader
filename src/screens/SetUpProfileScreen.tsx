@@ -16,7 +16,7 @@ import { supabase } from '../lib/supabase';
 
 /*
  * Setting up the profile: the display name other Traders see and the City
- * the Trader trades in.
+ * the Trader trades in, which this screen calls their area (CONTEXT.md).
  *
  * Both go through `set_trader_profile` in one call, the write path #41
  * established; clients never write the profile tables directly (ADR-0001).
@@ -62,7 +62,7 @@ export function SetUpProfileScreen() {
         <form className="flex grow flex-col gap-4 p-4" onSubmit={onSubmit}>
           <TextInput
             label="Display name"
-            placeholder="How other Traders see you"
+            hint="Your first name and last initial works well. Other traders see this; it doesn't need to be unique."
             autoComplete="nickname"
             maxLength={40}
             required
@@ -71,13 +71,14 @@ export function SetUpProfileScreen() {
           />
 
           <Select
-            label="City"
+            label="Area"
+            hint="Your matches and listings stay in your area."
             required
             value={cityId}
             onChange={(event) => setCityId(event.target.value)}
           >
             <option value="" disabled>
-              Choose your City
+              Choose your area
             </option>
             {cities.map((city) => (
               <option key={city.id} value={city.id}>
@@ -85,9 +86,6 @@ export function SetUpProfileScreen() {
               </option>
             ))}
           </Select>
-          <p className="text-sm leading-prose text-muted">
-            Your Matches and Listings stay inside your City.
-          </p>
 
           <FormError error={saveProfile.error} />
           <div className="flex">

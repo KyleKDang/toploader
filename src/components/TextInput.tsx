@@ -19,6 +19,10 @@ import { cx } from '../lib/cx';
  * Every input has a visible label, or an aria-label where the placeholder is
  * unambiguous as in the Catalog search. The `label` prop takes the first
  * route and `aria-label` the second; one of them is required by the type.
+ *
+ * Guidance a Trader needs while typing goes in `hint`, a muted line under the
+ * field tied to it by aria-describedby, never in the placeholder alone: a
+ * placeholder is gone after the first keystroke.
  */
 
 type Base = Omit<InputHTMLAttributes<HTMLInputElement>, 'className' | 'id'>;
@@ -26,6 +30,8 @@ type Base = Omit<InputHTMLAttributes<HTMLInputElement>, 'className' | 'id'>;
 type TextInputProps = Base & {
   /** Optional leading icon inside the field, e.g. the Catalog search glass. */
   icon?: ReactNode;
+  /** Optional guidance under the field, visible while typing. */
+  hint?: string;
   className?: string;
 } & (
     | { label: string; 'aria-label'?: never }
@@ -35,10 +41,12 @@ type TextInputProps = Base & {
 export function TextInput({
   label,
   icon,
+  hint,
   className,
   ...props
 }: TextInputProps) {
   const id = useId();
+  const hintId = `${id}-hint`;
 
   return (
     <div className={cx('flex flex-col gap-1.5', className)}>
@@ -58,10 +66,17 @@ export function TextInput({
         {icon ? <span className="text-muted">{icon}</span> : null}
         <input
           id={id}
+          aria-describedby={hint ? hintId : undefined}
           className="min-w-0 grow self-stretch bg-transparent text-base text-ink outline-none placeholder:text-muted"
           {...props}
         />
       </div>
+
+      {hint ? (
+        <p id={hintId} className="text-sm leading-prose text-muted">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }

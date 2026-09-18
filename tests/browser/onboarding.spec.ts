@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 
 /*
  * The Onboarding flow, end to end at 375px: attest to being 18 or over, sign
- * up with email, set a display name, pick the City, land on Matches.
+ * up with email, set a display name, pick the area, land on Matches.
  *
  * Wiring only. That the attestation is required and that a Trader can only
  * set their own profile are proven at seam 1 (tests/db/traders.test.ts).
@@ -24,11 +24,11 @@ test('a new Trader signs up, sets up their profile in Orange County, and lands o
 
   await expect(page).toHaveURL(/\/set-up-profile$/);
   await page.getByLabel('Display name').fill('Priya R.');
-  await page.getByLabel('City').selectOption({ label: 'Orange County' });
+  await page.getByLabel('Area').selectOption({ label: 'Orange County' });
   await page.getByRole('button', { name: 'Start trading' }).click();
 
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText('No Matches in Orange County yet')).toBeVisible();
+  await expect(page.getByText('No matches in Orange County yet')).toBeVisible();
 
   const tabs = page.getByRole('navigation', { name: 'Sections' });
   await expect(tabs.getByRole('button', { name: 'Matches' })).toBeEnabled();

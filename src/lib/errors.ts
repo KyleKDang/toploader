@@ -19,7 +19,7 @@ const MESSAGES: Record<string, string> = {
   email_address_invalid: 'That email address does not look right.',
   validation_failed: 'That email address does not look right.',
   // Postgres error codes raised by set_trader_profile.
-  '23502': 'Add a display name and choose your City.',
+  '23502': 'Add a display name and choose your area.',
 };
 
 const FALLBACK = 'Something went wrong. Check your connection and try again.';
