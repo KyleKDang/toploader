@@ -1,27 +1,14 @@
-import { execFileSync } from 'node:child_process';
 import { defineConfig, devices } from '@playwright/test';
+import { readLocalStackStatus } from './tests/local-stack.ts';
 
 /*
  * Seam 3: the browser, kept thin. One happy-path tracer per primary flow,
  * proving wiring only; the business rules under it are proven at seam 1.
  *
- * Like the seam-1 suite, this reads the API URL and publishable key from the
- * running local stack rather than from env files, so the app under test can
- * only ever talk to `supabase start`, never a hosted project.
+ * Like the seam-1 suite, the app under test is pointed at the running local
+ * stack, so it can only ever talk to `supabase start`, never a hosted project.
  */
-let status: { API_URL: string; PUBLISHABLE_KEY: string; MAILPIT_URL: string };
-try {
-  status = JSON.parse(
-    execFileSync('npx', ['supabase', 'status', '-o', 'json'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }),
-  ) as typeof status;
-} catch {
-  throw new Error(
-    'The local Supabase stack is not running. Start it with `npx supabase start`.',
-  );
-}
+const status = readLocalStackStatus();
 
 // Read by the tracer to fetch the sign-in code the local stack emailed.
 process.env.MAILPIT_URL = status.MAILPIT_URL;

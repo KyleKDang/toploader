@@ -5,6 +5,7 @@ import { useNavigate } from '@tanstack/react-router';
 import {
   AppShell,
   Button,
+  Checkbox,
   Disclaimer,
   FormError,
   TextInput,
@@ -19,11 +20,18 @@ import { supabase } from '../lib/supabase';
  * The code is typed rather than a link clicked. On iOS a link in an email
  * opens in Safari, not in the app installed to the home screen, which keeps
  * its own storage, so a link would sign the Trader in where they are not.
+ *
+ * The 18-or-over attestation is required before a code is sent, because
+ * sending one creates the account: attesting first makes an under-age
+ * signup the signer's misrepresentation rather than our collection of their
+ * email (#36). Every route to a session passes through this box, which is
+ * what lets setting up the profile record the attestation.
  */
 
 export function SignUpScreen() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
+  const [attestsAdult, setAttestsAdult] = useState(false);
   const [code, setCode] = useState('');
   const [codeSentTo, setCodeSentTo] = useState<string | null>(null);
 
@@ -66,7 +74,7 @@ export function SignUpScreen() {
       <div className="flex min-h-full flex-col">
         <div className="flex grow flex-col gap-5 p-4">
           <p className="text-base leading-prose text-ink">
-            In-person trades between Pokemon TCG collectors in your City.
+            In-person trading for Pokemon TCG collectors, in your City.
           </p>
 
           {codeSentTo === null ? (
@@ -83,6 +91,12 @@ export function SignUpScreen() {
                 New or returning, we email you a 6-digit code. There is no
                 password.
               </p>
+              <Checkbox
+                label="I am 18 or over"
+                required
+                checked={attestsAdult}
+                onChange={(event) => setAttestsAdult(event.target.checked)}
+              />
               <FormError error={sendCode.error} />
               <div className="flex">
                 <Button

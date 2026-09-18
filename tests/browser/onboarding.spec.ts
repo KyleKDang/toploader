@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
 /*
- * The Onboarding flow, end to end at 375px: sign up with email, attest to
- * being 18 or over, set a display name, pick the City, land on Matches.
+ * The Onboarding flow, end to end at 375px: attest to being 18 or over, sign
+ * up with email, set a display name, pick the City, land on Matches.
  *
  * Wiring only. That the attestation is required and that a Trader can only
  * set their own profile are proven at seam 1 (tests/db/traders.test.ts).
@@ -17,6 +17,7 @@ test('a new Trader signs up, sets up their profile in Orange County, and lands o
   await expect(page).toHaveURL(/\/sign-up$/);
 
   await page.getByLabel('Email').fill(email);
+  await page.getByLabel('I am 18 or over').check();
   await page.getByRole('button', { name: 'Email me a code' }).click();
   await page.getByLabel('6-digit code').fill(await readSignInCode(email));
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -24,7 +25,6 @@ test('a new Trader signs up, sets up their profile in Orange County, and lands o
   await expect(page).toHaveURL(/\/set-up-profile$/);
   await page.getByLabel('Display name').fill('Priya R.');
   await page.getByLabel('City').selectOption({ label: 'Orange County' });
-  await page.getByLabel('I am 18 or over').check();
   await page.getByRole('button', { name: 'Start trading' }).click();
 
   await expect(page).toHaveURL(/\/$/);
@@ -44,7 +44,10 @@ test('a new Trader signs up, sets up their profile in Orange County, and lands o
  */
 async function readSignInCode(email: string): Promise<string> {
   const mailpit = process.env.MAILPIT_URL;
-  if (!mailpit) throw new Error('MAILPIT_URL is set by playwright.config.ts');
+  if (!mailpit)
+    throw new Error(
+      'MAILPIT_URL is missing; run this through playwright.config.ts',
+    );
 
   const deadline = Date.now() + 10_000;
   for (;;) {

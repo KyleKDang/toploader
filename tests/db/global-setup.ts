@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { TestProject } from 'vitest/node';
+import { readLocalStackStatus } from '../local-stack.ts';
 
 /*
  * Reads the API URL and publishable key from the running local stack rather
@@ -9,19 +9,7 @@ import type { TestProject } from 'vitest/node';
  * never a hosted project.
  */
 export default async function setup(project: TestProject) {
-  let status: { API_URL: string; PUBLISHABLE_KEY: string };
-  try {
-    status = JSON.parse(
-      execFileSync('npx', ['supabase', 'status', '-o', 'json'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }),
-    ) as typeof status;
-  } catch {
-    throw new Error(
-      'The local Supabase stack is not running. Start it with `npx supabase start`.',
-    );
-  }
+  const status = readLocalStackStatus();
   await waitForSignedInReads(status.API_URL, status.PUBLISHABLE_KEY);
   project.provide('supabaseUrl', status.API_URL);
   project.provide('supabasePublishableKey', status.PUBLISHABLE_KEY);

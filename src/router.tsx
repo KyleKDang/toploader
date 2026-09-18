@@ -25,6 +25,14 @@ import { SignUpScreen } from './screens/SignUpScreen';
 
 type RouterContext = { queryClient: QueryClient };
 
+/** The signed-in Trader, or a redirect to sign up when nobody is. */
+async function loadSignedInTrader(queryClient: QueryClient) {
+  const traderId = await currentTraderId();
+  if (!traderId) throw redirect({ to: '/sign-up' });
+  const trader = await queryClient.ensureQueryData(traderQuery(traderId));
+  return { traderId, trader };
+}
+
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: Outlet,
 });
@@ -38,26 +46,22 @@ const signUpRoute = createRoute({
   component: SignUpScreen,
 });
 
-export const setUpProfileRoute = createRoute({
+const setUpProfileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/set-up-profile',
   loader: async ({ context: { queryClient } }) => {
-    const traderId = await currentTraderId();
-    if (!traderId) throw redirect({ to: '/sign-up' });
-    const trader = await queryClient.ensureQueryData(traderQuery(traderId));
+    const { traderId, trader } = await loadSignedInTrader(queryClient);
     if (hasProfile(trader)) throw redirect({ to: '/' });
     return { traderId, cities: await queryClient.ensureQueryData(citiesQuery) };
   },
   component: SetUpProfileScreen,
 });
 
-export const matchesRoute = createRoute({
+const matchesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   loader: async ({ context: { queryClient } }) => {
-    const traderId = await currentTraderId();
-    if (!traderId) throw redirect({ to: '/sign-up' });
-    const trader = await queryClient.ensureQueryData(traderQuery(traderId));
+    const { trader } = await loadSignedInTrader(queryClient);
     if (!hasProfile(trader)) throw redirect({ to: '/set-up-profile' });
     return { trader };
   },
