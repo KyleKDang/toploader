@@ -22,7 +22,7 @@ import { ChevronDownIcon } from './icons';
 
 type SelectProps = Omit<
   SelectHTMLAttributes<HTMLSelectElement>,
-  'className' | 'id'
+  'className' | 'id' | 'aria-describedby'
 > & {
   /** Always visible above the field. */
   label: string;

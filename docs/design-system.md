@@ -170,6 +170,9 @@ There is no ghost or text-only button: everything tappable has a visible edge.
 `--size-btn` tall, `--radius`, `--color-surface` fill, 2px border.
 Focused, the border is `--color-accent` with a 3px accent glow at 18% opacity.
 Every input has a visible label or, where the placeholder is unambiguous as in the Catalog search, an `aria-label`.
+Guidance a Trader needs while filling the field goes in a hint: a `--text-sm` `--color-muted` line under the field, tied to it with `aria-describedby`.
+A placeholder is never the only guidance, because it is gone after the first keystroke.
+A select is drawn the same way and takes a hint the same way.
 
 **Search picker.**
 A text input with a results panel below it: `--shadow-popover`, `--radius`, `--color-surface` fill, rows at 90% of `--size-row`.
@@ -259,5 +262,6 @@ Safety Program surfaces name mechanics and what each one does, never a promise: 
 
 **Vocabulary.**
 User-visible strings name the concepts in [CONTEXT.md](../CONTEXT.md), but in ordinary words and ordinary case, per its Glossary and UI copy rule.
-A running sentence lowercases them ("other traders see this", "your matches and listings"); titles, tabs and chips keep title case ("Matches", "3 Trades").
+A running sentence lowercases them ("other traders see this", "your matches and listings"), and so does a heading written as a sentence ("No matches in Orange County yet").
+Labels keep title case: screen titles, tabs and chips ("Matches", "3 Trades").
 Where the on-screen word differs from the glossary term, the term's entry in CONTEXT.md says so: City is "Area" on screen.
