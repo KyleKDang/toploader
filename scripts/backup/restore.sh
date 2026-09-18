@@ -12,8 +12,7 @@
 #   cp <dir>/gotrue-version <dir>/storage-version supabase/.temp/
 #
 # The nightly job does exactly that in a throwaway stack. A real recovery
-# builds a new project's schema with `supabase db push`, then loads roles.sql
-# and data.sql the same way with psql.
+# into a new hosted project is in docs/operations.md.
 #
 # It refuses a backup taken at a different migration than the target: the
 # data only fits the schema it was dumped from.
@@ -22,9 +21,10 @@ set -euo pipefail
 dir=${1:?usage: restore.sh <dir>}
 container=${RESTORE_DB_CONTAINER:-supabase_db_toploader}
 
-# The superuser, since the auth and storage tables belong to their services'
-# own roles, which `postgres` cannot empty or write.
-psql() {
+# psql inside the target's container, as the superuser, since the auth and
+# storage tables belong to their services' own roles, which `postgres` cannot
+# empty or write.
+target_psql() {
   docker exec -i "$container" \
     psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -X -q "$@"
 }
@@ -37,15 +37,18 @@ copy_counts() {
 }
 
 backup_migrations=$(awk '
-  /^COPY / { inside = 1; next } /^\\\.$/ { inside = 0 }
+  /^COPY "supabase_migrations"\."schema_migrations" / { inside = 1; next }
+  /^\\\.$/ { inside = 0 }
   inside { print $1 }' "$dir/migrations.sql" | sort)
-target_migrations=$(psql -At -c \
+target_migrations=$(target_psql -At -c \
   'select version from supabase_migrations.schema_migrations order by 1')
 if [[ "$backup_migrations" != "$target_migrations" ]]; then
   echo "The backup was taken at different migrations than the target has." >&2
   diff <(echo "$backup_migrations") <(echo "$target_migrations") >&2 || true
   exit 1
 fi
+
+target_psql --single-transaction <"$dir/roles.sql" >/dev/null
 
 # Replace, not merge: migrations seed rows too (the Cities), so every dumped
 # table is emptied first, in the same transaction that loads it.
@@ -54,10 +57,10 @@ tables=$(cut -d' ' -f1 <<<"$expected" | paste -sd, -)
 {
   echo "truncate $tables cascade;"
   cat "$dir/data.sql"
-} | psql --single-transaction >/dev/null
+} | target_psql --single-transaction >/dev/null
 
 actual=$(while read -r table _; do
-  echo "$table $(psql -At -c "select count(*) from $table" </dev/null)"
+  echo "$table $(target_psql -At -c "select count(*) from $table" </dev/null)"
 done <<<"$expected")
 if [[ "$expected" != "$actual" ]]; then
   echo "Restored row counts differ from the backup's." >&2
