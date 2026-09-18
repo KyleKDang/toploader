@@ -7,8 +7,8 @@ import { messageForTrader } from '../lib/errors';
  * What a Trader sees when a route fails to load, in place of the router's
  * default screen and its "Show Error" button that dumps the raw exception.
  *
- * The raw error is never shown. The router's `defaultOnCatch` already sends
- * it to Sentry, so this screen reports nothing itself.
+ * The raw error is never shown. React's root `onCaughtError` already sends
+ * it to Sentry (src/lib/sentry.ts), so this screen reports nothing itself.
  *
  * Trying again invalidates the router, which re-runs the failed route's
  * loader and resets this boundary, so a transient failure recovers in place

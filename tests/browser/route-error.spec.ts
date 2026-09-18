@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
+import { messageForTrader } from '../../src/lib/errors.ts';
 
 /*
  * A route that fails to load, end to end at 375px: the Trader sees the app's
  * error screen rather than the router's default, the failure reaches Sentry
  * exactly once, and trying again recovers without reloading the page.
  *
- * Wiring only. What the screen says is `messageForTrader`'s concern.
+ * Wiring only. What the screen says is `messageForTrader`'s concern, so the
+ * tracer checks only that its generic line is the one shown.
  *
  * The failure is a stored session whose `user` is null, the one #42 used to
  * prove Sentry on the live site: `currentTraderId` throws reading its id.
@@ -16,6 +18,7 @@ import { expect, test } from '@playwright/test';
 test('a route that fails to load shows the app error screen, reports once, and recovers on retry', async ({
   page,
 }) => {
+  const key = authStorageKey();
   const errorEvents: string[] = [];
   await page.route(/\/api\/1\/envelope\//, async (route) => {
     for (const line of (route.request().postData() ?? '').split('\n')) {
@@ -27,14 +30,12 @@ test('a route that fails to load shows the app error screen, reports once, and r
   await page.goto('/sign-up');
   await page.evaluate(
     ([key, session]) => localStorage.setItem(key, session),
-    [authStorageKey(), JSON.stringify(sessionWithoutUser())],
+    [key, JSON.stringify(sessionWithoutUser())],
   );
   await page.goto('/');
 
   await expect(
-    page.getByText(
-      'Something went wrong. Check your connection and try again.',
-    ),
+    page.getByText(messageForTrader(new Error('unmapped'))),
   ).toBeVisible();
   await expect(page.getByText('Something went wrong!')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Show Error' })).toHaveCount(0);
@@ -45,19 +46,18 @@ test('a route that fails to load shows the app error screen, reports once, and r
   // again re-runs the route in place rather than reloading the page.
   await page.evaluate((key) => {
     localStorage.removeItem(key);
-    (window as { notReloaded?: boolean }).notReloaded = true;
-  }, authStorageKey());
+    (window as Marked).notReloaded = true;
+  }, key);
   await page.getByRole('button', { name: 'Try again' }).click();
 
   await expect(page).toHaveURL(/\/sign-up$/);
   await expect(page.getByLabel('Email')).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => (window as { notReloaded?: boolean }).notReloaded,
-    ),
-  ).toBe(true);
+  expect(await page.evaluate(() => (window as Marked).notReloaded)).toBe(true);
   expect(errorEvents).toHaveLength(1);
 });
+
+/** The window, marked before trying again, to tell whether it reloaded. */
+type Marked = { notReloaded?: boolean };
 
 /** supabase-js's default storage key: `sb-` and the API host's first label. */
 function authStorageKey() {
