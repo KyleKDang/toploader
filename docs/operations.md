@@ -26,6 +26,29 @@ The direct connection will not work from GitHub's runners: it is IPv6-only, and 
 
 The Supabase URL and publishable key ship in the app's JavaScript, so in GitHub they are variables rather than secrets.
 
+## Hosted Auth settings
+
+`supabase/config.toml` configures only the local stack; nothing in the repo reaches the hosted project's Auth settings.
+They are set by hand in the Supabase dashboard, so they are listed here, and a change to any of them changes this table in the same commit.
+Where a row has a local counterpart, the two must agree, or the tests pass against settings production does not have: #37 found the hosted code length at Supabase's default of 8 while `config.toml` and the app both said 6, which broke live sign-in.
+
+| Setting | Dashboard location | Hosted value | Local counterpart |
+|---|---|---|---|
+| Site URL | Authentication → URL Configuration | `https://toploaderapp.com` | `site_url` (local address, differs on purpose) |
+| Redirect URLs | Authentication → URL Configuration | `https://toploaderapp.com/**` only | `additional_redirect_urls` (local, differs on purpose) |
+| Email OTP length | Authentication → Sign In / Providers → Email | `6` | `[auth.email] otp_length`; the app's code field (`SignUpScreen.tsx`) |
+| Email OTP expiration | Authentication → Sign In / Providers → Email | `3600` seconds | `[auth.email] otp_expiry`; the template's "expires in an hour" |
+| Custom SMTP | Authentication → Emails → SMTP Settings | `smtp.resend.com`, port `465`, user `resend`, password is the Resend key `supabase-auth-smtp` | none; locally, mail goes to Mailpit |
+| Sender | Authentication → Emails → SMTP Settings | `Toploader <noreply@mail.toploaderapp.com>` | none |
+| Confirm sign up template | Authentication → Emails → Templates | subject `Your Toploader code`, body `supabase/templates/sign-in-code.html` | `[auth.email.template.confirmation]` |
+| Magic Link template | Authentication → Emails → Templates | subject `Your Toploader code`, body `supabase/templates/sign-in-code.html` | `[auth.email.template.magic_link]` |
+
+Both templates carry the code because a first sign-in is a sign-up, so a new Trader gets the confirmation email and a returning one gets the magic link email.
+Editing `sign-in-code.html` changes nothing in production until the new body is pasted into both hosted templates.
+
+The Resend key is sending-only and scoped to `mail.toploaderapp.com`; it lives only in these SMTP settings.
+The domain's DNS records, including SPF, DKIM and DMARC for `mail.`, are in Cloudflare, and #37 records each of them.
+
 ## What runs where
 
 - **Every push:** `.github/workflows/ci.yml` runs every check.
@@ -47,3 +70,4 @@ To restore into a new hosted project:
    A new project's auth and storage tables start empty, so they need no truncating.
    `scripts/backup/restore.sh` does the same against a local stack every night, and is the reference for the steps.
 4. Point Render's `VITE_SUPABASE_*` values and the GitHub secrets and variables at the new project.
+5. Apply every row of [Hosted Auth settings](#hosted-auth-settings) to the new project; it starts on Supabase's defaults, and sign-in does not work until they are set.
