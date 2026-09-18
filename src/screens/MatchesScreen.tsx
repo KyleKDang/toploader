@@ -29,9 +29,9 @@ export function MatchesScreen() {
     >
       <EmptyState
         className="min-h-full"
-        title={`No Matches in ${cityName} yet`}
-        hint="Add Wants and Listings from Search, and the Matches for them show up here."
-        action={{ label: 'Search for a Card', disabled: true }}
+        title={`No matches in ${cityName} yet`}
+        hint="Add wants and listings from Search, and the matches for them show up here."
+        action={{ label: 'Search for a card', disabled: true }}
       />
     </AppShell>
   );

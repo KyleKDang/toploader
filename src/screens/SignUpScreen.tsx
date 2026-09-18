@@ -74,7 +74,7 @@ export function SignUpScreen() {
       <div className="flex min-h-full flex-col">
         <div className="flex grow flex-col gap-5 p-4">
           <p className="text-base leading-prose text-ink">
-            In-person trading for Pokemon TCG collectors, in your City.
+            In-person trading for Pokemon TCG collectors, in your area.
           </p>
 
           {codeSentTo === null ? (

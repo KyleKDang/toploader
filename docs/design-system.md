@@ -258,5 +258,6 @@ The non-affiliation disclaimer is visible, at `--text-xs`, at the foot of the Tr
 Safety Program surfaces name mechanics and what each one does, never a promise: the Verified Trading panel on the profile carries the line "None of it is a guarantee", and no screen anywhere says safe, guaranteed, protected, or secure as a claim about an outcome.
 
 **Vocabulary.**
-Every user-visible string uses the domain vocabulary in [CONTEXT.md](../CONTEXT.md) exactly: Trader, Listing, Want, Match, Trade, Meetup, Safe Spot, Market Price, Copy, Variant, Condition.
-Capitalized in the code and in the docs; in user-facing copy they are capitalized only where they are the product's own nouns, as the mockups show.
+User-visible strings name the concepts in [CONTEXT.md](../CONTEXT.md), but in ordinary words and ordinary case, per its Glossary and UI copy rule.
+A running sentence lowercases them ("other traders see this", "your matches and listings"); titles, tabs and chips keep title case ("Matches", "3 Trades").
+Where the on-screen word differs from the glossary term, the term's entry in CONTEXT.md says so: City is "Area" on screen.

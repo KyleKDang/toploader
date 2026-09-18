@@ -15,6 +15,9 @@ import { ChevronDownIcon } from './icons';
  * The focus ring is drawn on focus rather than only on :focus-visible, as the
  * text input does, because tapping a field is when it matters which field is
  * active.
+ *
+ * An optional `hint` is a muted line under the field, tied to it by
+ * aria-describedby, as on the text input.
  */
 
 type SelectProps = Omit<
@@ -23,12 +26,21 @@ type SelectProps = Omit<
 > & {
   /** Always visible above the field. */
   label: string;
+  /** Optional guidance under the field. */
+  hint?: string;
   children: ReactNode;
   className?: string;
 };
 
-export function Select({ label, children, className, ...props }: SelectProps) {
+export function Select({
+  label,
+  hint,
+  children,
+  className,
+  ...props
+}: SelectProps) {
   const id = useId();
+  const hintId = `${id}-hint`;
 
   return (
     <div className={cx('flex flex-col gap-1.5', className)}>
@@ -39,6 +51,7 @@ export function Select({ label, children, className, ...props }: SelectProps) {
       <div className="relative flex">
         <select
           id={id}
+          aria-describedby={hint ? hintId : undefined}
           className={cx(
             'min-h-btn w-full cursor-pointer appearance-none rounded-md border-2 border-line bg-surface pr-11 pl-3.5',
             'text-base text-ink',
@@ -51,6 +64,12 @@ export function Select({ label, children, className, ...props }: SelectProps) {
         </select>
         <ChevronDownIcon className="pointer-events-none absolute inset-y-0 right-3.5 my-auto text-lg text-muted" />
       </div>
+
+      {hint ? (
+        <p id={hintId} className="text-sm leading-prose text-muted">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }

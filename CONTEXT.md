@@ -3,6 +3,13 @@
 The domain of an app that organizes safe, in-person Pokemon TCG trades for adult collectors, city by city.
 No money ever moves through the app.
 
+## Glossary and UI copy
+
+The terms below name things in code, tests, docs and tickets.
+UI copy uses ordinary words in ordinary case: a running sentence on screen says "other traders" and "your matches", never "other Traders" or "your Matches".
+Titles and navigation labels, such as the Matches tab, keep title case because they are labels, not glossary.
+Where the word on screen differs from the glossary term, the term's entry below says so.
+
 ## Language
 
 ### People
@@ -115,4 +122,5 @@ _Avoid_: live price, current value
 
 **City**:
 The metro area a Trader trades in; the unit of launch, matching scope, and liquidity.
-_Avoid_: region, area, market
+The UI calls it "Area", because a field labeled City offering "Orange County" reads as a mistake; code, tests and docs still say City.
+_Avoid_: region, area, market (outside UI copy)
