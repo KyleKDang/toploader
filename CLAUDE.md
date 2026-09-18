@@ -31,8 +31,7 @@ Docs, ADRs, and config one-liners go straight to `main`, as the research-finding
 
 **Validation green.**
 `.github/workflows/ci.yml` is the authority: a branch is green when its CI run is.
-To run the same checks locally, start the stack with `npx supabase start`, then run these in order:
-`npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run build`, `npm test` (seams 1 and 2), and `npm run test:browser` (seam 3).
+To run the same checks locally, start the stack with `npx supabase start`, then run these in order: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run build`, `npm test` (seams 1 and 2), and `npm run test:browser` (seam 3).
 If the two ever disagree, CI wins, and this list is corrected to match it.
 
 **Deploys.**

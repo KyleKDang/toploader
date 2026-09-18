@@ -10,8 +10,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  # Superseded pushes to a branch are cancelled; runs on main never are, since
-  # each one may carry a migration.
+  # Superseded pushes to a branch are cancelled. A run on main is never
+  # cancelled mid-migration; at most a queued one is skipped for a newer one,
+  # whose db push applies every migration still pending.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
