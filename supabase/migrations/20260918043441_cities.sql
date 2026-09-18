@@ -7,9 +7,8 @@ create table public.cities (
   created_at timestamptz not null default now()
 );
 
--- Deny by default: no client role holds any privilege until granted below,
--- and RLS filters whatever a grant lets through. Policies are additive grants.
-revoke all on public.cities from public, anon, authenticated;
+-- No client role holds a privilege until granted below (deny_by_default), and
+-- RLS filters whatever a grant lets through. Policies are additive grants.
 alter table public.cities enable row level security;
 
 grant select on public.cities to authenticated;
