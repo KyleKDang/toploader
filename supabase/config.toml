@@ -3,6 +3,9 @@
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
 project_id = "toploader"
+# The hosted project, under the shared venture account (ticket #32), is ref
+# kokkeqbbfmogfbmbafyz. Link a checkout to it with:
+#   npx supabase link --project-ref kokkeqbbfmogfbmbafyz
 
 [api]
 enabled = true
