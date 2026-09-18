@@ -14,6 +14,7 @@ import {
 } from './lib/queries';
 import { reportError } from './lib/sentry';
 import { MatchesScreen } from './screens/MatchesScreen';
+import { RouteErrorScreen } from './screens/RouteErrorScreen';
 import { SetUpProfileScreen } from './screens/SetUpProfileScreen';
 import { SignUpScreen } from './screens/SignUpScreen';
 
@@ -82,6 +83,7 @@ export function createAppRouter(queryClient: QueryClient) {
     // A loader or beforeLoad that throws is caught by the router and rendered
     // as its error screen, so it never reaches the browser's error handler.
     defaultOnCatch: reportError,
+    defaultErrorComponent: RouteErrorScreen,
   });
 }
 

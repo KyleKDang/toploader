@@ -12,6 +12,8 @@ const status = readLocalStackStatus();
 
 // Read by the tracer to fetch the sign-in code the local stack emailed.
 process.env.MAILPIT_URL = status.MAILPIT_URL;
+// Read by the route-error tracer to plant a session under supabase-js's key.
+process.env.SUPABASE_API_URL = status.API_URL;
 
 // A port of its own, so the tracer never reuses a dev server that is
 // pointed somewhere else.
@@ -47,6 +49,11 @@ export default defineConfig({
     env: {
       VITE_SUPABASE_URL: status.API_URL,
       VITE_SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY,
+      // Sentry faked at the network edge: a DSN on the preview server itself,
+      // whose envelopes a tracer catches with `page.route`. A tracer that
+      // does not catch them gets a 404 from the preview server, and nothing
+      // ever reaches a real Sentry project.
+      VITE_SENTRY_DSN: `http://public@127.0.0.1:${PORT}/1`,
     },
   },
 });
