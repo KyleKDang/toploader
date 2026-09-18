@@ -1,0 +1,98 @@
+# The free tier's only backup, and its keepalive (ADR-0006): nightly, dump
+# the hosted database into an encrypted artifact, then prove that artifact
+# restores. Connecting to the database is also what resets the free tier's
+# 7-day inactivity pause. Every run checks in with a Sentry cron monitor, so
+# a failed or missing run is an alert rather than silence.
+name: Nightly backup
+
+on:
+  schedule:
+    # 10:17 UTC is 3:17 in the morning Pacific, off the hour because GitHub
+    # delays scheduled runs most at the top of it. Keep in step with the
+    # monitor's schedule in scripts/backup/sentry-checkin.sh.
+    - cron: '17 10 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-backup
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    name: Dump and encrypt
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      artifact-name: ${{ steps.name.outputs.value }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: scripts/backup/sentry-checkin.sh in_progress
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      - run: scripts/backup/dump.sh backup
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      - id: name
+        run: echo "value=backup-$(date -u +%Y-%m-%dT%H%MZ)" >>"$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.name.outputs.value }}
+          path: backup/backup.tar.gz.gpg
+          # A month of nightly restore points. Ninety would fit GitHub's
+          # limit but not, as the database grows, the free 500 MB of
+          # artifact storage.
+          retention-days: 30
+          if-no-files-found: error
+          # Already compressed and encrypted; zipping it again gains nothing.
+          compression-level: 0
+
+  restore:
+    name: Prove it restores
+    needs: dump
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.dump.outputs.artifact-name }}
+      - run: scripts/backup/decrypt.sh backup.tar.gz.gpg restored
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      - name: Pin the stack to the hosted Auth and Storage versions
+        run: |
+          mkdir -p supabase/.temp
+          cp restored/gotrue-version restored/storage-version supabase/.temp/
+      - name: Start a throwaway stack from the migrations
+        run: npx supabase start -x studio,imgproxy,logflare,vector,edge-runtime
+      - run: scripts/backup/restore.sh restored
+
+  report:
+    name: Check in with Sentry
+    needs: [dump, restore]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/backup/sentry-checkin.sh "$STATUS"
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          STATUS: >-
+            ${{ needs.dump.result == 'success' && needs.restore.result == 'success'
+            && 'ok' || 'error' }}

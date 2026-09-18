@@ -12,6 +12,7 @@ import {
   hasProfile,
   traderQuery,
 } from './lib/queries';
+import { reportError } from './lib/sentry';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { SetUpProfileScreen } from './screens/SetUpProfileScreen';
 import { SignUpScreen } from './screens/SignUpScreen';
@@ -75,7 +76,13 @@ const routeTree = rootRoute.addChildren([
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {
-  return createRouter({ routeTree, context: { queryClient } });
+  return createRouter({
+    routeTree,
+    context: { queryClient },
+    // A loader or beforeLoad that throws is caught by the router and rendered
+    // as its error screen, so it never reaches the browser's error handler.
+    defaultOnCatch: reportError,
+  });
 }
 
 declare module '@tanstack/react-router' {

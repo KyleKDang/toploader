@@ -2,8 +2,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Seam 1: supabase-js clients against the local stack (`supabase start`).
-    include: ['tests/db/**/*.test.ts'],
+    include: [
+      // Seam 1: supabase-js clients against the local stack (`supabase start`).
+      'tests/db/**/*.test.ts',
+      // Seam 2: edge/scheduled functions against the same stack, external HTTP
+      // faked at the network edge. Empty until the first function lands.
+      'tests/functions/**/*.test.ts',
+    ],
     globalSetup: ['tests/db/global-setup.ts'],
     environment: 'node',
   },
