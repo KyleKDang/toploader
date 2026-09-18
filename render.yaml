@@ -1,0 +1,39 @@
+# The deployed app: a Render static site (spec, Architecture; ADR-0002).
+# Created once from this Blueprint in the Render dashboard; after that, this
+# file is the site's configuration and edits to it deploy with the next merge.
+services:
+  - type: web
+    runtime: static
+    name: toploader
+    repo: https://github.com/KyleKDang/toploader
+    branch: main
+    # Only after every GitHub check on the commit passes, which on main
+    # includes applying its migrations to the hosted database (ci.yml).
+    autoDeployTrigger: checksPass
+    previews:
+      generation: off
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    # The router owns every path, so any path without a file behind it gets
+    # the app. Real files, robots.txt among them, are served as they are.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # The hosted project's API URL and publishable key; both public.
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      # Where the app reports errors (src/lib/sentry.ts).
+      - key: VITE_SENTRY_DSN
+        sync: false
+      # Source map upload at build time (vite.config.ts). The token is the
+      # one secret here: an org token scoped to releases and source maps.
+      - key: SENTRY_ORG
+        sync: false
+      - key: SENTRY_PROJECT
+        sync: false
+      - key: SENTRY_AUTH_TOKEN
+        sync: false

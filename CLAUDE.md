@@ -30,8 +30,15 @@ The repo is private, so GitHub cannot enforce this - hold it as convention anywa
 Docs, ADRs, and config one-liners go straight to `main`, as the research-findings convention already did.
 
 **Validation green.**
-Ticket #40 stands up the toolchain and #42 lands CI, so until they land the following is intent rather than runnable commands: typecheck, lint/format check, `vitest` for the seam-1 and seam-2 suites against a running local stack (`supabase start`), the Playwright tracer, and the production build.
-Once `.github/workflows/ci.yml` exists it is the authority on all of it, and this section is rewritten to name the exact commands #42 landed.
+`.github/workflows/ci.yml` is the authority: a branch is green when its CI run is.
+To run the same checks locally, start the stack with `npx supabase start`, then run these in order:
+`npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run build`, `npm test` (seams 1 and 2), and `npm run test:browser` (seam 3).
+If the two ever disagree, CI wins, and this list is corrected to match it.
+
+**Deploys.**
+A merge to `main` deploys.
+CI's `migrate` job applies new migrations to the hosted database, and Render builds the app only once every check on the commit has passed (`render.yaml`).
+So a merge is a production deploy, and a migration merged to `main` is applied to production data.
 
 **Code review** means `mattpocock-skills:code-review`, named in full.
 The bare `code-review` is Claude Code's built-in, which fans out sub-agents at the session effort level and is not the review this flow asks for.
