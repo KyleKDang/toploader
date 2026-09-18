@@ -245,6 +245,17 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Sign-in is a typed code, not a link (see templates/sign-in-code.html). A
+# first sign-in is a sign-up, which sends the confirmation email when
+# confirmations are on, so both templates carry the code.
+[auth.email.template.magic_link]
+subject = "Your Toploader code"
+content_path = "./supabase/templates/sign-in-code.html"
+
+[auth.email.template.confirmation]
+subject = "Your Toploader code"
+content_path = "./supabase/templates/sign-in-code.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

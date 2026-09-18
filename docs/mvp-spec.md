@@ -72,6 +72,8 @@ The differentiator is the Safety Program, public-facing name **Verified Trading*
 ### Onboarding
 
 1. Sign up with email (Supabase Auth), attest to being 18 or over, set display name, pick City.
+Sign-in is a 6-digit code emailed to the Trader and typed into the app, with no password and no magic link: on iOS a link opens in Safari rather than the app installed to the home screen, which keeps its own storage and would stay signed out, and with a code a first sign-in simply is the sign-up.
+Settled on [#13](https://github.com/KyleKDang/toploader/issues/13).
 The attestation is a checkbox, not a date of birth: the product is scoped to adult collectors and the real age check is the founder ID review that gates proposals, so the checkbox exists to make an under-age signup the signer's misrepresentation rather than our collection, at no cost in signups.
 Settled on [#36](https://github.com/KyleKDang/toploader/issues/36).
 2. Prompted (skippable) to install: Add-to-Home-Screen instructions on iOS ("install to get trade alerts"), browser install prompt elsewhere; push permission requested on that gesture.

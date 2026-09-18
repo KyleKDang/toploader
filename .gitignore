@@ -17,3 +17,7 @@
 node_modules/
 dist/
 *.local
+
+# Playwright output
+test-results/
+playwright-report/
