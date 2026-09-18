@@ -121,7 +121,8 @@ Settled on [#36](https://github.com/KyleKDang/toploader/issues/36).
 ## Data model sketch
 
 Catalog tables (synced, read-only to clients): `cards`, `card_variants`, `price_snapshots` (daily, per variant; compacted per the runway plan in the delivery research).
-Trader tables: `traders` (profile, city_id, verified_at, `banned_at`, denormalized reputation counters), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
+Trader tables: `traders` (the public profile: display name, verified_at, `banned_at`, denormalized reputation counters, member-since), `trader_private` (fields only the owner reads: city_id), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
+A Trader's profile is split by audience because RLS scopes rows, not columns: a public field goes on `traders`, a private one on `trader_private`, so no column-level grant or RLS-bypassing view is ever a second place the rule can be wrong.
 Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (trader, variant, condition, photos, status: active / in_trade / traded / withdrawn; asking_price nullable), `wants` (trader, card, variant nullable, min_condition nullable).
 Matching: a SQL view joining active `listings` x `wants` within a City, plus a `match_events` table so notifications fire once per new pair.
 Trading: `trades` (proposer, recipient, status: proposed / accepted / scheduled / completed / cancelled / no_show, scheduled_at, safe_spot_id, completed_at), `trade_items` (trade, side, listing snapshot, cash_amount nullable), `messages` (trade, sender, body), `trade_feedback` (trade, from, to, thumb).
@@ -129,7 +130,7 @@ Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests`
 
 RLS posture: every table deny-by-default.
 Reads are policy-scoped (own rows for private tables; city-scoped for listings/matches; participants-only for trades/messages; all rows for a Founder, via additive policies calling `is_founder()`).
-All state changes go through named RPCs - `create_trade`, `counter_trade`, `accept_trade`, `schedule_meetup`, `complete_trade`, `cancel_trade`, `mark_no_show`, `leave_feedback`, `submit_verification`, `approve_verification` - or edge functions when side effects leave the database.
+All state changes go through named RPCs - `set_trader_profile`, `create_trade`, `counter_trade`, `accept_trade`, `schedule_meetup`, `complete_trade`, `cancel_trade`, `mark_no_show`, `leave_feedback`, `submit_verification`, `approve_verification` - or edge functions when side effects leave the database.
 Ban and account deletion are edge functions rather than RPCs, because both must write `auth.users` through the Auth admin API, which a function running as the calling Trader cannot reach ([ADR-0007](adr/0007-admin-authorization.md)).
 Every policy and RPC ships with a test proving what a foreign user cannot do.
 
