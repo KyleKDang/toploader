@@ -1,19 +1,20 @@
 -- A Trader is a person with an account. RLS scopes rows, not columns, so the
 -- profile is split by audience:
 --   traders         the public profile and Reputation, readable by any Trader
---   trader_private  fields only the owner may read, such as their City
+--   trader_private  fields only the owner may read
 -- Clients never write either table: every change goes through a named RPC
 -- (ADR-0001).
 
 create table public.traders (
   id uuid primary key references auth.users (id) on delete cascade,
-  -- Null until the Trader finishes onboarding.
+  -- Both null until the Trader finishes onboarding.
   display_name text check (
     display_name = btrim(display_name)
     and char_length(display_name) between 1 and 40
   ),
-  -- Reserved for later tickets: the verified badge (ticket #26), the public
-  -- ban mark (#28), and the denormalized Reputation counters (#27).
+  city_id uuid references public.cities (id),
+  -- Reserved for later tickets: the verified badge (#26), the public ban mark
+  -- (#28), and the denormalized Reputation counters (#27).
   verified_at timestamptz,
   banned_at timestamptz,
   completed_trade_count integer not null default 0 check (completed_trade_count >= 0),
@@ -27,12 +28,13 @@ create table public.traders (
 
 create table public.trader_private (
   trader_id uuid primary key references public.traders (id) on delete cascade,
-  -- Null until the Trader finishes onboarding.
-  city_id uuid references public.cities (id)
+  -- When the Trader self-attested to being 18 or over (settled on #36); null
+  -- until they finish onboarding.
+  adult_attested_at timestamptz
 );
 
-revoke all on public.traders, public.trader_private
-  from public, anon, authenticated;
+-- No client role holds a privilege until granted below (deny_by_default), and
+-- RLS filters whatever a grant lets through. Policies are additive grants.
 alter table public.traders enable row level security;
 alter table public.trader_private enable row level security;
 
@@ -48,8 +50,8 @@ create policy "A Trader can read their own private fields"
   to authenticated
   using (trader_id = (select auth.uid()));
 
--- Every new auth user becomes a Trader with an empty profile.
-create function public.create_trader_for_new_user()
+-- Every new account becomes a Trader with an empty profile.
+create function public.create_trader_for_new_account()
   returns trigger
   language plpgsql
   security definer
@@ -62,16 +64,18 @@ begin
 end;
 $$;
 
-revoke execute on function public.create_trader_for_new_user()
-  from public, anon, authenticated;
-
-create trigger create_trader_for_new_user
+create trigger create_trader_for_new_account
   after insert on auth.users
-  for each row execute function public.create_trader_for_new_user();
+  for each row execute function public.create_trader_for_new_account();
 
 -- Sets the calling Trader's display name and City. It takes no Trader id, so
--- a Trader can only ever change their own profile.
-create function public.set_trader_profile(display_name text, city_id uuid)
+-- a Trader can only ever change their own profile, and it refuses to without
+-- the 18-or-over attestation, whose first time is kept.
+create function public.set_trader_profile(
+  display_name text,
+  city_id uuid,
+  attests_adult boolean
+)
   returns void
   language plpgsql
   security definer
@@ -89,17 +93,24 @@ begin
     raise exception 'display_name and city_id are required'
       using errcode = '23502';
   end if;
+  if attests_adult is not true then
+    raise exception 'a Trader must attest to being 18 or over'
+      using errcode = '22023';
+  end if;
 
   update public.traders
-    set display_name = btrim(set_trader_profile.display_name)
+    set display_name = btrim(set_trader_profile.display_name),
+        city_id = set_trader_profile.city_id
     where id = caller;
+  if not found then
+    raise exception 'no Trader row exists for the caller'
+      using errcode = 'P0002';
+  end if;
   update public.trader_private
-    set city_id = set_trader_profile.city_id
+    set adult_attested_at = coalesce(adult_attested_at, now())
     where trader_id = caller;
 end;
 $$;
 
-revoke execute on function public.set_trader_profile(text, uuid)
-  from public, anon;
-grant execute on function public.set_trader_profile(text, uuid)
+grant execute on function public.set_trader_profile(text, uuid, boolean)
   to authenticated;

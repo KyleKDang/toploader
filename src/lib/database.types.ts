@@ -54,25 +54,18 @@ export type Database = {
       }
       trader_private: {
         Row: {
-          city_id: string | null
+          adult_attested_at: string | null
           trader_id: string
         }
         Insert: {
-          city_id?: string | null
+          adult_attested_at?: string | null
           trader_id: string
         }
         Update: {
-          city_id?: string | null
+          adult_attested_at?: string | null
           trader_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "trader_private_city_id_fkey"
-            columns: ["city_id"]
-            isOneToOne: false
-            referencedRelation: "cities"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "trader_private_trader_id_fkey"
             columns: ["trader_id"]
@@ -86,6 +79,7 @@ export type Database = {
         Row: {
           banned_at: string | null
           cancellation_count: number
+          city_id: string | null
           completed_trade_count: number
           created_at: string
           display_name: string | null
@@ -98,6 +92,7 @@ export type Database = {
         Insert: {
           banned_at?: string | null
           cancellation_count?: number
+          city_id?: string | null
           completed_trade_count?: number
           created_at?: string
           display_name?: string | null
@@ -110,6 +105,7 @@ export type Database = {
         Update: {
           banned_at?: string | null
           cancellation_count?: number
+          city_id?: string | null
           completed_trade_count?: number
           created_at?: string
           display_name?: string | null
@@ -119,7 +115,15 @@ export type Database = {
           no_show_count?: number
           verified_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "traders_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -127,7 +131,7 @@ export type Database = {
     }
     Functions: {
       set_trader_profile: {
-        Args: { city_id: string; display_name: string }
+        Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
       }
     }

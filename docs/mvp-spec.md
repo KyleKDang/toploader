@@ -121,7 +121,7 @@ Settled on [#36](https://github.com/KyleKDang/toploader/issues/36).
 ## Data model sketch
 
 Catalog tables (synced, read-only to clients): `cards`, `card_variants`, `price_snapshots` (daily, per variant; compacted per the runway plan in the delivery research).
-Trader tables: `traders` (the public profile: display name, verified_at, `banned_at`, denormalized reputation counters, member-since), `trader_private` (fields only the owner reads: city_id), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
+Trader tables: `traders` (the public profile: display name, city_id, verified_at, `banned_at`, denormalized reputation counters, member-since), `trader_private` (fields only the owner reads: the 18-or-over attestation time), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
 A Trader's profile is split by audience because RLS scopes rows, not columns: a public field goes on `traders`, a private one on `trader_private`, so no column-level grant or RLS-bypassing view is ever a second place the rule can be wrong.
 Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (trader, variant, condition, photos, status: active / in_trade / traded / withdrawn; asking_price nullable), `wants` (trader, card, variant nullable, min_condition nullable).
 Matching: a SQL view joining active `listings` x `wants` within a City, plus a `match_events` table so notifications fire once per new pair.

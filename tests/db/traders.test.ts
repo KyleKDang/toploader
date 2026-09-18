@@ -4,58 +4,73 @@ import {
   cityId,
   ORANGE_COUNTY,
   seedAdversarialTraders,
+  seedTrader,
   signUpTrader,
+  type Client,
   type SeededTrader,
-} from './traders.ts';
+} from './seed.ts';
 
 describe('A new Trader', () => {
   it('gets a Trader row the moment they sign up, with no profile set yet', async () => {
     const trader = await signUpTrader();
 
-    const profile = await trader.client
-      .from('traders')
-      .select('display_name, verified_at, banned_at, completed_trade_count')
-      .eq('id', trader.id)
-      .single();
-    const secret = await trader.client
-      .from('trader_private')
-      .select('city_id')
-      .eq('trader_id', trader.id)
-      .single();
-
-    expect(profile.error).toBeNull();
-    expect(profile.data).toEqual({
+    expect(await readProfile(trader.client, trader.id)).toEqual({
       display_name: null,
+      city_id: null,
       verified_at: null,
       banned_at: null,
       completed_trade_count: 0,
+      adult_attested_at: null,
     });
-    expect(secret.error).toBeNull();
-    expect(secret.data).toEqual({ city_id: null });
   });
 
-  it('sets their own display name and City', async () => {
+  it('sets their own display name and City, attesting to being 18 or over', async () => {
     const trader = await signUpTrader();
     const orangeCounty = await cityId(trader.client, ORANGE_COUNTY);
 
     const { error } = await trader.client.rpc('set_trader_profile', {
       display_name: '  Misty  ',
       city_id: orangeCounty,
+      attests_adult: true,
     });
 
     expect(error).toBeNull();
-    const profile = await trader.client
-      .from('traders')
-      .select('display_name')
-      .eq('id', trader.id)
-      .single();
-    const secret = await trader.client
-      .from('trader_private')
-      .select('city_id')
-      .eq('trader_id', trader.id)
-      .single();
-    expect(profile.data?.display_name).toBe('Misty');
-    expect(secret.data?.city_id).toBe(orangeCounty);
+    const profile = await readProfile(trader.client, trader.id);
+    expect(profile.display_name).toBe('Misty');
+    expect(profile.city_id).toBe(orangeCounty);
+    expect(profile.adult_attested_at).not.toBeNull();
+  });
+
+  it('keeps the time of their first attestation when the profile is set again', async () => {
+    const trader = await seedTrader('Misty');
+    const first = await readProfile(trader.client, trader.id);
+
+    await trader.client.rpc('set_trader_profile', {
+      display_name: 'Misty W',
+      city_id: await cityId(trader.client, ORANGE_COUNTY),
+      attests_adult: true,
+    });
+
+    const second = await readProfile(trader.client, trader.id);
+    expect(second.display_name).toBe('Misty W');
+    expect(second.adult_attested_at).toBe(first.adult_attested_at);
+  });
+
+  it('cannot set a profile without attesting to being 18 or over', async () => {
+    const trader = await signUpTrader();
+
+    const { error } = await trader.client.rpc('set_trader_profile', {
+      display_name: 'Misty',
+      city_id: await cityId(trader.client, ORANGE_COUNTY),
+      attests_adult: false,
+    });
+
+    expect(error?.code).toBe('22023');
+    expect(await readProfile(trader.client, trader.id)).toMatchObject({
+      display_name: null,
+      city_id: null,
+      adult_attested_at: null,
+    });
   });
 
   it('cannot set a blank display name', async () => {
@@ -64,6 +79,7 @@ describe('A new Trader', () => {
     const { error } = await trader.client.rpc('set_trader_profile', {
       display_name: '   ',
       city_id: await cityId(trader.client, ORANGE_COUNTY),
+      attests_adult: true,
     });
 
     expect(error?.code).toBe('23514');
@@ -75,6 +91,7 @@ describe('A new Trader', () => {
     const { error } = await trader.client.rpc('set_trader_profile', {
       display_name: 'Misty',
       city_id: crypto.randomUUID(),
+      attests_adult: true,
     });
 
     expect(error?.code).toBe('23503');
@@ -89,15 +106,18 @@ describe('A Trader profile', () => {
     ({ actor, foreign } = await seedAdversarialTraders());
   });
 
-  it('shows its public fields to a foreign Trader', async () => {
+  it('shows its display name and City to a foreign Trader', async () => {
     const { data, error } = await foreign.client
       .from('traders')
-      .select('display_name')
+      .select('display_name, city_id')
       .eq('id', actor.id)
       .single();
 
     expect(error).toBeNull();
-    expect(data?.display_name).toBe(actor.displayName);
+    expect(data).toEqual({
+      display_name: actor.displayName,
+      city_id: await cityId(foreign.client, ORANGE_COUNTY),
+    });
   });
 
   it('hides its private fields from a foreign Trader', async () => {
@@ -113,47 +133,47 @@ describe('A Trader profile', () => {
   it('shows the owner their own private fields', async () => {
     const { data } = await actor.client
       .from('trader_private')
-      .select('trader_id, city_id');
+      .select('trader_id, adult_attested_at');
 
     expect(data).toEqual([
-      {
-        trader_id: actor.id,
-        city_id: await cityId(actor.client, ORANGE_COUNTY),
-      },
+      { trader_id: actor.id, adult_attested_at: expect.any(String) as string },
     ]);
   });
 
-  it('cannot have its display name changed by a foreign Trader', async () => {
-    const { error } = await foreign.client
+  it('cannot have its display name or City changed by a foreign Trader', async () => {
+    const before = await readProfile(actor.client, actor.id);
+
+    const renamed = await foreign.client
       .from('traders')
       .update({ display_name: 'Hijacked' })
       .eq('id', actor.id);
-
-    expect(error?.code).toBe('42501');
-    await expectProfileUnchanged(actor);
-  });
-
-  it('cannot have its City changed by a foreign Trader', async () => {
-    const { error } = await foreign.client
-      .from('trader_private')
+    const moved = await foreign.client
+      .from('traders')
       .update({ city_id: null })
-      .eq('trader_id', actor.id);
+      .eq('id', actor.id);
 
-    expect(error?.code).toBe('42501');
-    await expectProfileUnchanged(actor);
+    expect(renamed.error?.code).toBe('42501');
+    expect(moved.error?.code).toBe('42501');
+    expect(await readProfile(actor.client, actor.id)).toEqual(before);
   });
 
-  it('is changed through set_trader_profile only for the calling Trader', async () => {
-    const { error } = await foreign.client.rpc('set_trader_profile', {
-      display_name: 'Renamed Foreign',
-      city_id: await cityId(foreign.client, ORANGE_COUNTY),
+  it('is changed by set_trader_profile only for the calling Trader', async () => {
+    const other = await seedTrader('Other');
+    const before = await readProfile(actor.client, actor.id);
+
+    const { error } = await other.client.rpc('set_trader_profile', {
+      display_name: 'Renamed Other',
+      city_id: await cityId(other.client, ORANGE_COUNTY),
+      attests_adult: true,
     });
 
     expect(error).toBeNull();
-    await expectProfileUnchanged(actor);
+    expect(await readProfile(actor.client, actor.id)).toEqual(before);
   });
 
   it('cannot be written directly, even by its owner', async () => {
+    const before = await readProfile(actor.client, actor.id);
+
     const renamed = await actor.client
       .from('traders')
       .update({ display_name: 'Direct' })
@@ -162,9 +182,10 @@ describe('A Trader profile', () => {
       .from('traders')
       .update({ verified_at: new Date().toISOString() })
       .eq('id', actor.id);
-    const inserted = await actor.client
+    const attested = await actor.client
       .from('trader_private')
-      .insert({ trader_id: actor.id });
+      .update({ adult_attested_at: null })
+      .eq('trader_id', actor.id);
     const deleted = await actor.client
       .from('traders')
       .delete()
@@ -172,41 +193,47 @@ describe('A Trader profile', () => {
 
     expect(renamed.error?.code).toBe('42501');
     expect(verified.error?.code).toBe('42501');
-    expect(inserted.error?.code).toBe('42501');
+    expect(attested.error?.code).toBe('42501');
     expect(deleted.error?.code).toBe('42501');
-    await expectProfileUnchanged(actor);
+    expect(await readProfile(actor.client, actor.id)).toEqual(before);
   });
 
-  it('is not readable by a signed-out visitor', async () => {
+  it('cannot be read or set by a signed-out visitor', async () => {
     const anon = anonClient();
 
     const profile = await anon.from('traders').select('display_name');
-    const secret = await anon.from('trader_private').select('city_id');
-    const write = await anon.rpc('set_trader_profile', {
+    const privateFields = await anon
+      .from('trader_private')
+      .select('adult_attested_at');
+    const set = await anon.rpc('set_trader_profile', {
       display_name: 'Nobody',
       city_id: await cityId(actor.client, ORANGE_COUNTY),
+      attests_adult: true,
     });
 
     expect(profile.error?.code).toBe('42501');
-    expect(secret.error?.code).toBe('42501');
-    expect(write.error?.code).toBe('42501');
+    expect(privateFields.error?.code).toBe('42501');
+    expect(set.error?.code).toBe('42501');
   });
 });
 
-async function expectProfileUnchanged(trader: SeededTrader) {
-  const profile = await trader.client
-    .from('traders')
-    .select('display_name, verified_at')
-    .eq('id', trader.id)
-    .single();
-  const secret = await trader.client
-    .from('trader_private')
-    .select('city_id')
-    .eq('trader_id', trader.id)
-    .single();
-  expect(profile.data).toEqual({
-    display_name: trader.displayName,
-    verified_at: null,
-  });
-  expect(secret.data?.city_id).toBe(await cityId(trader.client, ORANGE_COUNTY));
+/** A Trader's profile as its owner sees it: public and private fields. */
+async function readProfile(owner: Client, traderId: string) {
+  const [profile, privateFields] = await Promise.all([
+    owner
+      .from('traders')
+      .select(
+        'display_name, city_id, verified_at, banned_at, completed_trade_count',
+      )
+      .eq('id', traderId)
+      .single(),
+    owner
+      .from('trader_private')
+      .select('adult_attested_at')
+      .eq('trader_id', traderId)
+      .single(),
+  ]);
+  if (profile.error) throw profile.error;
+  if (privateFields.error) throw privateFields.error;
+  return { ...profile.data, ...privateFields.data };
 }

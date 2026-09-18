@@ -53,12 +53,13 @@ export async function cityId(client: Client, name: string): Promise<string> {
   return data.id;
 }
 
-/** A signed-up Trader who has also set a display name and picked a City. */
+/** A Trader who has finished onboarding in Orange County. */
 export async function seedTrader(displayName: string): Promise<SeededTrader> {
   const trader = await signUpTrader();
   const { error } = await trader.client.rpc('set_trader_profile', {
     display_name: displayName,
     city_id: await cityId(trader.client, ORANGE_COUNTY),
+    attests_adult: true,
   });
   if (error) throw error;
   return { ...trader, displayName };

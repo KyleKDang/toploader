@@ -5,7 +5,7 @@ import {
   ORANGE_COUNTY,
   signUpTrader,
   type Client,
-} from './traders.ts';
+} from './seed.ts';
 
 describe('Cities', () => {
   let trader: Client;
