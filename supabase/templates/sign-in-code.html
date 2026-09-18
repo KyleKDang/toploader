@@ -1,0 +1,15 @@
+<!--
+  The sign-in email. Toploader signs Traders in with a typed code rather than
+  a link: on iOS a link opens in Safari, not in the installed app, which keeps
+  its own storage and so would stay signed out. Used for both the magic-link
+  and the confirmation email, since a first sign-in is a sign-up.
+-->
+<h2>Your Toploader code</h2>
+<p>Enter this code in Toploader to continue:</p>
+<p style="font-size: 28px; font-weight: bold; letter-spacing: 4px">
+  {{ .Token }}
+</p>
+<p>
+  It works once and expires in an hour. If you did not ask for it, you can
+  ignore this email.
+</p>

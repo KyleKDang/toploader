@@ -32,6 +32,22 @@ export default tseslint.config([
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // TanStack Router redirects by throwing `redirect(...)` from a route's
+      // beforeLoad or loader, which is its documented API, not an error.
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        {
+          allow: [
+            {
+              from: 'package',
+              package: '@tanstack/router-core',
+              name: 'Redirect',
+            },
+          ],
+        },
+      ],
+    },
   },
 
   /*

@@ -11,12 +11,18 @@ export { Badge, ReputationPill } from './Badge';
 export { BottomTabBar } from './BottomTabBar';
 export type { TabKey } from './BottomTabBar';
 export { Button } from './Button';
+export { Checkbox } from './Checkbox';
 export { Disclaimer } from './Disclaimer';
 export { EmptyState } from './EmptyState';
+export { FormError } from './FormError';
 export { ListRow } from './ListRow';
+export { Select } from './Select';
 export { TextInput } from './TextInput';
+export { TopBar } from './TopBar';
 
 export {
+  CheckIcon,
+  ChevronDownIcon,
   MatchesIcon,
   PlusIcon,
   ProfileIcon,

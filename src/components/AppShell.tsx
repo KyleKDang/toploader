@@ -13,13 +13,18 @@ import type { TabKey } from './BottomTabBar';
  * The viewport-height frame with the content scrolling inside it is gate 1's
  * app feel: the bar stays put while a list moves under it, rather than the
  * page scrolling away as a document would.
+ *
+ * The tab bar is on every top-level screen. The screens before a Trader has a
+ * profile - sign up and setting up the profile - are not inside the app yet,
+ * have no sections to move between, and so pass no `tab` and get no bar.
  */
 
 type AppShellProps = {
   /** The top bar. Each screen brings its own. */
   header?: ReactNode;
   children: ReactNode;
-  tab: TabKey;
+  /** The active tab. Omitted only before a Trader is inside the app. */
+  tab?: TabKey;
   onSelectTab?: (tab: TabKey) => void;
   /** Tabs with something new. An alert dot rides the icon. */
   unreadTabs?: readonly TabKey[];
@@ -44,12 +49,14 @@ export function AppShell({
           {children}
         </main>
 
-        <BottomTabBar
-          active={tab}
-          onSelect={onSelectTab}
-          unreadTabs={unreadTabs}
-          unavailableTabs={unavailableTabs}
-        />
+        {tab ? (
+          <BottomTabBar
+            active={tab}
+            onSelect={onSelectTab}
+            unreadTabs={unreadTabs}
+            unavailableTabs={unavailableTabs}
+          />
+        ) : null}
       </div>
     </div>
   );
