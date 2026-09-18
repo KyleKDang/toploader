@@ -24,7 +24,7 @@ const MESSAGES: Record<string, string> = {
 
 const FALLBACK = 'Something went wrong. Check your connection and try again.';
 
-export function messageForTrader(error: Error): string {
-  const code = (error as { code?: unknown }).code;
+export function messageForTrader(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
   return (typeof code === 'string' && MESSAGES[code]) || FALLBACK;
 }
