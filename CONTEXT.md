@@ -7,7 +7,8 @@ No money ever moves through the app.
 
 The terms below name things in code, tests, docs and tickets.
 UI copy uses ordinary words in ordinary case: a running sentence on screen says "other traders" and "your matches", never "other Traders" or "your Matches".
-Titles and navigation labels, such as the Matches tab, keep title case because they are labels, not glossary.
+A heading written as a sentence is a sentence ("No matches in Orange County yet").
+Labels, such as a screen title or the Matches tab, keep title case because they are labels, not glossary.
 Where the word on screen differs from the glossary term, the term's entry below says so.
 
 ## Language

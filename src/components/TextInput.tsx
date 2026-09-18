@@ -25,7 +25,10 @@ import { cx } from '../lib/cx';
  * placeholder is gone after the first keystroke.
  */
 
-type Base = Omit<InputHTMLAttributes<HTMLInputElement>, 'className' | 'id'>;
+type Base = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'className' | 'id' | 'aria-describedby'
+>;
 
 type TextInputProps = Base & {
   /** Optional leading icon inside the field, e.g. the Catalog search glass. */
