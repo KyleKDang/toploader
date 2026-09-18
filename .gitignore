@@ -11,6 +11,7 @@
 # Secrets
 .env
 .env.*
+!.env.example
 
 # Node / Vite
 node_modules/
