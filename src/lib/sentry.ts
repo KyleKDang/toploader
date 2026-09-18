@@ -15,12 +15,11 @@ const dsn = import.meta.env.VITE_SENTRY_DSN;
 
 if (dsn) Sentry.init({ dsn });
 
-/** Reports an error the app caught itself and so the browser never saw. */
-export function reportError(error: unknown) {
-  Sentry.captureException(error);
-}
-
-/** React's root error hooks, so errors React swallows still get reported. */
+/**
+ * React's root error hooks, so errors React swallows still get reported.
+ * `onCaughtError` is also how a route that fails to load reaches Sentry: the
+ * router renders its error screen from a React error boundary.
+ */
 export const reactRootErrorHandlers = {
   onUncaughtError: Sentry.reactErrorHandler(),
   onCaughtError: Sentry.reactErrorHandler(),

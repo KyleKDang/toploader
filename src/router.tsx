@@ -12,7 +12,6 @@ import {
   hasProfile,
   traderQuery,
 } from './lib/queries';
-import { reportError } from './lib/sentry';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { RouteErrorScreen } from './screens/RouteErrorScreen';
 import { SetUpProfileScreen } from './screens/SetUpProfileScreen';
@@ -80,9 +79,10 @@ export function createAppRouter(queryClient: QueryClient) {
   return createRouter({
     routeTree,
     context: { queryClient },
-    // A loader or beforeLoad that throws is caught by the router and rendered
-    // as its error screen, so it never reaches the browser's error handler.
-    defaultOnCatch: reportError,
+    // A loader or beforeLoad that throws is rendered as this screen by a
+    // React error boundary, so React's root `onCaughtError` reports it to
+    // Sentry. No `defaultOnCatch` as well: that fires from the same boundary,
+    // and a second report path would count a thrown non-Error twice.
     defaultErrorComponent: RouteErrorScreen,
   });
 }
