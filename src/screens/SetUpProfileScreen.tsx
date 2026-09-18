@@ -5,7 +5,6 @@ import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import {
   AppShell,
   Button,
-  Checkbox,
   Disclaimer,
   FormError,
   Select,
@@ -16,15 +15,14 @@ import { traderQuery } from '../lib/queries';
 import { supabase } from '../lib/supabase';
 
 /*
- * Setting up the profile: the display name other Traders see, the City the
- * Trader trades in, and the 18-or-over attestation.
+ * Setting up the profile: the display name other Traders see and the City
+ * the Trader trades in.
  *
- * All three go through `set_trader_profile` in one call, the write path #41
+ * Both go through `set_trader_profile` in one call, the write path #41
  * established; clients never write the profile tables directly (ADR-0001).
- * The RPC refuses without the attestation, so the checkbox being required
- * here is a courtesy, not the rule.
- *
- * The attestation is a checkbox, not a date of birth, as settled on #36.
+ * The RPC also records the 18-or-over attestation, which the Trader gave on
+ * the sign-up screen before any code was sent: no session exists that did
+ * not tick that box, so a signed-in Trader here has attested.
  */
 
 const route = getRouteApi('/set-up-profile');
@@ -36,14 +34,13 @@ export function SetUpProfileScreen() {
 
   const [displayName, setDisplayName] = useState('');
   const [cityId, setCityId] = useState('');
-  const [attestsAdult, setAttestsAdult] = useState(false);
 
   const saveProfile = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc('set_trader_profile', {
         display_name: displayName.trim(),
         city_id: cityId,
-        attests_adult: attestsAdult,
+        attests_adult: true,
       });
       if (error) throw error;
     },
@@ -91,13 +88,6 @@ export function SetUpProfileScreen() {
           <p className="text-sm leading-prose text-muted">
             Your Matches and Listings stay inside your City.
           </p>
-
-          <Checkbox
-            label="I am 18 or over"
-            required
-            checked={attestsAdult}
-            onChange={(event) => setAttestsAdult(event.target.checked)}
-          />
 
           <FormError error={saveProfile.error} />
           <div className="flex">

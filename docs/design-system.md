@@ -205,11 +205,14 @@ Four tabs: Matches, Search, Trades, Profile.
 Each is a 26px icon over a 13px label, `--size-tap` minimum, `--color-muted` at rest and `--color-accent` when active, with 22px of bottom padding for the home indicator.
 An `--color-alert` dot rides the icon when that tab has something new.
 The bar is present on every top-level screen and hidden on nothing; a screen reached by drilling in keeps it and gains a back button in the top bar.
+The one exception is before a Trader is inside the app at all: sign up and setting up the profile have no sections to move between, so they have no bar ([#13](https://github.com/KyleKDang/toploader/issues/13)).
+A tab whose screen is not built yet stays on the bar, visibly inactive and disabled, rather than being left off.
 
 **Empty state.**
 Centered in the content area: one line saying what would be here in `--text-base`, one line in `--color-muted` saying how to get there, and one primary button that does it.
 No illustration.
 The empty Matches view in #13 is the first one and sets the pattern.
+Where the action's destination is not built yet, the button is still shown, disabled, so the empty state names the way in without inventing a screen; the ticket that builds the destination enables it.
 
 **Photo treatment.**
 Listing photos are photographs of the actual Copy, so they are never cropped in a way that hides the card.
