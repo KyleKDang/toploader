@@ -9,7 +9,7 @@
 # on the hosted services' versions first, or the auth and storage tables in
 # the backup will not fit it:
 #
-#   cp <dir>/gotrue-version <dir>/storage-version supabase/.temp/
+#   scripts/backup/pin-versions.sh <dir>
 #
 # The nightly job does exactly that in a throwaway stack. A real recovery
 # into a new hosted project is in docs/operations.md.

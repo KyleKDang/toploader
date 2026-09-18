@@ -75,9 +75,7 @@ jobs:
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
       - name: Pin the stack to the hosted Auth and Storage versions
-        run: |
-          mkdir -p supabase/.temp
-          cp restored/gotrue-version restored/storage-version supabase/.temp/
+        run: scripts/backup/pin-versions.sh restored
       - name: Start a throwaway stack from the migrations
         run: npx supabase start -x studio,imgproxy,logflare,vector,edge-runtime
       - run: scripts/backup/restore.sh restored
