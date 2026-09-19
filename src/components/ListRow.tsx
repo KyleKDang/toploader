@@ -13,7 +13,9 @@ import { cx } from '../lib/cx';
  *
  * Rows never wrap; they truncate with an ellipsis. That is the Large Print
  * bargain: about five Matches on a screen rather than ten, and a long Card
- * name gets cut short rather than pushing the row taller.
+ * name gets cut short rather than pushing the row taller. The one exception
+ * is `wrapRelation`, for a short list whose line 3 must be read in full,
+ * such as a Safe Spot's notes.
  */
 
 type ListRowProps = {
@@ -29,6 +31,8 @@ type ListRowProps = {
   relation?: ReactNode;
   /** Line 3, right. Usually a ReputationPill. */
   relationTrailing?: ReactNode;
+  /** Line 3 wraps rather than truncating. Only for a short list. */
+  wrapRelation?: boolean;
   /** An unread row carries a 7px accent dot before its title. */
   unread?: boolean;
   /** Renders as a button when given; rows are otherwise plain content. */
@@ -43,6 +47,7 @@ export function ListRow({
   detail,
   relation,
   relationTrailing,
+  wrapRelation = false,
   unread = false,
   onClick,
   className,
@@ -89,8 +94,20 @@ export function ListRow({
         ) : null}
 
         {relation || relationTrailing ? (
-          <span className="flex min-w-0 items-center justify-between gap-2 text-sm">
-            <span className="min-w-0 truncate text-muted">{relation}</span>
+          <span
+            className={cx(
+              'flex min-w-0 justify-between gap-2 text-sm',
+              wrapRelation ? 'items-start' : 'items-center',
+            )}
+          >
+            <span
+              className={cx(
+                'min-w-0 text-muted',
+                wrapRelation ? 'leading-prose' : 'truncate',
+              )}
+            >
+              {relation}
+            </span>
             {relationTrailing}
           </span>
         ) : null}

@@ -185,6 +185,7 @@ The workhorse.
 Left: a thumbnail or an avatar.
 Right: up to three lines - line 1 is the name with a price pushed to the right edge, line 2 is `--text-sm` muted detail, line 3 carries relationship text and a Reputation pill.
 Rows never wrap; they truncate with an ellipsis.
+The one exception is line 3 in a short list where that line is instructions a Trader needs in full, such as a Safe Spot's notes: there it wraps, since a City has a handful of Safe Spots and cutting the directions short defeats the row.
 An unread row carries a 7px `--color-accent` dot before its title.
 
 **Card tile.**
