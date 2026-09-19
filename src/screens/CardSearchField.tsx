@@ -36,10 +36,11 @@ export function CardSearchField({ autoFocus }: { autoFocus?: boolean }) {
   const results = searching ? (search.data ?? []) : [];
 
   let status: string | undefined;
-  if (!searching) status = undefined;
-  else if (search.isError) status = messageForTrader(search.error);
-  else if (search.isPending) status = 'Searching…';
-  else if (results.length === 0) status = `No cards match “${query}”.`;
+  if (searching) {
+    if (search.isError) status = messageForTrader(search.error);
+    else if (search.isPending) status = 'Searching…';
+    else if (results.length === 0) status = `No cards match “${query}”.`;
+  }
 
   return (
     <div className="px-4 pt-2.5">

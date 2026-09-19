@@ -180,8 +180,10 @@ A placeholder is never the only guidance, because it is gone after the first key
 A select is drawn the same way and takes a hint the same way.
 
 **Search picker.**
-A text input with a results panel below it: `--shadow-popover`, `--radius`, `--color-surface` fill, rows at 90% of `--size-row`.
+A text input with a results panel below it: `--shadow-popover`, `--radius`, `--color-surface` fill, rows at 90% of `--size-row` with 12px sides.
+The panel floats over the screen rather than pushing it down, and scrolls inside itself past 60% of the screen height, so the field stays in view.
 Each result is a small thumbnail, the Card name with its Market Price on the right, and Set, collector number, and Variant underneath.
+The Variant named is the Card's first by name, the one its Card page opens on, so the price on the row is the price the page shows first.
 This is the only typeahead pattern in the app; the Catalog search and any later Card picker use it.
 
 **List row.**
@@ -195,6 +197,7 @@ An unread row carries a 7px `--color-accent` dot before its title.
 
 **Card tile.**
 A 5:7 rectangle at `--size-thumb` wide, `--radius-sm`, with an inset hairline and an inset white highlight so a pale card still reads as an object against a white background.
+A tile with no image, because the Catalog has none or it failed to load, is an empty `--color-surface-2` rectangle with a 1px `--color-line` border instead: the highlight makes an image read as an object, and on its own in dark mode it reads as a heavy frame.
 Sizes are `.75x` in the search picker, `1x` in lists, and `2x` on the Card page.
 
 **Badge and Reputation pill.**
@@ -216,6 +219,7 @@ Each is a 26px icon over a 13px label, `--size-tap` minimum, `--color-muted` at 
 An `--color-alert` dot rides the icon when that tab has something new.
 The bar is present on every top-level screen and hidden on nothing; a screen reached by drilling in keeps it and gains a back button in the top bar.
 The one exception is before a Trader is inside the app at all: sign up and setting up the profile have no sections to move between, so they have no bar ([#13](https://github.com/KyleKDang/toploader/issues/13)).
+The Card page is not drilled into, so it has no back button: it is the Search tab's own screen, with the search picker open above the Card as the chosen mockup draws it, and the next Card is one search away rather than one step back ([#15](https://github.com/KyleKDang/toploader/issues/15)).
 A tab whose screen is not built yet stays on the bar, visibly inactive and disabled, rather than being left off.
 
 **Empty state.**
