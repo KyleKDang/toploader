@@ -5,7 +5,9 @@
 
 -- A trigram index answers "contains this text" without reading every row.
 -- It covers the name and the collector number together, since a Trader may
--- type either, or both ("umbreon 215").
+-- type either, or both ("umbreon 215"). search_cards below spells the same
+-- expression, (name || ' ' || number), and must keep spelling it exactly:
+-- the planner uses an expression index only for the expression it indexes.
 create extension if not exists pg_trgm with schema extensions;
 
 create index cards_search_idx on public.cards

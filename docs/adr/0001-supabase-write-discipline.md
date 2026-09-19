@@ -16,3 +16,9 @@ The write discipline that keeps business logic in one place: reads go through RL
 - Coupling: Auth, Realtime, and the generated API are Supabase-shaped; the data layer is plain Postgres, so the exit is pg_dump plus rewriting the API surface.
 - Pre-planned escape hatch: a small FastAPI worker on Fly (~$2/month) beside Supabase if sync or matching outgrow scheduled functions; this is an addition, not a rewrite.
 - Server-side business rules mean future mobile clients can't drift: rules change without app-store releases.
+
+## Amendment, 2026-09-19 (ticket #15)
+
+A read that a select cannot express may be a function, as `search_cards` is: it ranks Cards by how well they match, which PostgREST's filters and ordering cannot.
+Such a function runs as its caller (`security invoker`, the default), never `security definer`, so the same RLS policies decide what it returns as would decide a select, and it ships with the same denial test.
+Writes are unchanged: every state change is still a named RPC or an edge function.

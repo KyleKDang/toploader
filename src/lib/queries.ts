@@ -95,6 +95,16 @@ export function safeSpotsQuery(cityId: string) {
 const CATALOG_STALE_MS = 60 * 60 * 1000;
 
 /**
+ * The one order a Card's Variants come in, by name. The picker names a
+ * Card's first Variant and its price, and the card page opens on its first
+ * Variant; sharing this is what keeps those the same Variant.
+ */
+const VARIANTS_BY_NAME = [
+  'name',
+  { referencedTable: 'card_variants' },
+] as const;
+
+/**
  * The Cards a search finds, best first, at most 20: search_cards ranks them
  * on the server, across the whole Catalog. Each carries its set and its
  * Variants in name order, the order the card page lists them in.
@@ -108,7 +118,7 @@ export function cardSearchQuery(query: string) {
         .select(
           'id, name, number, image_url, card_sets (name), card_variants (name, market_price_cents)',
         )
-        .order('name', { referencedTable: 'card_variants' });
+        .order(...VARIANTS_BY_NAME);
       if (error) throw error;
       return data;
     },
@@ -136,7 +146,7 @@ async function fetchCard(cardId: number) {
       'id, name, number, rarity, image_url, card_sets (name), card_variants (id, name, market_price_cents, market_price_as_of)',
     )
     .eq('id', cardId)
-    .order('name', { referencedTable: 'card_variants' })
+    .order(...VARIANTS_BY_NAME)
     .maybeSingle();
   if (error) throw error;
   return data;
