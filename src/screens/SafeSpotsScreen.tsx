@@ -51,6 +51,7 @@ export function SafeSpotsScreen() {
                 detail={spot.address}
                 relation={spot.notes}
                 relationTrailing={<Badge>{KIND_LABELS[spot.kind]}</Badge>}
+                wrapRelation
               />
             </li>
           ))}
