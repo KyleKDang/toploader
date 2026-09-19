@@ -19,7 +19,7 @@ const UNBUILT_TABS: readonly TabKey[] = ['search', 'trades', 'profile'];
 
 export function MatchesScreen() {
   const { trader } = route.useLoaderData();
-  const cityName = trader.city?.name;
+  const cityName = trader.city.name;
 
   return (
     <AppShell

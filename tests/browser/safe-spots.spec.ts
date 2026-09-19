@@ -27,6 +27,13 @@ test("a Trader opens the Safe Spot directory and sees their City's Safe Spots", 
   await expect(spots.nth(1)).toContainText('Example Police Station');
   await expect(spots.nth(1)).toContainText('100 Example Way, Irvine, CA 92618');
   await expect(spots.nth(1)).toContainText('Police station');
+  await expect(
+    spots
+      .nth(1)
+      .getByText(
+        'Exchange zone is the two marked spaces by the front entrance.',
+      ),
+  ).toBeVisible();
   await expect(page.getByText('Test City Police Station')).toHaveCount(0);
 
   const tabs = page.getByRole('navigation', { name: 'Sections' });

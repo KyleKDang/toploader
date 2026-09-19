@@ -28,7 +28,7 @@ const KIND_LABELS: Record<
 
 export function SafeSpotsScreen() {
   const { trader, safeSpots } = route.useLoaderData();
-  const cityName = trader.city?.name;
+  const cityName = trader.city.name;
 
   return (
     <AppShell

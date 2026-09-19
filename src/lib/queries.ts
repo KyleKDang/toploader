@@ -16,10 +16,10 @@ export async function currentTraderId(): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
-/** A Trader's public profile, with their City's name. */
+/** A Trader's public profile, with their City. */
 export type TraderProfile = {
   display_name: string | null;
-  city: { name: string } | null;
+  city: { id: string; name: string } | null;
 };
 
 export function traderQuery(traderId: string) {
@@ -28,7 +28,7 @@ export function traderQuery(traderId: string) {
     queryFn: async (): Promise<TraderProfile> => {
       const { data, error } = await supabase
         .from('traders')
-        .select('display_name, city:cities(name)')
+        .select('display_name, city:cities(id, name)')
         .eq('id', traderId)
         .single();
       if (error) throw error;
@@ -42,9 +42,15 @@ export function traderQuery(traderId: string) {
  * display name and City together, and only with the 18-or-over attestation,
  * so a profile with both has all three.
  */
-export function hasProfile(trader: TraderProfile) {
+export function hasProfile(trader: TraderProfile): trader is OnboardedTrader {
   return trader.display_name !== null && trader.city !== null;
 }
+
+/** A Trader who has finished onboarding: display name and City both set. */
+export type OnboardedTrader = {
+  display_name: string;
+  city: NonNullable<TraderProfile['city']>;
+};
 
 /** Every City, in name order. Reference data, so never refetched. */
 export const citiesQuery = queryOptions({
@@ -61,17 +67,19 @@ export const citiesQuery = queryOptions({
 });
 
 /**
- * The signed-in Trader's City's Safe Spots, in name order. RLS scopes the
- * rows to their City, so the query names none. Reference data, so never
- * refetched.
+ * The Safe Spots of the signed-in Trader's City, in name order. RLS already
+ * limits a Trader to their own City's rows; the City is named here so the
+ * cache is keyed on what the rows depend on, and a Trader whose City changes
+ * gets a fresh read. Reference data, so never refetched.
  */
-export function safeSpotsQuery(traderId: string) {
+export function safeSpotsQuery(cityId: string) {
   return queryOptions({
-    queryKey: ['safe-spots', traderId],
+    queryKey: ['safe-spots', cityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('safe_spots')
         .select('id, name, address, kind, notes')
+        .eq('city_id', cityId)
         .order('name');
       if (error) throw error;
       return data;

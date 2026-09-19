@@ -196,6 +196,7 @@ Sizes are `.75x` in the search picker, `1x` in lists, and `2x` on the Card page.
 `--radius-full`, `--text-xs` bold, 3px by 9px padding.
 Verified is `--color-ok-ink` on `--color-ok-bg` with a shield icon and the word "Verified".
 Unverified is `--color-muted` on `--color-surface-2` and reads "Not verified".
+The same neutral badge labels a category on a row, such as a Safe Spot's kind.
 A badge never appears without its word.
 
 **Sheet and modal.**
