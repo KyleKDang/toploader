@@ -39,6 +39,16 @@ async function loadSignedInTrader(queryClient: QueryClient) {
   return { traderId, trader };
 }
 
+/**
+ * The signed-in Trader who has finished onboarding, or a redirect to set up
+ * the profile when they have not. Every screen inside the app loads this.
+ */
+async function loadOnboardedTrader(queryClient: QueryClient) {
+  const { trader } = await loadSignedInTrader(queryClient);
+  if (!hasProfile(trader)) throw redirect({ to: '/set-up-profile' });
+  return trader;
+}
+
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: Outlet,
 });
@@ -72,11 +82,9 @@ const setUpProfileRoute = createRoute({
 const matchesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  loader: async ({ context: { queryClient } }) => {
-    const { trader } = await loadSignedInTrader(queryClient);
-    if (!hasProfile(trader)) throw redirect({ to: '/set-up-profile' });
-    return { trader };
-  },
+  loader: async ({ context: { queryClient } }) => ({
+    trader: await loadOnboardedTrader(queryClient),
+  }),
   component: lazyRouteComponent(
     () => import('./screens/MatchesScreen'),
     'MatchesScreen',
@@ -87,11 +95,12 @@ const safeSpotsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/safe-spots',
   loader: async ({ context: { queryClient } }) => {
-    const { traderId, trader } = await loadSignedInTrader(queryClient);
-    if (!hasProfile(trader)) throw redirect({ to: '/set-up-profile' });
+    const trader = await loadOnboardedTrader(queryClient);
     return {
       trader,
-      safeSpots: await queryClient.ensureQueryData(safeSpotsQuery(traderId)),
+      safeSpots: await queryClient.ensureQueryData(
+        safeSpotsQuery(trader.city.id),
+      ),
     };
   },
   component: lazyRouteComponent(
