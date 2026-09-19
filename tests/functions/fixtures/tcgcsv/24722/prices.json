@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "errors": [],
+  "results": [
+    {
+      "productId": 696613,
+      "lowPrice": 15.99,
+      "midPrice": 19.99,
+      "highPrice": 155.49,
+      "marketPrice": 17.35,
+      "directLowPrice": null,
+      "subTypeName": "Normal"
+    },
+    {
+      "productId": 696676,
+      "lowPrice": 0.46,
+      "midPrice": 0.79,
+      "highPrice": 49.99,
+      "marketPrice": 0.61,
+      "directLowPrice": 0.5,
+      "subTypeName": "Holofoil"
+    },
+    {
+      "productId": 717607,
+      "lowPrice": 6899.99,
+      "midPrice": 8249.5,
+      "highPrice": 10000.0,
+      "marketPrice": null,
+      "directLowPrice": null,
+      "subTypeName": "Holofoil"
+    }
+  ]
+}

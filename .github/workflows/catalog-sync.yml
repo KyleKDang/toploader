@@ -1,0 +1,46 @@
+# The daily Catalog sync (ADR-0003): pulls TCGCSV's files for every Pokemon
+# set into our own database, so Market Prices keep working whatever happens
+# upstream. It runs here rather than as an edge function because parsing a
+# few hundred files does not fit the free tier's 2 seconds of CPU per call.
+# Every run checks in with a Sentry cron monitor, so a failed or missing run
+# is an alert rather than silence.
+name: Catalog sync
+
+on:
+  schedule:
+    # TCGCSV publishes around 20:00 UTC. Off the hour because GitHub delays
+    # scheduled runs most at the top of it. Keep in step with the monitor's
+    # schedule in scripts/sentry-checkin.sh.
+    - cron: '23 21 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: catalog-sync
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync the Catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: scripts/sentry-checkin.sh catalog-sync in_progress
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      - run: node scripts/catalog-sync/main.ts
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      - if: always()
+        run: scripts/sentry-checkin.sh catalog-sync "$STATUS"
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          STATUS: ${{ job.status == 'success' && 'ok' || 'error' }}

@@ -1,0 +1,156 @@
+{
+  "totalItems": 3,
+  "success": true,
+  "errors": [],
+  "results": [
+    {
+      "productId": 696613,
+      "name": "30th Celebration Booster Pack",
+      "cleanName": "30th Celebration Booster Pack",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/696613_200w.jpg",
+      "categoryId": 3,
+      "groupId": 24722,
+      "url": "https://www.tcgplayer.com/product/696613/pokemon-me-30th-celebration-30th-celebration-booster-pack",
+      "modifiedOn": "2026-09-16T04:10:15.28",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": "2026-09-16T00:00:00",
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "CardText",
+          "displayName": "Card Text",
+          "value": "Commemorate 30 years of joy with fan-favorite Pokémon spanning three dazzling decades! Celebrate this magnificent milestone with the might presences of Mewtwo ex and Mew ex, followed by a wealth of allies like Umbreon ex, Salamance ex, and Greninja ex. Plus, there are 30 reasons to honor Pikachu, as each booster pack contains one—with 30 unique variations to collect as Pikachu rare cards! And, whether you're looking forward to a glittering future or taking a nostalgic look at a storied past, there are a host of treasures to find and secrets to reveal in the Pokémon TCG: 30th Celebration!\r\n<br><br>Each 30th Celebration pack contains 6 random holographic cards <em>(cards vary by pack)</em>"
+        }
+      ]
+    },
+    {
+      "productId": 696676,
+      "name": "Greninja ex - 021/128",
+      "cleanName": "Greninja ex 021 128",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/696676_200w.jpg",
+      "categoryId": 3,
+      "groupId": 24722,
+      "url": "https://www.tcgplayer.com/product/696676/pokemon-me-30th-celebration-greninja-ex-021-128",
+      "modifiedOn": "2026-09-16T04:10:15.28",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": "2026-09-16T00:00:00",
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "Number",
+          "displayName": "Card Number",
+          "value": "021/128"
+        },
+        {
+          "name": "Rarity",
+          "displayName": "Rarity",
+          "value": "Double Rare"
+        },
+        {
+          "name": "Card Type",
+          "displayName": "Card Type",
+          "value": "Water"
+        },
+        {
+          "name": "HP",
+          "displayName": "HP",
+          "value": "300"
+        },
+        {
+          "name": "Stage",
+          "displayName": "Stage",
+          "value": "Stage 2"
+        },
+        {
+          "name": "Attack 1",
+          "displayName": "Attack 1",
+          "value": "[W] Stealthy Slash<br> This attack does 30 damage to 1 of your opponent's Pok?mon for each damage counter on that Pok?mon. <em>(Don't apply Weakness and Resistance for Benched Pok?mon.)</em>"
+        },
+        {
+          "name": "Attack 2",
+          "displayName": "Attack 2",
+          "value": "[WW] Aqua Edge (160)"
+        },
+        {
+          "name": "Weakness",
+          "displayName": "Weakness",
+          "value": "Lx2"
+        },
+        {
+          "name": "RetreatCost",
+          "displayName": "Retreat Cost",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "productId": 717607,
+      "name": "Mew - R/RGB",
+      "cleanName": "Mew R RGB",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/717607_200w.jpg",
+      "categoryId": 3,
+      "groupId": 24722,
+      "url": "https://www.tcgplayer.com/product/717607/pokemon-me-30th-celebration-mew-r-rgb",
+      "modifiedOn": "2026-09-17T13:48:02.48",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": null,
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "Number",
+          "displayName": "Card Number",
+          "value": "R/RGB"
+        },
+        {
+          "name": "Rarity",
+          "displayName": "Rarity",
+          "value": "RBG Rare"
+        },
+        {
+          "name": "Card Type",
+          "displayName": "Card Type",
+          "value": "Psychic"
+        },
+        {
+          "name": "HP",
+          "displayName": "HP",
+          "value": "60"
+        },
+        {
+          "name": "Stage",
+          "displayName": "Stage",
+          "value": "Basic"
+        },
+        {
+          "name": "Attack 1",
+          "displayName": "Attack 1",
+          "value": "[PP] Psychic (10+)<br> This attack does 40 more damage for each Energy attached to your opponent's Active Pokémon."
+        },
+        {
+          "name": "Weakness",
+          "displayName": "Weakness",
+          "value": "Dx2"
+        },
+        {
+          "name": "Resistance",
+          "displayName": "Resistance",
+          "value": "F-30"
+        },
+        {
+          "name": "RetreatCost",
+          "displayName": "Retreat Cost",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}

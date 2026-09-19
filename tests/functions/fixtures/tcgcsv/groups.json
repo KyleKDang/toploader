@@ -1,0 +1,34 @@
+{
+  "totalItems": 3,
+  "success": true,
+  "errors": [],
+  "results": [
+    {
+      "groupId": 24722,
+      "name": "ME: 30th Celebration",
+      "abbreviation": "30C",
+      "isSupplemental": false,
+      "publishedOn": "2026-09-16T00:00:00",
+      "modifiedOn": "2026-09-18T18:38:13.477",
+      "categoryId": 3
+    },
+    {
+      "groupId": 23237,
+      "name": "SV: Scarlet & Violet 151",
+      "abbreviation": "MEW",
+      "isSupplemental": false,
+      "publishedOn": "2023-09-22T00:00:00",
+      "modifiedOn": "2026-09-10T15:21:18.29",
+      "categoryId": 3
+    },
+    {
+      "groupId": 604,
+      "name": "Base Set",
+      "abbreviation": "BS",
+      "isSupplemental": false,
+      "publishedOn": "1999-01-09T00:00:00",
+      "modifiedOn": "2026-09-10T19:37:21.387",
+      "categoryId": 3
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "totalItems": 1,
+  "success": true,
+  "errors": [],
+  "results": [
+    {
+      "productId": 502548,
+      "name": "Squirtle - 007/165",
+      "cleanName": "Squirtle 007 165",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/502548_200w.jpg",
+      "categoryId": 3,
+      "groupId": 23237,
+      "url": "https://www.tcgplayer.com/product/502548/pokemon-sv-scarlet-and-violet-151-squirtle-007-165",
+      "modifiedOn": "2026-07-10T01:58:33.263",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": null,
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "Number",
+          "displayName": "Card Number",
+          "value": "007/165"
+        },
+        {
+          "name": "Rarity",
+          "displayName": "Rarity",
+          "value": "Common"
+        },
+        {
+          "name": "Card Type",
+          "displayName": "Card Type",
+          "value": "Water"
+        },
+        {
+          "name": "HP",
+          "displayName": "HP",
+          "value": "60"
+        },
+        {
+          "name": "Stage",
+          "displayName": "Stage",
+          "value": "Basic"
+        },
+        {
+          "name": "Attack 1",
+          "displayName": "Attack 1",
+          "value": "[W] Withdraw\r\n<br>Flip a coin. If heads, during your opponent's next turn, prevent all damage done to this Pokemon by attacks."
+        },
+        {
+          "name": "Attack 2",
+          "displayName": "Attack 2",
+          "value": "[WW] Skull Bash (20)"
+        },
+        {
+          "name": "Weakness",
+          "displayName": "Weakness",
+          "value": "Lx2"
+        },
+        {
+          "name": "Resistance",
+          "displayName": "Resistance",
+          "value": "None"
+        },
+        {
+          "name": "RetreatCost",
+          "displayName": "Retreat Cost",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}
