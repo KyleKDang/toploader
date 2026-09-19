@@ -8,6 +8,7 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import {
+  cardQuery,
   citiesQuery,
   currentTraderId,
   hasProfile,
@@ -109,11 +110,45 @@ const safeSpotsRoute = createRoute({
   ),
 });
 
+const searchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/search',
+  loader: async ({ context: { queryClient } }) => ({
+    trader: await loadOnboardedTrader(queryClient),
+  }),
+  component: lazyRouteComponent(
+    () => import('./screens/SearchScreen'),
+    'SearchScreen',
+  ),
+});
+
+const cardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/cards/$cardId',
+  loader: async ({ context: { queryClient }, params }) => {
+    await loadOnboardedTrader(queryClient);
+    // An id that is not a whole number names no Card, the same as one that
+    // is not in the Catalog, rather than a request that errors.
+    const cardId = Number(params.cardId);
+    return {
+      card: Number.isSafeInteger(cardId)
+        ? await queryClient.ensureQueryData(cardQuery(cardId))
+        : null,
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/CardScreen'),
+    'CardScreen',
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   signUpRoute,
   setUpProfileRoute,
   matchesRoute,
   safeSpotsRoute,
+  searchRoute,
+  cardRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

@@ -84,6 +84,13 @@
   --shadow-focus: 0 0 0 3px
     color-mix(in srgb, var(--color-accent) 18%, transparent);
 
+  /* The Card tile's "inset hairline and inset white highlight", so a pale
+     card still reads as an object against a white background. Inset, so it
+     draws on the tile rather than floating it; the rule that nothing else
+     has a shadow is about elevation. */
+  --shadow-tile:
+    inset 0 0 0 1px rgb(0 0 0 / 0.12), inset 0 0 0 3px rgb(255 255 255 / 0.35);
+
   /* Control sizes. Tokens because the whole direction rests on them. */
   --size-tap: 56px;
   --size-btn: 56px;
@@ -99,6 +106,14 @@
   --spacing-chip: var(--size-chip);
   --spacing-row: var(--size-row);
   --spacing-thumb: var(--size-thumb);
+
+  /* The multiples of those sizes the design system states in prose: the
+     Card tile at .75x in the search picker and 2x on the Card page, and the
+     picker's rows at 90% of a list row. Derived, so they move with the
+     token they are a multiple of. */
+  --spacing-thumb-sm: calc(var(--size-thumb) * 0.75);
+  --spacing-thumb-lg: calc(var(--size-thumb) * 2);
+  --spacing-row-picker: calc(var(--size-row) * 0.9);
 
   /* The content column: single-column at every width, capped and centered
      above 640px. That is the whole responsive story for v1. */
