@@ -13,6 +13,8 @@ export default async function setup(project: TestProject) {
   await waitForSignedInReads(status.API_URL, status.PUBLISHABLE_KEY);
   project.provide('supabaseUrl', status.API_URL);
   project.provide('supabasePublishableKey', status.PUBLISHABLE_KEY);
+  // The server-side key, for seam 2: the Catalog sync runs as service_role.
+  project.provide('supabaseSecretKey', status.SECRET_KEY);
 }
 
 /*
@@ -47,5 +49,6 @@ declare module 'vitest' {
   export interface ProvidedContext {
     supabaseUrl: string;
     supabasePublishableKey: string;
+    supabaseSecretKey: string;
   }
 }

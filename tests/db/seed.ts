@@ -31,6 +31,18 @@ export function anonClient(): Client {
 }
 
 /**
+ * A client holding the server-side key: service_role, the identity of the
+ * Catalog sync and of no Trader.
+ */
+export function serviceClient(): Client {
+  return createClient<Database>(
+    inject('supabaseUrl'),
+    inject('supabaseSecretKey'),
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}
+
+/**
  * A new Trader who signed up with email through real Auth and whose client
  * holds their session. The profile is left exactly as signup leaves it.
  */
