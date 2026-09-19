@@ -9,7 +9,7 @@ on:
   schedule:
     # 10:17 UTC is 3:17 in the morning Pacific, off the hour because GitHub
     # delays scheduled runs most at the top of it. Keep in step with the
-    # monitor's schedule in scripts/backup/sentry-checkin.sh.
+    # monitor's schedule in scripts/sentry-checkin.sh.
     - cron: '17 10 * * *'
   workflow_dispatch:
 
@@ -33,7 +33,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: scripts/backup/sentry-checkin.sh in_progress
+      - run: scripts/sentry-checkin.sh nightly-backup in_progress
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       - run: scripts/backup/dump.sh backup
@@ -88,7 +88,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - run: scripts/backup/sentry-checkin.sh "$STATUS"
+      - run: scripts/sentry-checkin.sh nightly-backup "$STATUS"
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           STATUS: >-
