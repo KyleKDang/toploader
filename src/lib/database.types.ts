@@ -52,6 +52,44 @@ export type Database = {
         }
         Relationships: []
       }
+      safe_spots: {
+        Row: {
+          address: string
+          city_id: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["safe_spot_kind"]
+          name: string
+          notes: string | null
+        }
+        Insert: {
+          address: string
+          city_id: string
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["safe_spot_kind"]
+          name: string
+          notes?: string | null
+        }
+        Update: {
+          address?: string
+          city_id?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["safe_spot_kind"]
+          name?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safe_spots_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trader_private: {
         Row: {
           adult_attested_at: string | null
@@ -136,7 +174,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      safe_spot_kind: "police_station" | "monitored_site"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -266,7 +304,9 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      safe_spot_kind: ["police_station", "monitored_site"],
+    },
   },
 } as const
 

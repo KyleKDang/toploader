@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { messageForTrader } from '../../src/lib/errors.ts';
+import { authStorageKey } from './session.ts';
 
 /*
  * A route that fails to load, end to end at 375px: the Trader sees the app's
@@ -58,16 +59,6 @@ test('a route that fails to load shows the app error screen, reports once, and r
 
 /** The window, marked before trying again, to tell whether it reloaded. */
 type Marked = { notReloaded?: boolean };
-
-/** supabase-js's default storage key: `sb-` and the API host's first label. */
-function authStorageKey() {
-  const api = process.env.SUPABASE_API_URL;
-  if (!api)
-    throw new Error(
-      'SUPABASE_API_URL is missing; run this through playwright.config.ts',
-    );
-  return `sb-${new URL(api).hostname.split('.')[0]}-auth-token`;
-}
 
 /** A session that passes supabase-js's shape check but has no user. */
 function sessionWithoutUser() {

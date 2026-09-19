@@ -14,6 +14,13 @@ export interface SeededTrader {
 
 export const ORANGE_COUNTY = 'Orange County';
 
+/**
+ * A second City that exists only on local and CI stacks, seeded by
+ * supabase/seed.sql, so a test can put a Trader somewhere other than the
+ * launch City.
+ */
+export const TEST_CITY = 'Test City';
+
 /** A client with no session: the anon role, as a signed-out visitor. */
 export function anonClient(): Client {
   return createClient<Database>(
@@ -53,12 +60,15 @@ export async function cityId(client: Client, name: string): Promise<string> {
   return data.id;
 }
 
-/** A Trader who has finished onboarding in Orange County. */
-export async function seedTrader(displayName: string): Promise<SeededTrader> {
+/** A Trader who has finished onboarding, in Orange County unless told. */
+export async function seedTrader(
+  displayName: string,
+  city: string = ORANGE_COUNTY,
+): Promise<SeededTrader> {
   const trader = await signUpTrader();
   const { error } = await trader.client.rpc('set_trader_profile', {
     display_name: displayName,
-    city_id: await cityId(trader.client, ORANGE_COUNTY),
+    city_id: await cityId(trader.client, city),
     attests_adult: true,
   });
   if (error) throw error;

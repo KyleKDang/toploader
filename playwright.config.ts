@@ -12,8 +12,10 @@ const status = readLocalStackStatus();
 
 // Read by the tracer to fetch the sign-in code the local stack emailed.
 process.env.MAILPIT_URL = status.MAILPIT_URL;
-// Read by the route-error tracer to plant a session under supabase-js's key.
+// Read by tests/browser/session.ts to sign a Trader up on the local stack
+// and plant their session under supabase-js's key.
 process.env.SUPABASE_API_URL = status.API_URL;
+process.env.SUPABASE_PUBLISHABLE_KEY = status.PUBLISHABLE_KEY;
 
 // A port of its own, so the tracer never reuses a dev server that is
 // pointed somewhere else.
