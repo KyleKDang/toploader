@@ -122,7 +122,8 @@ Settled on [#36](https://github.com/KyleKDang/toploader/issues/36).
 
 ## Data model sketch
 
-Catalog tables (synced, read-only to clients): `cards`, `card_variants`, `price_snapshots` (daily, per variant; compacted per the runway plan in the delivery research).
+Catalog tables (synced, read-only to clients): `card_sets`, `cards`, `card_variants` (each carrying its current Market Price), `price_snapshots` (per variant, changed-only, thinned to weekly after 90 days, per the runway plan in the delivery research).
+Every Catalog row has our own id, with TCGplayer's id beside it as a unique column, so the upstream stays swappable.
 Trader tables: `traders` (the public profile: display name, city_id, verified_at, `banned_at`, denormalized reputation counters, member-since), `trader_private` (fields only the owner reads: the 18-or-over attestation time), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
 A Trader's profile is split by audience because RLS scopes rows, not columns: a public field goes on `traders`, a private one on `trader_private`, so no column-level grant or RLS-bypassing view is ever a second place the rule can be wrong.
 Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (trader, variant, condition, photos, status: active / in_trade / traded / withdrawn; asking_price nullable), `wants` (trader, card, variant nullable, min_condition nullable).
@@ -141,7 +142,9 @@ Every policy and RPC ships with a test proving what a foreign user cannot do.
 - Backend: Supabase (Postgres + Auth + Realtime + Storage + edge/scheduled functions) with the write discipline above ([ADR-0001](adr/0001-supabase-write-discipline.md)).
 - Frontend: Vite + React + TypeScript SPA, Tailwind, TanStack Query + TanStack Router, vite-plugin-pwa; deployed on Render free static hosting.
 - Languages: TypeScript everywhere plus SQL/PL/pgSQL; Python only if the pre-planned FastAPI-on-Fly escape hatch ever fires.
-- Price sync: scheduled function pulling TCGCSV daily (primary) with pokemontcg.io/TCGdex as catalog source and cross-check ([ADR-0003](adr/0003-price-data-sources.md)).
+- Price sync: a scheduled GitHub Actions job pulling TCGCSV daily into our own database, one transaction per set through an RPC only `service_role` may call ([ADR-0003](adr/0003-price-data-sources.md)).
+  It is a job rather than an edge function because parsing a few hundred files does not fit the free tier's 2 seconds of CPU per call.
+  TCGCSV carries the Cards, Variants, images, and prices, so it is the only upstream pulled; pokemontcg.io and TCGdex are the named swap-in sources, not a daily cross-check.
 - Notifications: web push via self-generated VAPID keys; email via Resend, which also serves as Supabase Auth's custom SMTP, sending from a `mail.` subdomain with SPF/DKIM/DMARC ([ADR-0006](adr/0006-operational-vendors.md)).
 - Domain and DNS: registered at Cloudflare Registrar with DNS hosted at Cloudflare, where the Render, Resend, and DMARC records all live ([ADR-0006](adr/0006-operational-vendors.md)).
 - Error monitoring: Sentry (free Developer plan), covering the SPA and the edge functions ([ADR-0006](adr/0006-operational-vendors.md)).
@@ -174,7 +177,7 @@ Three seams, chosen highest-first, with no test-only indirection layers.
    All business rules are tested here: the Trade state machine, Matching, Reputation counters, Trade Record immutability, and every policy/RPC's foreign-user denial test.
    pgTAP was considered and rejected as the primary seam: it runs below Auth/PostgREST (login claims must be simulated) and adds a second toolchain.
 2. **Edge/scheduled function seam.**
-   Functions whose side effects leave the database (price sync, web push, email) are invoked against the local stack with external HTTP faked at the network edge: recorded TCGCSV/catalog fixtures in, captured Resend/push requests out.
+   Functions and scheduled jobs whose side effects cross the database's edge (price sync, web push, email) are invoked against the local stack with external HTTP faked at the network edge: recorded TCGCSV/catalog fixtures in, captured Resend/push requests out.
    Assertions are on database state and outbound calls.
 3. **Browser seam (Playwright), kept thin.**
    One happy-path tracer per primary flow above, plus a PWA installability smoke check.

@@ -12,8 +12,9 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 |---|---|---|
 | `SUPABASE_DB_URL` | GitHub secret | CI `migrate`, nightly backup |
 | `BACKUP_PASSPHRASE` | GitHub secret, and the shared inbox | nightly backup |
-| `SENTRY_DSN` | GitHub secret | nightly backup's cron check-in |
-| `SUPABASE_URL` | GitHub variable | nightly backup (reads the hosted service versions) |
+| `SENTRY_DSN` | GitHub secret | the cron check-ins of the nightly backup and the Catalog sync |
+| `SUPABASE_SECRET_KEY` | GitHub secret | Catalog sync |
+| `SUPABASE_URL` | GitHub variable | nightly backup (reads the hosted service versions), Catalog sync |
 | `SUPABASE_PUBLISHABLE_KEY` | GitHub variable | nightly backup |
 | `VITE_SUPABASE_URL` | Render env | the app |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Render env | the app |
@@ -23,6 +24,9 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 
 `SUPABASE_DB_URL` is the **session pooler** connection string from the Supabase dashboard's Connect panel, with the database password filled in.
 The direct connection will not work from GitHub's runners: it is IPv6-only, and they are IPv4-only.
+
+`SUPABASE_SECRET_KEY` is the secret API key from the Supabase dashboard's API Keys panel.
+It acts as `service_role`, which bypasses RLS, so it exists only as this GitHub secret and never reaches the app.
 
 The Supabase URL and publishable key ship in the app's JavaScript, so in GitHub they are variables rather than secrets.
 
@@ -55,6 +59,9 @@ The domain's DNS records, including SPF, DKIM and DMARC for `mail.`, are in Clou
 - **Merge to `main`:** CI's `migrate` job applies new migrations to the hosted database; Render deploys the app once every check on the commit has passed (`render.yaml`).
 - **Nightly, 10:17 UTC:** `.github/workflows/nightly-backup.yml` dumps and encrypts the database, keeps it as an artifact for 30 days, restores it into a throwaway stack to prove it restores, and checks in with the Sentry cron monitor `nightly-backup`.
   A failed run, or no run at all, raises a Sentry issue.
+- **Daily, 21:23 UTC:** `.github/workflows/catalog-sync.yml` syncs the Catalog from TCGCSV, which publishes around 20:00 UTC, and checks in with the Sentry cron monitor `catalog-sync`.
+  A set that fails keeps its last-good data and fails the run, so it raises a Sentry issue while every other set is still applied.
+  It can be run by hand from the Actions tab, and running it twice in a day is harmless.
 
 ## Recovering the database
 
