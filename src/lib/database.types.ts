@@ -34,6 +34,103 @@ export type Database = {
   }
   public: {
     Tables: {
+      card_sets: {
+        Row: {
+          abbreviation: string | null
+          id: number
+          name: string
+          released_on: string | null
+          synced_as_of: string
+          tcgplayer_group_id: number
+        }
+        Insert: {
+          abbreviation?: string | null
+          id?: never
+          name: string
+          released_on?: string | null
+          synced_as_of: string
+          tcgplayer_group_id: number
+        }
+        Update: {
+          abbreviation?: string | null
+          id?: never
+          name?: string
+          released_on?: string | null
+          synced_as_of?: string
+          tcgplayer_group_id?: number
+        }
+        Relationships: []
+      }
+      card_variants: {
+        Row: {
+          card_id: number
+          id: number
+          market_price_as_of: string | null
+          market_price_cents: number | null
+          name: string
+        }
+        Insert: {
+          card_id: number
+          id?: never
+          market_price_as_of?: string | null
+          market_price_cents?: number | null
+          name: string
+        }
+        Update: {
+          card_id?: number
+          id?: never
+          market_price_as_of?: string | null
+          market_price_cents?: number | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_variants_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards: {
+        Row: {
+          card_set_id: number
+          id: number
+          image_url: string | null
+          name: string
+          number: string
+          rarity: string | null
+          tcgplayer_product_id: number
+        }
+        Insert: {
+          card_set_id: number
+          id?: never
+          image_url?: string | null
+          name: string
+          number: string
+          rarity?: string | null
+          tcgplayer_product_id: number
+        }
+        Update: {
+          card_set_id?: number
+          id?: never
+          image_url?: string | null
+          name?: string
+          number?: string
+          rarity?: string | null
+          tcgplayer_product_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_card_set_id_fkey"
+            columns: ["card_set_id"]
+            isOneToOne: false
+            referencedRelation: "card_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cities: {
         Row: {
           created_at: string
@@ -51,6 +148,32 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      price_snapshots: {
+        Row: {
+          as_of: string
+          card_variant_id: number
+          market_price_cents: number
+        }
+        Insert: {
+          as_of: string
+          card_variant_id: number
+          market_price_cents: number
+        }
+        Update: {
+          as_of?: string
+          card_variant_id?: number
+          market_price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_snapshots_card_variant_id_fkey"
+            columns: ["card_variant_id"]
+            isOneToOne: false
+            referencedRelation: "card_variants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       safe_spots: {
         Row: {
@@ -168,6 +291,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_catalog_set: {
+        Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
+        Returns: undefined
+      }
+      compact_price_snapshots: {
+        Args: { sync_day: string }
+        Returns: undefined
+      }
       set_trader_profile: {
         Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
