@@ -11,6 +11,7 @@ import {
   citiesQuery,
   currentTraderId,
   hasProfile,
+  safeSpotsQuery,
   traderQuery,
 } from './lib/queries';
 import { RouteErrorScreen } from './screens/RouteErrorScreen';
@@ -82,10 +83,28 @@ const matchesRoute = createRoute({
   ),
 });
 
+const safeSpotsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/safe-spots',
+  loader: async ({ context: { queryClient } }) => {
+    const { traderId, trader } = await loadSignedInTrader(queryClient);
+    if (!hasProfile(trader)) throw redirect({ to: '/set-up-profile' });
+    return {
+      trader,
+      safeSpots: await queryClient.ensureQueryData(safeSpotsQuery(traderId)),
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/SafeSpotsScreen'),
+    'SafeSpotsScreen',
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   signUpRoute,
   setUpProfileRoute,
   matchesRoute,
+  safeSpotsRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

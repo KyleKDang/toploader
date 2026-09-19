@@ -3,7 +3,8 @@ import { supabase } from './supabase';
 
 /*
  * What the routes need to know about the signed-in Trader - who they are,
- * their profile, and whether it is set up - and the Cities to pick from.
+ * their profile, and whether it is set up - the Cities to pick from, and
+ * the Safe Spots of the Trader's City.
  * Reads are TanStack Query options, so a route loader and a component share
  * one cache entry per read.
  */
@@ -58,3 +59,23 @@ export const citiesQuery = queryOptions({
   },
   staleTime: Infinity,
 });
+
+/**
+ * The signed-in Trader's City's Safe Spots, in name order. RLS scopes the
+ * rows to their City, so the query names none. Reference data, so never
+ * refetched.
+ */
+export function safeSpotsQuery(traderId: string) {
+  return queryOptions({
+    queryKey: ['safe-spots', traderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('safe_spots')
+        .select('id, name, address, kind, notes')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    staleTime: Infinity,
+  });
+}
