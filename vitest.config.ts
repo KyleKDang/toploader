@@ -6,7 +6,7 @@ export default defineConfig({
       // Seam 1: supabase-js clients against the local stack (`supabase start`).
       'tests/db/**/*.test.ts',
       // Seam 2: edge/scheduled functions against the same stack, external HTTP
-      // faked at the network edge. Empty until the first function lands.
+      // faked at the network edge.
       'tests/functions/**/*.test.ts',
     ],
     globalSetup: ['tests/db/global-setup.ts'],

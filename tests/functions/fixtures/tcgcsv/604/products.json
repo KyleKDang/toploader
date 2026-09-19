@@ -1,0 +1,217 @@
+{
+  "totalItems": 5,
+  "success": true,
+  "errors": [],
+  "results": [
+    {
+      "productId": 42346,
+      "name": "Alakazam",
+      "cleanName": "Alakazam",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/42346_200w.jpg",
+      "categoryId": 3,
+      "groupId": 604,
+      "url": "https://www.tcgplayer.com/product/42346/pokemon-base-set-alakazam",
+      "modifiedOn": "2026-02-17T13:08:33.207",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": null,
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "Number",
+          "displayName": "Card Number",
+          "value": "001/102"
+        },
+        {
+          "name": "Rarity",
+          "displayName": "Rarity",
+          "value": "Holo Rare"
+        },
+        {
+          "name": "Card Type",
+          "displayName": "Card Type",
+          "value": "Psychic"
+        },
+        {
+          "name": "HP",
+          "displayName": "HP",
+          "value": "80"
+        },
+        {
+          "name": "Stage",
+          "displayName": "Stage",
+          "value": "Stage 2"
+        },
+        {
+          "name": "CardText",
+          "displayName": "Card Text",
+          "value": "<strong>Pokémon Power: Damage Swap</strong> As often as you like during your turn <em>(before your attack)</em>, you may move 1 damage counter from 1 of your Pokémon to another as long as you don't Knock Out that Pokémon. This power can't be used if Alakazam is Asleep, Confused, or Paralyzed."
+        },
+        {
+          "name": "Attack 1",
+          "displayName": "Attack 1",
+          "value": "[PPP] Confuse Ray (30)\r\n<br>Flip a coin. If heads, the Defending Pokémon is now Confused."
+        },
+        {
+          "name": "Weakness",
+          "displayName": "Weakness",
+          "value": "P"
+        },
+        {
+          "name": "RetreatCost",
+          "displayName": "Retreat Cost",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "productId": 42348,
+      "name": "Lightning Energy",
+      "cleanName": "Lightning Energy",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/42348_200w.jpg",
+      "categoryId": 3,
+      "groupId": 604,
+      "url": "https://www.tcgplayer.com/product/42348/pokemon-base-set-lightning-energy",
+      "modifiedOn": "2025-11-29T03:26:56.117",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": null,
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "Number",
+          "displayName": "Card Number",
+          "value": "100/102"
+        },
+        {
+          "name": "Rarity",
+          "displayName": "Rarity",
+          "value": "Common"
+        },
+        {
+          "name": "Card Type",
+          "displayName": "Card Type",
+          "value": "Basic Energy"
+        }
+      ]
+    },
+    {
+      "productId": 138130,
+      "name": "Base Set Booster Pack [Revised Unlimited Edition]",
+      "cleanName": "Base Set Booster Pack Revised Unlimited Edition",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/138130_200w.jpg",
+      "categoryId": 3,
+      "groupId": 604,
+      "url": "https://www.tcgplayer.com/product/138130/pokemon-base-set-base-set-booster-pack-revised-unlimited-edition",
+      "modifiedOn": "2022-12-07T13:53:45.347",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": null,
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "CardText",
+          "displayName": "Card Text",
+          "value": "This is the reprinted Base Set unlimited booster pack that introduced the new shadowed border design and card format introduced in Jungle.\r\n<br>Disclaimer: This product comes in 3 different sealed wrapping designs. The design you receive when ordering this product depends on the seller's inventory. \r\n<br>\r\n<br><strong>(Not to be confused with the original 1st Edition and Unlimited Shadowless print runs)</strong>"
+        }
+      ]
+    },
+    {
+      "productId": 185731,
+      "name": "Base Set Booster Box [Revised Unlimited Edition]",
+      "cleanName": "Base Set Booster Box Revised Unlimited Edition",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/185731_200w.jpg",
+      "categoryId": 3,
+      "groupId": 604,
+      "url": "https://www.tcgplayer.com/product/185731/pokemon-base-set-base-set-booster-box-revised-unlimited-edition",
+      "modifiedOn": "2021-12-13T19:23:48.47",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": null,
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "CardText",
+          "displayName": "Card Text",
+          "value": "This is the reprinted Base Set unlimited booster box that introduced the new shadowed border design and card format introduced in Jungle.\r\n<br>\r\n<br><strong>(Not to be confused with the original 1st Edition and Unlimited Shadowless print runs)</strong>"
+        }
+      ]
+    },
+    {
+      "productId": 657516,
+      "name": "Charizard (Black Dot Error)",
+      "cleanName": "Charizard Black Dot Error",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/657516_200w.jpg",
+      "categoryId": 3,
+      "groupId": 604,
+      "url": "https://www.tcgplayer.com/product/657516/pokemon-base-set-charizard-black-dot-error",
+      "modifiedOn": "2025-10-10T14:50:00.273",
+      "imageCount": 1,
+      "presaleInfo": {
+        "isPresale": false,
+        "releasedOn": null,
+        "note": null
+      },
+      "extendedData": [
+        {
+          "name": "Number",
+          "displayName": "Card Number",
+          "value": "004/102"
+        },
+        {
+          "name": "Rarity",
+          "displayName": "Rarity",
+          "value": "Holo Rare"
+        },
+        {
+          "name": "Card Type",
+          "displayName": "Card Type",
+          "value": "Fire"
+        },
+        {
+          "name": "HP",
+          "displayName": "HP",
+          "value": "120"
+        },
+        {
+          "name": "Stage",
+          "displayName": "Stage",
+          "value": "Stage 2"
+        },
+        {
+          "name": "CardText",
+          "displayName": "Card Text",
+          "value": "<strong>Pokémon Power: Energy Burn</strong> As often as you like during your turn <em>(before your attack)</em>, you may turn all Energy attached to Charizard into Fire Energy for the rest of the turn. This power can't be used if Charizard is Asleep, Confused, or Paralyzed."
+        },
+        {
+          "name": "Attack 1",
+          "displayName": "Attack 1",
+          "value": "[RRRR] Fire Spin (100)\r\n<br>Discard 2 Energy cards attached to Charizard in order to use this attack."
+        },
+        {
+          "name": "Weakness",
+          "displayName": "Weakness",
+          "value": "W"
+        },
+        {
+          "name": "Resistance",
+          "displayName": "Resistance",
+          "value": "F-30"
+        },
+        {
+          "name": "RetreatCost",
+          "displayName": "Retreat Cost",
+          "value": "3"
+        }
+      ]
+    }
+  ]
+}
