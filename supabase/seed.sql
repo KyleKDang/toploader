@@ -35,3 +35,27 @@ from (
     )
 ) as spot (city, name, address, kind, notes)
 join public.cities on cities.name = spot.city;
+
+-- A made-up Catalog set, written through the sync's own function so local
+-- data takes the same path production data does. Its images point at
+-- TCGplayer's image host, which a browser tracer fakes at the network edge.
+select public.apply_catalog_set(
+  card_set => '{"groupId": 990900, "name": "Example Base Set",
+    "abbreviation": "EX", "releasedOn": "2026-03-01"}',
+  cards => '[
+    {"productId": 990900001, "name": "Examplemon", "number": "004/102",
+     "rarity": "Holo Rare",
+     "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/990900001_200w.jpg"},
+    {"productId": 990900002, "name": "Examplemon ex", "number": "150/102",
+     "rarity": "Ultra Rare",
+     "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/990900002_200w.jpg"},
+    {"productId": 990900003, "name": "Dark Examplemon", "number": "031/102",
+     "rarity": "Rare", "imageUrl": null}
+  ]',
+  prices => '[
+    {"productId": 990900001, "variant": "Holofoil", "marketPrice": 1240.5},
+    {"productId": 990900001, "variant": "Reverse Holofoil", "marketPrice": 4.56},
+    {"productId": 990900002, "variant": "Normal", "marketPrice": 12}
+  ]',
+  sync_day => '2026-09-19'
+);

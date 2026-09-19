@@ -1,7 +1,7 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { AppShell, Badge, EmptyState, ListRow, TopBar } from '../components';
-import type { TabKey } from '../components';
 import type { Database } from '../lib/database.types';
+import { useTabs } from '../lib/tabs';
 
 /*
  * The Safe Spot directory: the curated public places in the Trader's City
@@ -14,9 +14,6 @@ import type { Database } from '../lib/database.types';
  */
 
 const route = getRouteApi('/safe-spots');
-
-/** The tabs whose screens are not built yet. */
-const UNBUILT_TABS: readonly TabKey[] = ['search', 'profile'];
 
 const KIND_LABELS: Record<
   Database['public']['Enums']['safe_spot_kind'],
@@ -33,8 +30,7 @@ export function SafeSpotsScreen() {
   return (
     <AppShell
       header={<TopBar title="Safe Spots" subtitle={cityName} />}
-      tab="trades"
-      unavailableTabs={UNBUILT_TABS}
+      {...useTabs('trades')}
     >
       {safeSpots.length === 0 ? (
         <EmptyState

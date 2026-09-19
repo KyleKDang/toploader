@@ -140,8 +140,8 @@ The mockups draw 52px, and this file wins over a mockup by its own rule; 4px is 
 
 ### Tokens this file states in prose
 
-Five values above are named in a sentence rather than a table, and the code needs a token name for each of them, because a component may not inline a value.
-They were added to the theme in [#40](https://github.com/KyleKDang/toploader/issues/40) and carry the values this file already gives them; none of them is a new decision.
+Some values above are named in a sentence rather than a table, and the code needs a token name for each of them, because a component may not inline a value.
+The first five were added to the theme in [#40](https://github.com/KyleKDang/toploader/issues/40); every row carries the value this file already gives it, and none of them is a new decision.
 
 | Token | Value | Stated in |
 |---|---|---|
@@ -150,6 +150,11 @@ They were added to the theme in [#40](https://github.com/KyleKDang/toploader/iss
 | `--text-tab-icon` | 26px | Bottom tab bar, "a 26px icon over a 13px label" |
 | `--shadow-focus` | 3px accent glow at 18% | Text input, the focused state |
 | `--container-content` | 480px | Mobile first, "the content column is capped at 480px" |
+| `--shadow-tile` | 1px inset hairline and 3px inset white highlight | Card tile, "an inset hairline and an inset white highlight" |
+| `--spacing-thumb-sm`, `--spacing-thumb-lg` | `.75x` and `2x` of `--size-thumb` | Card tile, "Sizes are `.75x` in the search picker, `1x` in lists, and `2x` on the Card page" |
+| `--spacing-row-picker` | 90% of `--size-row` | Search picker, "rows at 90% of `--size-row`" |
+
+The last three rows were added in [#15](https://github.com/KyleKDang/toploader/issues/15), the ticket that first drew a Card tile and the search picker.
 
 One token is renamed rather than added.
 Tailwind derives `rounded-*` from the suffix of a `--radius-*` name, so this file's `--radius` is `--radius-md` in the theme, and `--radius` remains as an alias.

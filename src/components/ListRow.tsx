@@ -35,6 +35,8 @@ type ListRowProps = {
   wrapRelation?: boolean;
   /** An unread row carries a 7px accent dot before its title. */
   unread?: boolean;
+  /** A search picker result: 90% of a list row's height, 12px sides. */
+  picker?: boolean;
   /** Renders as a button when given; rows are otherwise plain content. */
   onClick?: () => void;
   className?: string;
@@ -49,6 +51,7 @@ export function ListRow({
   relationTrailing,
   wrapRelation = false,
   unread = false,
+  picker = false,
   onClick,
   className,
 }: ListRowProps) {
@@ -58,7 +61,8 @@ export function ListRow({
     <Element
       {...(onClick ? { type: 'button' as const, onClick } : {})}
       className={cx(
-        'flex w-full min-h-row items-center gap-3.5 border-b border-line px-4 py-2.5 text-left',
+        'flex w-full items-center gap-3.5 border-b border-line py-2.5 text-left',
+        picker ? 'min-h-row-picker px-3' : 'min-h-row px-4',
         onClick && 'hover:bg-surface-2 active:bg-surface-2',
         className,
       )}

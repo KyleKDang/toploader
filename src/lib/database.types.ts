@@ -299,6 +299,24 @@ export type Database = {
         Args: { sync_day: string }
         Returns: undefined
       }
+      search_cards: {
+        Args: { query: string }
+        Returns: {
+          card_set_id: number
+          id: number
+          image_url: string | null
+          name: string
+          number: string
+          rarity: string | null
+          tcgplayer_product_id: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "cards"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       set_trader_profile: {
         Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
