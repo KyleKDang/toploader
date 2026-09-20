@@ -157,6 +157,26 @@ describe('Wants', () => {
     expect((await readWants(actor.client)).map((w) => w.id)).toContain(want);
   });
 
+  it('cannot be written for, or over, another Trader by a foreign one', async () => {
+    const want = await addWant(actor.client, { card_id: examplemon.id });
+
+    // Planting a Want on someone else, and tampering with one they hold.
+    const planted = await foreign.client
+      .from('wants')
+      .insert({ trader_id: actor.id, card_id: examplemonEx.id });
+    const tampered = await foreign.client
+      .from('wants')
+      .update({ min_condition: 'DMG' })
+      .eq('id', want);
+    const deleted = await foreign.client.from('wants').delete().eq('id', want);
+
+    expect(planted.error?.code).toBe('42501');
+    expect(tampered.error?.code).toBe('42501');
+    expect(deleted.error?.code).toBe('42501');
+    expect(await readWants(foreign.client)).toEqual([]);
+    expect((await readWants(actor.client)).map((w) => w.id)).toContain(want);
+  });
+
   it('is out of reach of a signed-out visitor', async () => {
     const anon = anonClient();
 
