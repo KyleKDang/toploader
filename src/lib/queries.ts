@@ -169,10 +169,6 @@ export function collectionKey(traderId: string) {
   return ['collection', traderId] as const;
 }
 
-/** A Copy a Trader owns, with the Card and the Market Price it is valued at. */
-const ENTRY_COLUMNS =
-  'id, condition, quantity, card_variants (id, name, market_price_cents, cards (id, name, number, image_url, card_sets (name)))';
-
 /** The Copies a Trader owns, most recently added first. */
 export function collectionQuery(traderId: string) {
   return queryOptions({
@@ -184,7 +180,9 @@ export function collectionQuery(traderId: string) {
 async function fetchCollection() {
   const { data, error } = await supabase
     .from('collection_entries')
-    .select(ENTRY_COLUMNS)
+    .select(
+      'id, condition, quantity, card_variants (id, name, market_price_cents, cards (id, name, number, image_url, card_sets (name)))',
+    )
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data;
@@ -207,17 +205,24 @@ export function cardCollectionQuery(
 ) {
   return queryOptions({
     queryKey: [...collectionKey(traderId), 'card', cardId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('collection_entries')
-        .select('id, condition, quantity, card_variant_id')
-        .in('card_variant_id', variantIds)
-        .order('created_at');
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchCardCollection(variantIds),
   });
 }
+
+async function fetchCardCollection(variantIds: readonly number[]) {
+  const { data, error } = await supabase
+    .from('collection_entries')
+    .select('id, condition, quantity, card_variant_id')
+    .in('card_variant_id', variantIds)
+    .order('created_at');
+  if (error) throw error;
+  return data;
+}
+
+/** A Copy a Trader owns of one Card, as its card page lists it. */
+export type CardCollectionEntry = Awaited<
+  ReturnType<typeof fetchCardCollection>
+>[number];
 
 /**
  * The single total-value line a Collection shows: what its Copies are worth

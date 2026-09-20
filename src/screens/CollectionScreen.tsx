@@ -1,5 +1,12 @@
 import { getRouteApi, useNavigate, useRouter } from '@tanstack/react-router';
-import { AppShell, CardTile, EmptyState, ListRow, TopBar } from '../components';
+import {
+  AppShell,
+  CardTile,
+  EmptyState,
+  ListRow,
+  StatStrip,
+  TopBar,
+} from '../components';
 import { formatPrice } from '../lib/format';
 import type { CollectionEntry } from '../lib/queries';
 import { useTabs } from '../lib/tabs';
@@ -79,13 +86,11 @@ function TotalValue({
   unpriced_copy_count: number;
 }) {
   return (
-    <section
-      aria-label="Total value"
-      className="mx-4 mt-3.5 flex flex-col gap-0.5 rounded-md border border-line bg-surface px-3.5 py-3"
+    <StatStrip
+      name="Total value"
+      label="Total value · at market price, updated daily"
+      className="mt-3.5"
     >
-      <p className="text-xs font-semibold text-muted">
-        Total value · at market price, updated daily
-      </p>
       <p className="text-xl font-bold tabular-nums text-ink">
         {formatPrice(total_cents)}
       </p>
@@ -95,7 +100,7 @@ function TotalValue({
           ? ` · ${copies(unpriced_copy_count)} with no market price`
           : ''}
       </p>
-    </section>
+    </StatStrip>
   );
 }
 

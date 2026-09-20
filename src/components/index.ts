@@ -20,6 +20,7 @@ export { FormError } from './FormError';
 export { ListRow } from './ListRow';
 export { SearchPicker } from './SearchPicker';
 export { Select } from './Select';
+export { StatStrip } from './StatStrip';
 export { Stepper } from './Stepper';
 export { TextInput } from './TextInput';
 export { TopBar } from './TopBar';

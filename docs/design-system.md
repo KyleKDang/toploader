@@ -84,7 +84,7 @@ Numbers use the same family with `font-variant-numeric: tabular-nums`, so that a
 | `--text-sm` | 15px | Second and third lines of a row, captions, chips |
 | `--text-base` | 17px | Body, row titles, prices, buttons |
 | `--text-lg` | 21px | Screen titles, Card names, profile names, stat numbers |
-| `--text-xl` | 34px | The one big number: Market Price on the Card page |
+| `--text-xl` | 34px | The one big number on a screen: the Market Price on the Card page, the total value on the Collection screen ([#16](https://github.com/KyleKDang/toploader/issues/16)) |
 
 Body line height is 1.35.
 Prose that runs longer than two lines uses 1.5.
@@ -178,6 +178,13 @@ Every input has a visible label or, where the placeholder is unambiguous as in t
 Guidance a Trader needs while filling the field goes in a hint: a `--text-sm` `--color-muted` line under the field, tied to it with `aria-describedby`.
 A placeholder is never the only guidance, because it is gone after the first keystroke.
 A select is drawn the same way and takes a hint the same way.
+
+**Stat strip.**
+The panel a screen's one big number sits in: the Market Price on the Card page, the total value on the Collection screen.
+`--color-surface` fill, a `--color-line` border and `--radius`, with an `--text-xs` `--color-muted` eyebrow over an `--text-xl` number in tabular figures.
+The eyebrow says what the number is and how fresh it is, because every number shown this way is a daily reference rather than a live one ([ADR-0003](adr/0003-price-data-sources.md)).
+The strip owns the panel and the eyebrow; what sits under the number belongs to the screen, since a Market Price and a Collection's value are read off differently.
+Named in the Color and Radius tables from the start; given a primitive in [#16](https://github.com/KyleKDang/toploader/issues/16), the ticket that first needed a second one.
 
 **Stepper.**
 A small whole number a Trader sets by tapping: how many Copies of a Card they own.
