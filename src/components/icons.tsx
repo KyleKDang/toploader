@@ -78,7 +78,7 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
-export function BackIcon(props: IconProps) {
+export function ChevronLeftIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <path d="M15 5 8 12l7 7" />
