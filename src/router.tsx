@@ -16,6 +16,7 @@ import {
   hasProfile,
   safeSpotsQuery,
   traderQuery,
+  wantsQuery,
 } from './lib/queries';
 import { RouteErrorScreen } from './screens/RouteErrorScreen';
 
@@ -124,6 +125,36 @@ const searchRoute = createRoute({
   ),
 });
 
+const wantsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/wants',
+  // `?card=` is the Card the screen is narrowing into a Want, so that the
+  // card page's way in and a pick from the search field arrive the same way.
+  // Anything that is not a Card's id names no Card, the same as an empty
+  // search, rather than a request that errors.
+  validateSearch: (search: Record<string, unknown>): { card?: number } => {
+    const card = Number(search.card);
+    return Number.isSafeInteger(card) && card > 0 ? { card } : {};
+  },
+  loaderDeps: ({ search: { card } }) => ({ card }),
+  loader: async ({ context: { queryClient }, deps }) => {
+    const { traderId, trader } = await loadOnboardedTrader(queryClient);
+    return {
+      traderId,
+      trader,
+      card:
+        deps.card === undefined
+          ? null
+          : await queryClient.ensureQueryData(cardQuery(deps.card)),
+      wants: await queryClient.ensureQueryData(wantsQuery(traderId)),
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/WantsScreen'),
+    'WantsScreen',
+  ),
+});
+
 const cardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/cards/$cardId',
@@ -171,6 +202,7 @@ const routeTree = rootRoute.addChildren([
   matchesRoute,
   safeSpotsRoute,
   searchRoute,
+  wantsRoute,
   cardRoute,
   collectionRoute,
 ]);
