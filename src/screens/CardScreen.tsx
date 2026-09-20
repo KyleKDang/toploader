@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import {
   AppShell,
   Button,
@@ -42,8 +42,13 @@ import { CollectionLink } from './CollectionLink';
  * Variant, so one Market Price covers every Condition of it, and a Condition
  * chip carries no price of its own rather than inventing one.
  *
- * Listing the Card, wanting it, and who in the City holds one are later
- * tickets (#17, #18, #19).
+ * Wanting the Card happens on the Wants screen rather than here: this hands
+ * that screen the Card, and the Variant and minimum Condition are chosen
+ * there, since both are optional for a Want and the Variant chips above are
+ * not.
+ *
+ * Listing the Card and who in the City holds one are later tickets (#17,
+ * #19).
  */
 
 const route = getRouteApi('/cards/$cardId');
@@ -88,6 +93,7 @@ function CardDetails({
   card: CatalogCard;
   traderId: string;
 }) {
+  const navigate = useNavigate();
   const variants = card.card_variants;
   const [variantId, setVariantId] = useState(variants[0]?.id);
   const variant = variants.find(({ id }) => id === variantId);
@@ -148,6 +154,16 @@ function CardDetails({
           traderId={traderId}
         />
       ) : null}
+
+      <div className="mt-3.5 flex px-4">
+        <Button
+          onClick={() =>
+            void navigate({ to: '/wants', search: { card: card.id } })
+          }
+        >
+          Add to wants
+        </Button>
+      </div>
     </>
   );
 }

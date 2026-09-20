@@ -14,11 +14,18 @@ import { cx } from '../lib/cx';
  *
  * Underneath, the chips are native radio buttons, so arrow keys move the
  * choice and a screen reader hears a radio group with its label.
+ *
+ * The label is the accessible name, and `showLabel` also draws it above the
+ * chips. One group whose meaning its surroundings already give - the Variant
+ * on the card page - does not need it; two groups side by side do, or the
+ * chips read as one row of nine with two of them chosen.
  */
 
 type ChipGroupProps<T extends string | number> = {
-  /** Names the group for assistive tech, e.g. "Variant". */
+  /** Names the group, e.g. "Variant". */
   label: string;
+  /** Draws the label above the chips, as well as naming the group by it. */
+  showLabel?: boolean;
   options: readonly { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
@@ -27,43 +34,53 @@ type ChipGroupProps<T extends string | number> = {
 
 export function ChipGroup<T extends string | number>({
   label,
+  showLabel = false,
   options,
   value,
   onChange,
   className,
 }: ChipGroupProps<T>) {
   const name = useId();
+  const labelId = useId();
 
   return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className={cx('flex flex-wrap gap-2', className)}
-    >
-      {options.map((option) => (
-        <label
-          key={option.value}
-          className="flex min-h-tap min-w-tap cursor-pointer items-center justify-center"
-        >
-          <input
-            type="radio"
-            name={name}
-            checked={option.value === value}
-            onChange={() => onChange(option.value)}
-            className="peer sr-only"
-          />
-          <span
-            className={cx(
-              'flex h-chip items-center rounded-full border-2 px-3 text-sm font-semibold',
-              'border-line bg-surface text-ink',
-              'peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink',
-              'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent',
-            )}
+    <div className={className}>
+      {showLabel ? (
+        <p id={labelId} className="mb-1 text-sm font-semibold text-ink">
+          {label}
+        </p>
+      ) : null}
+      <div
+        role="radiogroup"
+        aria-label={showLabel ? undefined : label}
+        aria-labelledby={showLabel ? labelId : undefined}
+        className="flex flex-wrap gap-2"
+      >
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className="flex min-h-tap min-w-tap cursor-pointer items-center justify-center"
           >
-            {option.label}
-          </span>
-        </label>
-      ))}
+            <input
+              type="radio"
+              name={name}
+              checked={option.value === value}
+              onChange={() => onChange(option.value)}
+              className="peer sr-only"
+            />
+            <span
+              className={cx(
+                'flex h-chip items-center rounded-full border-2 px-3 text-sm font-semibold',
+                'border-line bg-surface text-ink',
+                'peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink',
+                'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent',
+              )}
+            >
+              {option.label}
+            </span>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }

@@ -8,19 +8,30 @@ import { cardSearchQuery } from '../lib/queries';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 
 /*
- * The Catalog search at the top of the Search tab: the only way a Trader
- * finds a Card in v1. Typing searches the whole Catalog on the server once
- * the Trader pauses, and picking a result opens that Card's page.
+ * The Catalog search: the only way a Trader finds a Card in v1. Typing
+ * searches the whole Catalog on the server once the Trader pauses.
  *
  * Each result reads as it will on the card page: the Variant it names is the
  * one the page opens on, and the price beside it is that Variant's.
+ *
+ * Picking a result opens that Card's page, which is what the Search tab and
+ * the card page itself want. A screen that wants the Card rather than a
+ * visit to it - the Wants screen, which narrows it into a Want - passes
+ * `onSelect` and keeps the Trader where they are.
  */
 
 /** Long enough to mean something; one letter matches half the Catalog. */
 const MIN_QUERY_LENGTH = 2;
 const TYPING_PAUSE_MS = 200;
 
-export function CardSearchField({ autoFocus }: { autoFocus?: boolean }) {
+export function CardSearchField({
+  autoFocus,
+  onSelect,
+}: {
+  autoFocus?: boolean;
+  /** Given a Card's id. Defaults to opening that Card's page. */
+  onSelect?: (cardId: number) => void;
+}) {
   const navigate = useNavigate();
   const [text, setText] = useState('');
   const query = useDebouncedValue(text.trim(), TYPING_PAUSE_MS);
@@ -55,6 +66,10 @@ export function CardSearchField({ autoFocus }: { autoFocus?: boolean }) {
         autoFocus={autoFocus}
         onSelect={(card) => {
           setText('');
+          if (onSelect) {
+            onSelect(card.id);
+            return;
+          }
           void navigate({
             to: '/cards/$cardId',
             params: { cardId: String(card.id) },

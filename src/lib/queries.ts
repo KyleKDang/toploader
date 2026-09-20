@@ -252,3 +252,30 @@ export function collectionValueQuery(traderId: string) {
     },
   });
 }
+
+/**
+ * The signed-in Trader's Wants, newest first, each with its Card and the
+ * Variant it is narrowed to. The select policy already limits a Trader to
+ * their own rows; the Trader is named here so the cache is keyed on what the
+ * rows depend on, the way the Safe Spots read is.
+ */
+export function wantsQuery(traderId: string) {
+  return queryOptions({
+    queryKey: ['wants', traderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('wants')
+        .select(
+          'id, min_condition, card:cards (id, name, number, image_url, card_sets (name)), card_variant:card_variants (id, name)',
+        )
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** A Want as the Wants screen shows it. */
+export type Want = Awaited<
+  ReturnType<NonNullable<ReturnType<typeof wantsQuery>['queryFn']>>
+>[number];
