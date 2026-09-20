@@ -20,12 +20,14 @@ export { FormError } from './FormError';
 export { ListRow } from './ListRow';
 export { SearchPicker } from './SearchPicker';
 export { Select } from './Select';
+export { Sheet } from './Sheet';
 export { StatStrip } from './StatStrip';
 export { Stepper } from './Stepper';
 export { TextInput } from './TextInput';
 export { TopBar } from './TopBar';
 
 export {
+  CameraIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,

@@ -109,3 +109,13 @@ export function ChevronDownIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Taking a photo of the Copy, on the button that opens the camera. */
+export function CameraIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 8.5h3.5L8 6h8l1.5 2.5H21v10H3z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </Icon>
+  );
+}

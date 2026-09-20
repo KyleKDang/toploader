@@ -191,6 +191,89 @@ export type Database = {
           },
         ]
       }
+      listing_photos: {
+        Row: {
+          id: string
+          listing_id: string
+          path: string
+          position: number
+          thumbnail_path: string
+        }
+        Insert: {
+          id?: string
+          listing_id: string
+          path: string
+          position: number
+          thumbnail_path: string
+        }
+        Update: {
+          id?: string
+          listing_id?: string
+          path?: string
+          position?: number
+          thumbnail_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_photos_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listings: {
+        Row: {
+          asking_price_cents: number | null
+          card_variant_id: number
+          condition: Database["public"]["Enums"]["card_condition"]
+          created_at: string
+          id: string
+          open_to_cash_offers: boolean
+          status: Database["public"]["Enums"]["listing_status"]
+          trader_id: string
+          withdrawn_at: string | null
+        }
+        Insert: {
+          asking_price_cents?: number | null
+          card_variant_id: number
+          condition: Database["public"]["Enums"]["card_condition"]
+          created_at?: string
+          id?: string
+          open_to_cash_offers?: boolean
+          status?: Database["public"]["Enums"]["listing_status"]
+          trader_id: string
+          withdrawn_at?: string | null
+        }
+        Update: {
+          asking_price_cents?: number | null
+          card_variant_id?: number
+          condition?: Database["public"]["Enums"]["card_condition"]
+          created_at?: string
+          id?: string
+          open_to_cash_offers?: boolean
+          status?: Database["public"]["Enums"]["listing_status"]
+          trader_id?: string
+          withdrawn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listings_card_variant_id_fkey"
+            columns: ["card_variant_id"]
+            isOneToOne: false
+            referencedRelation: "card_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listings_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_snapshots: {
         Row: {
           as_of: string
@@ -422,6 +505,16 @@ export type Database = {
         Args: { sync_day: string }
         Returns: undefined
       }
+      create_listing: {
+        Args: {
+          asking_price_cents?: number
+          card_variant_id: number
+          condition: Database["public"]["Enums"]["card_condition"]
+          open_to_cash_offers?: boolean
+          photos: Json
+        }
+        Returns: string
+      }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
       remove_want: { Args: { want_id: string }; Returns: undefined }
       search_cards: {
@@ -450,9 +543,17 @@ export type Database = {
         Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
       }
+      unreferenced_listing_photos: {
+        Args: { uploaded_before: string }
+        Returns: {
+          path: string
+        }[]
+      }
+      withdraw_listing: { Args: { listing_id: string }; Returns: undefined }
     }
     Enums: {
       card_condition: "DMG" | "HP" | "MP" | "LP" | "NM"
+      listing_status: "active" | "in_trade" | "traded" | "withdrawn"
       safe_spot_kind: "police_station" | "monitored_site"
     }
     CompositeTypes: {
@@ -585,6 +686,7 @@ export const Constants = {
   public: {
     Enums: {
       card_condition: ["DMG", "HP", "MP", "LP", "NM"],
+      listing_status: ["active", "in_trade", "traded", "withdrawn"],
       safe_spot_kind: ["police_station", "monitored_site"],
     },
   },

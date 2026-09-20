@@ -1,4 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
+import type { Condition } from './conditions';
+import { PHOTO_MIME, type PreparedPhoto } from './photos';
 import { supabase } from './supabase';
 
 /*
@@ -279,3 +281,197 @@ export function wantsQuery(traderId: string) {
 export type Want = Awaited<
   ReturnType<NonNullable<ReturnType<typeof wantsQuery>['queryFn']>>
 >[number];
+
+/*
+ * Listings.
+ *
+ * RLS is what scopes these reads by City: a Trader sees their own Listings
+ * and the live ones of their City, and nothing else, so no query below
+ * filters by City to make that true.
+ *
+ * Status is the one thing a query does have to say, and only because a
+ * Trader may always read their own Listings whatever state they are in -
+ * which is what lets a withdrawn Listing still open on its own page. Browse
+ * is the surface that must not show one, so browse is where it is said.
+ */
+
+const LISTING_PHOTOS_BUCKET = 'listing-photos';
+
+/** The states a Listing is still on offer in, and so still browsable in. */
+const LIVE_STATUSES = ['active', 'in_trade'] as const;
+
+/**
+ * How long a photo's URL works for. The bucket is private, so a photo is
+ * reached through a signed URL rather than by knowing its path; an hour is
+ * longer than anyone spends on a screen and short enough that a URL that
+ * gets away is not a lasting one.
+ */
+const PHOTO_URL_TTL_SECONDS = 60 * 60;
+
+/**
+ * Signs a batch of photo paths in one request, and returns what came back by
+ * path. A path that cannot be signed is simply absent: a missing photo
+ * leaves an empty tile rather than failing the screen around it.
+ */
+async function signedPhotoUrls(paths: string[]): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+  const { data, error } = await supabase.storage
+    .from(LISTING_PHOTOS_BUCKET)
+    .createSignedUrls(paths, PHOTO_URL_TTL_SECONDS);
+  if (error) throw error;
+  return new Map(
+    data.flatMap(({ path, signedUrl }) =>
+      path && signedUrl ? [[path, signedUrl] as const] : [],
+    ),
+  );
+}
+
+/**
+ * The Listings of one Card in the Trader's City, newest first, each with the
+ * thumbnail of its first photo.
+ *
+ * The thumbnail, not the full-size photo: a card page can carry a dozen of
+ * these, and full-size images in a feed are what actually spends the free
+ * tier's egress (ADR-0006).
+ */
+export function cityListingsForCardQuery(cardId: number) {
+  return queryOptions({
+    queryKey: ['listings', 'card', cardId],
+    queryFn: () => fetchCityListingsForCard(cardId),
+  });
+}
+
+async function fetchCityListingsForCard(cardId: number) {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(
+      'id, condition, asking_price_cents, open_to_cash_offers, status, created_at, trader:traders(id, display_name), card_variants!inner(name, card_id), listing_photos(position, thumbnail_path)',
+    )
+    .eq('card_variants.card_id', cardId)
+    // Without this a Trader's own withdrawn or traded Listing would still
+    // sit in their area's list, because RLS lets them read their own.
+    .in('status', LIVE_STATUSES)
+    .order('created_at', { ascending: false })
+    .order('position', { referencedTable: 'listing_photos' });
+  if (error) throw error;
+
+  const urls = await signedPhotoUrls(
+    data.flatMap((listing) => firstThumbnail(listing) ?? []),
+  );
+  return data.map((listing) => ({
+    ...listing,
+    thumbnailUrl: urls.get(firstThumbnail(listing) ?? '') ?? null,
+  }));
+}
+
+function firstThumbnail(listing: {
+  listing_photos: { thumbnail_path: string }[];
+}) {
+  return listing.listing_photos[0]?.thumbnail_path;
+}
+
+/** A Listing as City browse shows it in a row. */
+export type BrowsedListing = Awaited<
+  ReturnType<typeof fetchCityListingsForCard>
+>[number];
+
+/**
+ * One Listing as its own page shows it: the Card it is of, the Trader who
+ * listed it, and every photo full size, uncropped, in the order they were
+ * taken. Null when the Trader may not see it, which reads the same as one
+ * that does not exist.
+ */
+export function listingQuery(listingId: string) {
+  return queryOptions({
+    queryKey: ['listing', listingId],
+    queryFn: () => fetchListing(listingId),
+  });
+}
+
+async function fetchListing(listingId: string) {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(
+      'id, trader_id, condition, asking_price_cents, open_to_cash_offers, status, created_at, trader:traders(display_name), card_variants(name, cards(id, name, number, card_sets(name))), listing_photos(position, path)',
+    )
+    .eq('id', listingId)
+    .order('position', { referencedTable: 'listing_photos' })
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const urls = await signedPhotoUrls(
+    data.listing_photos.map(({ path }) => path),
+  );
+  return {
+    ...data,
+    photoUrls: data.listing_photos.flatMap(({ path }) => urls.get(path) ?? []),
+  };
+}
+
+/** A Listing as its own page shows it. */
+export type ListingDetail = NonNullable<
+  Awaited<ReturnType<typeof fetchListing>>
+>;
+
+/**
+ * Publishes a Listing: the photos go into the bucket under the Trader's own
+ * prefix first, then the RPC records the Listing that names them.
+ *
+ * That order is why an abandoned upload is possible at all, and why the
+ * reaper sweeps uploads that never became a Listing. The other order is not
+ * available: the bucket is where a photo lives, and a Listing with no photo
+ * of the actual Copy is not a Listing.
+ */
+export async function createListing({
+  traderId,
+  cardVariantId,
+  condition,
+  photos,
+  askingPriceCents,
+  openToCashOffers,
+}: {
+  traderId: string;
+  cardVariantId: number;
+  condition: Condition;
+  photos: PreparedPhoto[];
+  askingPriceCents: number | null;
+  openToCashOffers: boolean;
+}): Promise<string> {
+  const uploaded: { path: string; thumbnail_path: string }[] = [];
+  for (const photo of photos) {
+    const name = `${traderId}/${crypto.randomUUID()}`;
+    const paths = {
+      path: `${name}.webp`,
+      thumbnail_path: `${name}-thumb.webp`,
+    };
+    await uploadPhoto(paths.path, photo.full);
+    await uploadPhoto(paths.thumbnail_path, photo.thumbnail);
+    uploaded.push(paths);
+  }
+
+  const { data, error } = await supabase.rpc('create_listing', {
+    card_variant_id: cardVariantId,
+    condition,
+    photos: uploaded,
+    asking_price_cents: askingPriceCents ?? undefined,
+    open_to_cash_offers: openToCashOffers,
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function uploadPhoto(path: string, body: Blob) {
+  const { error } = await supabase.storage
+    .from(LISTING_PHOTOS_BUCKET)
+    .upload(path, body, { contentType: PHOTO_MIME });
+  if (error) throw error;
+}
+
+/** Takes a Listing down. Only its own Trader may, and only while it is active. */
+export async function withdrawListing(listingId: string): Promise<void> {
+  const { error } = await supabase.rpc('withdraw_listing', {
+    listing_id: listingId,
+  });
+  if (error) throw error;
+}

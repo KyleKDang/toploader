@@ -19,6 +19,7 @@ status=${2:?$usage}
 case $monitor in
   nightly-backup) schedule='17 10 * * *' ;;
   catalog-sync) schedule='23 21 * * *' ;;
+  photo-reaper) schedule='41 8 * * *' ;;
   *) echo "unknown monitor: $monitor" >&2 && exit 1 ;;
 esac
 

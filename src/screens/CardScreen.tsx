@@ -8,6 +8,7 @@ import {
   ChipGroup,
   EmptyState,
   FormError,
+  ListRow,
   PlusIcon,
   StatStrip,
   Stepper,
@@ -18,6 +19,7 @@ import { formatDay, formatPrice } from '../lib/format';
 import {
   cardCollectionQuery,
   collectionKey,
+  type BrowsedListing,
   type CardCollectionEntry,
   type CatalogCard,
 } from '../lib/queries';
@@ -42,13 +44,14 @@ import { CollectionLink } from './CollectionLink';
  * Variant, so one Market Price covers every Condition of it, and a Condition
  * chip carries no price of its own rather than inventing one.
  *
+ * Under that, what the Card is for a Trader beyond owning one: the way to
+ * list a Copy of it, the way to want it, and who in their City is already
+ * listing one.
+ *
  * Wanting the Card happens on the Wants screen rather than here: this hands
  * that screen the Card, and the Variant and minimum Condition are chosen
  * there, since both are optional for a Want and the Variant chips above are
  * not.
- *
- * Listing the Card and who in the City holds one are later tickets (#17,
- * #19).
  */
 
 const route = getRouteApi('/cards/$cardId');
@@ -64,7 +67,7 @@ const MAX_COPIES = 9999;
 const MAX_PER_ADD = 99;
 
 export function CardScreen() {
-  const { traderId, card } = route.useLoaderData();
+  const { traderId, card, listings } = route.useLoaderData();
 
   return (
     <AppShell
@@ -75,7 +78,12 @@ export function CardScreen() {
       {card ? (
         // Keyed on the Card, so opening another one starts on its own first
         // Variant rather than carrying over the last Card's choice.
-        <CardDetails key={card.id} card={card} traderId={traderId} />
+        <CardDetails
+          key={card.id}
+          card={card}
+          traderId={traderId}
+          listings={listings}
+        />
       ) : (
         <EmptyState
           title="That card is not in the catalog"
@@ -89,9 +97,11 @@ export function CardScreen() {
 function CardDetails({
   card,
   traderId,
+  listings,
 }: {
   card: CatalogCard;
   traderId: string;
+  listings: BrowsedListing[];
 }) {
   const navigate = useNavigate();
   const variants = card.card_variants;
@@ -155,7 +165,20 @@ function CardDetails({
         />
       ) : null}
 
-      <div className="mt-3.5 flex px-4">
+      {/* Both secondary, side by side and so equal width: adding a Copy to
+          the Collection is the primary on this screen, and the design system
+          allows one per screen area. */}
+      <div className="mt-3.5 flex gap-2 px-4">
+        <Button
+          onClick={() =>
+            void navigate({
+              to: '/cards/$cardId/list',
+              params: { cardId: String(card.id) },
+            })
+          }
+        >
+          List this card
+        </Button>
         <Button
           onClick={() =>
             void navigate({ to: '/wants', search: { card: card.id } })
@@ -164,6 +187,8 @@ function CardDetails({
           Add to wants
         </Button>
       </div>
+
+      <CityListings listings={listings} />
     </>
   );
 }
@@ -341,6 +366,71 @@ function OwnedCopies({
         error={setQuantity.error ?? remove.error}
         className="px-4 pt-3.5"
       />
+    </section>
+  );
+}
+
+/*
+ * Who in the Trader's City is listing this Card. RLS is what makes it their
+ * City and only live Listings; this just shows what came back.
+ *
+ * Each row carries the thumbnail rather than the full-size photo. A popular
+ * Card can fill this list, and full-size images in a feed are what actually
+ * spends the free tier's egress (ADR-0006).
+ *
+ * The thumbnails take empty alt text: the row beside them already says whose
+ * card it is and what condition it is in, so naming it again is noise to a
+ * screen reader. The alt text the design system asks for rides the full-size
+ * photos on the Listing's own page, where nothing else carries it.
+ */
+function CityListings({ listings }: { listings: BrowsedListing[] }) {
+  const navigate = useNavigate();
+
+  return (
+    <section aria-label="Listings in your area" className="mt-5">
+      <h3 className="px-4 pb-1.5 text-sm font-semibold text-muted">
+        Listed in your area
+      </h3>
+
+      {listings.length === 0 ? (
+        <p className="px-4 pb-4 text-base leading-prose text-ink">
+          Nobody in your area is listing this card yet.
+        </p>
+      ) : (
+        <ul>
+          {listings.map((listing) => (
+            <li key={listing.id}>
+              <ListRow
+                leading={<CardTile src={listing.thumbnailUrl} alt="" />}
+                title={listing.trader?.display_name ?? 'A trader'}
+                trailing={
+                  listing.asking_price_cents !== null ? (
+                    <span className="tabular-nums">
+                      {formatPrice(listing.asking_price_cents)}
+                    </span>
+                  ) : null
+                }
+                detail={[
+                  listing.condition,
+                  listing.card_variants.name,
+                  listing.open_to_cash_offers ? 'Open to cash offers' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+                relation={
+                  listing.status === 'in_trade' ? 'In a trade' : undefined
+                }
+                onClick={() =>
+                  void navigate({
+                    to: '/listings/$listingId',
+                    params: { listingId: listing.id },
+                  })
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

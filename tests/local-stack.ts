@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 
 export type LocalStackStatus = {
   API_URL: string;
+  DB_URL: string;
   PUBLISHABLE_KEY: string;
   SECRET_KEY: string;
   MAILPIT_URL: string;

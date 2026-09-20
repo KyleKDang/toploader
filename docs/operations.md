@@ -12,9 +12,9 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 |---|---|---|
 | `SUPABASE_DB_URL` | GitHub secret | CI `migrate`, nightly backup |
 | `BACKUP_PASSPHRASE` | GitHub secret, and the shared inbox | nightly backup |
-| `SENTRY_DSN` | GitHub secret | the cron check-ins of the nightly backup and the Catalog sync |
-| `SUPABASE_SECRET_KEY` | GitHub secret | Catalog sync |
-| `SUPABASE_URL` | GitHub variable | nightly backup (reads the hosted service versions), Catalog sync |
+| `SENTRY_DSN` | GitHub secret | the cron check-ins of the nightly backup, the Catalog sync, and the photo reaper |
+| `SUPABASE_SECRET_KEY` | GitHub secret | Catalog sync, photo reaper |
+| `SUPABASE_URL` | GitHub variable | nightly backup (reads the hosted service versions), Catalog sync, photo reaper |
 | `SUPABASE_PUBLISHABLE_KEY` | GitHub variable | nightly backup |
 | `VITE_SUPABASE_URL` | Render env | the app |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Render env | the app |
@@ -62,6 +62,9 @@ The domain's DNS records, including SPF, DKIM and DMARC for `mail.`, are in Clou
 - **Daily, 21:23 UTC:** `.github/workflows/catalog-sync.yml` syncs the Catalog from TCGCSV, which publishes around 20:00 UTC, and checks in with the Sentry cron monitor `catalog-sync`.
   A set that fails keeps its last-good data and fails the run, so it raises a Sentry issue while every other set is still applied.
   It can be run by hand from the Actions tab, and running it twice in a day is harmless.
+- **Daily, 08:41 UTC:** `.github/workflows/photo-reaper.yml` deletes the Listing photos of withdrawn Listings, and uploads more than a day old that never became a Listing, then checks in with the Sentry cron monitor `photo-reaper`.
+  It never touches the photos of a Listing that went through a Trade: those are the Trade Record's evidence.
+  Running it twice in a day is harmless, and a run that reclaims nothing is the normal case.
 
 ## Recovering the database
 
