@@ -20,13 +20,16 @@ export { FormError } from './FormError';
 export { ListRow } from './ListRow';
 export { SearchPicker } from './SearchPicker';
 export { Select } from './Select';
+export { Stepper } from './Stepper';
 export { TextInput } from './TextInput';
 export { TopBar } from './TopBar';
 
 export {
+  BackIcon,
   CheckIcon,
   ChevronDownIcon,
   MatchesIcon,
+  MinusIcon,
   PlusIcon,
   ProfileIcon,
   SearchIcon,

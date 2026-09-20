@@ -10,6 +10,8 @@ import {
 import {
   cardQuery,
   citiesQuery,
+  collectionQuery,
+  collectionValueQuery,
   currentTraderId,
   hasProfile,
   safeSpotsQuery,
@@ -43,11 +45,13 @@ async function loadSignedInTrader(queryClient: QueryClient) {
 /**
  * The signed-in Trader who has finished onboarding, or a redirect to set up
  * the profile when they have not. Every screen inside the app loads this.
+ * The id comes back with the profile, because a screen reading rows of the
+ * Trader's own - their Collection - keys them in the cache by it.
  */
 async function loadOnboardedTrader(queryClient: QueryClient) {
-  const { trader } = await loadSignedInTrader(queryClient);
+  const { traderId, trader } = await loadSignedInTrader(queryClient);
   if (!hasProfile(trader)) throw redirect({ to: '/set-up-profile' });
-  return trader;
+  return { traderId, trader };
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
@@ -83,9 +87,8 @@ const setUpProfileRoute = createRoute({
 const matchesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  loader: async ({ context: { queryClient } }) => ({
-    trader: await loadOnboardedTrader(queryClient),
-  }),
+  loader: async ({ context: { queryClient } }) =>
+    await loadOnboardedTrader(queryClient),
   component: lazyRouteComponent(
     () => import('./screens/MatchesScreen'),
     'MatchesScreen',
@@ -96,7 +99,7 @@ const safeSpotsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/safe-spots',
   loader: async ({ context: { queryClient } }) => {
-    const trader = await loadOnboardedTrader(queryClient);
+    const { trader } = await loadOnboardedTrader(queryClient);
     return {
       trader,
       safeSpots: await queryClient.ensureQueryData(
@@ -113,9 +116,8 @@ const safeSpotsRoute = createRoute({
 const searchRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/search',
-  loader: async ({ context: { queryClient } }) => ({
-    trader: await loadOnboardedTrader(queryClient),
-  }),
+  loader: async ({ context: { queryClient } }) =>
+    await loadOnboardedTrader(queryClient),
   component: lazyRouteComponent(
     () => import('./screens/SearchScreen'),
     'SearchScreen',
@@ -126,11 +128,12 @@ const cardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/cards/$cardId',
   loader: async ({ context: { queryClient }, params }) => {
-    await loadOnboardedTrader(queryClient);
+    const { traderId } = await loadOnboardedTrader(queryClient);
     // An id that is not a whole number names no Card, the same as one that
     // is not in the Catalog, rather than a request that errors.
     const cardId = Number(params.cardId);
     return {
+      traderId,
       card: Number.isSafeInteger(cardId)
         ? await queryClient.ensureQueryData(cardQuery(cardId))
         : null,
@@ -142,6 +145,26 @@ const cardRoute = createRoute({
   ),
 });
 
+// The Collection sits in the Search tab: the Catalog search is how Copies
+// get into it, and the Trader profile that will also link to it (#27) has no
+// screen yet.
+const collectionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/collection',
+  loader: async ({ context: { queryClient } }) => {
+    const { traderId } = await loadOnboardedTrader(queryClient);
+    const [entries, value] = await Promise.all([
+      queryClient.ensureQueryData(collectionQuery(traderId)),
+      queryClient.ensureQueryData(collectionValueQuery(traderId)),
+    ]);
+    return { entries, value };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/CollectionScreen'),
+    'CollectionScreen',
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   signUpRoute,
   setUpProfileRoute,
@@ -149,6 +172,7 @@ const routeTree = rootRoute.addChildren([
   safeSpotsRoute,
   searchRoute,
   cardRoute,
+  collectionRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

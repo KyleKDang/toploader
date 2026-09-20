@@ -78,6 +78,22 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+export function BackIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M15 5 8 12l7 7" />
+    </Icon>
+  );
+}
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 12h14" />
+    </Icon>
+  );
+}
+
 export function CheckIcon(props: IconProps) {
   return (
     <Icon {...props}>

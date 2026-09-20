@@ -149,6 +149,48 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_entries: {
+        Row: {
+          card_variant_id: number
+          condition: Database["public"]["Enums"]["card_condition"]
+          created_at: string
+          id: string
+          quantity: number
+          trader_id: string
+        }
+        Insert: {
+          card_variant_id: number
+          condition: Database["public"]["Enums"]["card_condition"]
+          created_at?: string
+          id?: string
+          quantity: number
+          trader_id: string
+        }
+        Update: {
+          card_variant_id?: number
+          condition?: Database["public"]["Enums"]["card_condition"]
+          created_at?: string
+          id?: string
+          quantity?: number
+          trader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_entries_card_variant_id_fkey"
+            columns: ["card_variant_id"]
+            isOneToOne: false
+            referencedRelation: "card_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_entries_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_snapshots: {
         Row: {
           as_of: string
@@ -288,9 +330,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      collection_value: {
+        Row: {
+          copy_count: number | null
+          total_cents: number | null
+          trader_id: string | null
+          unpriced_copy_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_entries_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      add_to_collection: {
+        Args: {
+          card_variant_id: number
+          condition: Database["public"]["Enums"]["card_condition"]
+          quantity: number
+        }
+        Returns: string
+      }
       apply_catalog_set: {
         Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
         Returns: undefined
@@ -299,6 +365,7 @@ export type Database = {
         Args: { sync_day: string }
         Returns: undefined
       }
+      remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
       search_cards: {
         Args: { query: string }
         Returns: {
@@ -317,12 +384,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      set_collection_quantity: {
+        Args: { entry_id: string; quantity: number }
+        Returns: undefined
+      }
       set_trader_profile: {
         Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
       }
     }
     Enums: {
+      card_condition: "DMG" | "HP" | "MP" | "LP" | "NM"
       safe_spot_kind: "police_station" | "monitored_site"
     }
     CompositeTypes: {
@@ -454,6 +526,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      card_condition: ["DMG", "HP", "MP", "LP", "NM"],
       safe_spot_kind: ["police_station", "monitored_site"],
     },
   },
