@@ -1,45 +1,65 @@
 import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import {
   AppShell,
+  Button,
   CardTile,
   ChipGroup,
   EmptyState,
+  FormError,
+  PlusIcon,
+  Stepper,
   TopBar,
 } from '../components';
+import { CONDITION_NAMES, CONDITIONS, type Condition } from '../lib/conditions';
 import { cx } from '../lib/cx';
 import { formatDay, formatPrice } from '../lib/format';
-import type { CatalogCard } from '../lib/queries';
+import {
+  cardCollectionQuery,
+  collectionKey,
+  type CatalogCard,
+} from '../lib/queries';
+import { supabase } from '../lib/supabase';
 import { useTabs } from '../lib/tabs';
 import { CardSearchField } from './CardSearchField';
+import { CollectionLink } from './CollectionLink';
 
 /*
- * A Card's page: its image, its Variants, and the Market Price of the one
- * chosen, with the Catalog search still open above it so the next Card is
- * one search away. It sits in the Search tab, the way the chosen mockup
- * draws it.
+ * A Card's page: its image, its Variants, the Market Price of the one
+ * chosen, and the way a Copy of it enters a Trader's Collection - Variant,
+ * then Condition, then how many. The Catalog search stays open above it, so
+ * the next Card is one search away. It sits in the Search tab, the way the
+ * chosen mockup draws it.
  *
  * The Market Price is a daily reference and says so: "updated daily", and
  * the day the sync last confirmed it, so a price the upstream stopped
  * sending shows its age rather than passing for today's (ADR-0003). It is
  * never called live.
  *
- * Condition prices, who in the City lists or wants the Card, and adding it
- * to a Collection or Wants are later tickets (#16, #17, #18).
+ * The mockup prices each Condition. The Catalog does not: TCGCSV prices a
+ * Variant, so one Market Price covers every Condition of it, and a Condition
+ * chip carries no price of its own rather than inventing one.
+ *
+ * Listing the Card, wanting it, and who in the City holds one are later
+ * tickets (#17, #18, #19).
  */
 
 const route = getRouteApi('/cards/$cardId');
 
 export function CardScreen() {
-  const { card } = route.useLoaderData();
+  const { traderId, card } = route.useLoaderData();
 
   return (
-    <AppShell header={<TopBar title="Search" />} {...useTabs('search')}>
+    <AppShell
+      header={<TopBar title="Search" action={<CollectionLink />} />}
+      {...useTabs('search')}
+    >
       <CardSearchField />
       {card ? (
         // Keyed on the Card, so opening another one starts on its own first
         // Variant rather than carrying over the last Card's choice.
-        <CardDetails key={card.id} card={card} />
+        <CardDetails key={card.id} card={card} traderId={traderId} />
       ) : (
         <EmptyState
           title="That card is not in the catalog"
@@ -50,7 +70,13 @@ export function CardScreen() {
   );
 }
 
-function CardDetails({ card }: { card: CatalogCard }) {
+function CardDetails({
+  card,
+  traderId,
+}: {
+  card: CatalogCard;
+  traderId: string;
+}) {
   const variants = card.card_variants;
   const [variantId, setVariantId] = useState(variants[0]?.id);
   const variant = variants.find(({ id }) => id === variantId);
@@ -108,6 +134,179 @@ function CardDetails({ card }: { card: CatalogCard }) {
           </p>
         )}
       </section>
+
+      {variant ? (
+        <AddToCollection
+          card={card}
+          variantId={variant.id}
+          traderId={traderId}
+        />
+      ) : null}
     </>
+  );
+}
+
+/**
+ * Picking a Condition and a quantity, adding that Copy, and correcting what
+ * the Trader already holds of this Card. A Collection entry is one Variant
+ * in one Condition, so the Copies below are the same shape as the control
+ * above them.
+ */
+function AddToCollection({
+  card,
+  variantId,
+  traderId,
+}: {
+  card: CatalogCard;
+  variantId: number;
+  traderId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [condition, setCondition] = useState<Condition>('NM');
+  const [quantity, setQuantity] = useState(1);
+
+  const owned = useQuery(
+    cardCollectionQuery(
+      traderId,
+      card.id,
+      card.card_variants.map(({ id }) => id),
+    ),
+  );
+
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: collectionKey(traderId) });
+
+  const add = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('add_to_collection', {
+        card_variant_id: variantId,
+        condition,
+        quantity,
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      setQuantity(1);
+      await refresh();
+    },
+  });
+
+  return (
+    <>
+      <ChipGroup
+        label="Condition"
+        options={CONDITIONS.map((value) => ({ value, label: value }))}
+        value={condition}
+        onChange={setCondition}
+        className="mt-3.5 px-4"
+      />
+      {/* The scale is initials on the chips, because that is how collectors
+          write it; the one chosen is spelled out here, so nobody has to
+          know what MP stands for. */}
+      <p className="px-4 text-sm text-muted">{CONDITION_NAMES[condition]}</p>
+
+      <div className="mt-3.5 flex items-center justify-between gap-2 px-4">
+        <span className="text-base font-semibold text-ink">Quantity</span>
+        <Stepper label="Quantity" value={quantity} onChange={setQuantity} />
+      </div>
+
+      <div className="mt-3 flex px-4">
+        <Button
+          variant="primary"
+          icon={<PlusIcon className="text-lg" />}
+          disabled={add.isPending}
+          onClick={() => add.mutate()}
+        >
+          Add to collection
+        </Button>
+      </div>
+      <FormError error={add.error} className="px-4" />
+
+      {owned.data && owned.data.length > 0 ? (
+        <OwnedCopies card={card} entries={owned.data} onChanged={refresh} />
+      ) : null}
+    </>
+  );
+}
+
+type OwnedEntry = { id: string; condition: Condition; quantity: number };
+
+function OwnedCopies({
+  card,
+  entries,
+  onChanged,
+}: {
+  card: CatalogCard;
+  entries: readonly (OwnedEntry & { card_variant_id: number })[];
+  onChanged: () => Promise<void>;
+}) {
+  const setQuantity = useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      const { error } = await supabase.rpc('set_collection_quantity', {
+        entry_id: id,
+        quantity,
+      });
+      if (error) throw error;
+    },
+    onSuccess: onChanged,
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('remove_from_collection', {
+        entry_id: id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: onChanged,
+  });
+
+  const variantName = (id: number) =>
+    card.card_variants.find((variant) => variant.id === id)?.name ?? '';
+
+  return (
+    <section className="mt-5 border-t border-line pb-4 pt-4">
+      <h3 className="px-4 text-base font-bold text-ink">In your collection</h3>
+
+      <ul>
+        {entries.map((entry) => {
+          // The tap a Trader just made, until the write that follows it
+          // lands, so the number under their finger moves when they press.
+          const pending =
+            setQuantity.isPending && setQuantity.variables?.id === entry.id
+              ? setQuantity.variables.quantity
+              : entry.quantity;
+
+          return (
+            <li key={entry.id} className="px-4 pt-3.5">
+              <p className="truncate text-base text-ink">
+                {variantName(entry.card_variant_id)} ·{' '}
+                {CONDITION_NAMES[entry.condition]}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <Stepper
+                  label={`Copies of ${variantName(entry.card_variant_id)} in ${CONDITION_NAMES[entry.condition]}`}
+                  value={pending}
+                  onChange={(quantity) =>
+                    setQuantity.mutate({ id: entry.id, quantity })
+                  }
+                />
+                <Button
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate(entry.id)}
+                >
+                  Remove
+                </Button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <FormError
+        error={setQuantity.error ?? remove.error}
+        className="px-4 pt-3.5"
+      />
+    </section>
   );
 }

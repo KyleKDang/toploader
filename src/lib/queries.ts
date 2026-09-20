@@ -154,3 +154,96 @@ async function fetchCard(cardId: number) {
 
 /** A Card as its card page shows it. */
 export type CatalogCard = NonNullable<Awaited<ReturnType<typeof fetchCard>>>;
+
+/*
+ * A Trader's Collection: the Copies they own, the Copies of one Card, and
+ * what the whole Collection is worth at Market Price.
+ *
+ * RLS already limits every one of these reads to the caller's own rows. The
+ * Trader is named in the key anyway, so the cache is keyed on whose rows
+ * these are - the same reason safeSpotsQuery names the City.
+ */
+
+/** Everything cached about one Trader's Collection, for invalidating it. */
+export function collectionKey(traderId: string) {
+  return ['collection', traderId] as const;
+}
+
+/** A Copy a Trader owns, with the Card and the Market Price it is valued at. */
+const ENTRY_COLUMNS =
+  'id, condition, quantity, card_variants (id, name, market_price_cents, cards (id, name, number, image_url, card_sets (name)))';
+
+/** The Copies a Trader owns, most recently added first. */
+export function collectionQuery(traderId: string) {
+  return queryOptions({
+    queryKey: collectionKey(traderId),
+    queryFn: () => fetchCollection(),
+  });
+}
+
+async function fetchCollection() {
+  const { data, error } = await supabase
+    .from('collection_entries')
+    .select(ENTRY_COLUMNS)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+/** One Copy a Trader owns, as the Collection screen draws it. */
+export type CollectionEntry = Awaited<
+  ReturnType<typeof fetchCollection>
+>[number];
+
+/**
+ * The Copies a Trader owns of one Card, which is what its card page shows
+ * and edits. It names the Card's Variants rather than the Card, because that
+ * is the column an entry carries, and the page already holds them.
+ */
+export function cardCollectionQuery(
+  traderId: string,
+  cardId: number,
+  variantIds: readonly number[],
+) {
+  return queryOptions({
+    queryKey: [...collectionKey(traderId), 'card', cardId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('collection_entries')
+        .select('id, condition, quantity, card_variant_id')
+        .in('card_variant_id', variantIds)
+        .order('created_at');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/**
+ * The single total-value line a Collection shows: what its Copies are worth
+ * at Market Price, how many Copies that is, and how many of them the Catalog
+ * has no price for, so the line can say so rather than valuing them at
+ * nothing. Null until the Trader owns a Copy.
+ */
+export function collectionValueQuery(traderId: string) {
+  return queryOptions({
+    queryKey: [...collectionKey(traderId), 'value'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('collection_value')
+        .select('copy_count, total_cents, unpriced_copy_count')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      // Each column is an aggregate over a group that exists, so none of
+      // them is ever null. Postgres cannot promise that about a view, and
+      // the generated types say so; the promise is kept here rather than at
+      // every place the line is drawn.
+      return {
+        copy_count: data.copy_count ?? 0,
+        total_cents: data.total_cents ?? 0,
+        unpriced_copy_count: data.unpriced_copy_count ?? 0,
+      };
+    },
+  });
+}

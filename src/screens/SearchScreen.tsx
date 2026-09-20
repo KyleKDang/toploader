@@ -1,6 +1,7 @@
 import { AppShell, EmptyState, TopBar } from '../components';
 import { useTabs } from '../lib/tabs';
 import { CardSearchField } from './CardSearchField';
+import { CollectionLink } from './CollectionLink';
 
 /*
  * The Search tab: the Catalog search, and room under it for what the Trader
@@ -9,7 +10,10 @@ import { CardSearchField } from './CardSearchField';
  */
 export function SearchScreen() {
   return (
-    <AppShell header={<TopBar title="Search" />} {...useTabs('search')}>
+    <AppShell
+      header={<TopBar title="Search" action={<CollectionLink />} />}
+      {...useTabs('search')}
+    >
       <CardSearchField autoFocus />
       <EmptyState
         title="Find any card"

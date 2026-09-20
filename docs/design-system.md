@@ -179,6 +179,14 @@ Guidance a Trader needs while filling the field goes in a hint: a `--text-sm` `-
 A placeholder is never the only guidance, because it is gone after the first keystroke.
 A select is drawn the same way and takes a hint the same way.
 
+**Stepper.**
+A small whole number a Trader sets by tapping: how many Copies of a Card they own.
+Two `--size-btn` squares, minus and plus, with the number between them at `--text-lg` in tabular figures.
+The squares carry the secondary button's look - `--color-surface` fill, a 2px `--color-line` border, `--radius` - rather than the Button primitive itself, which fills its share of a row where these two must stay square.
+The pair is one group named in words for assistive tech, because a bare number labels nothing.
+The buttons stop at the ends of their range rather than wrapping: a quantity below the minimum is a removal, and removal is its own control wherever a stepper appears.
+Added in [#16](https://github.com/KyleKDang/toploader/issues/16), the ticket that first had to ask how many.
+
 **Search picker.**
 A text input with a results panel below it: `--shadow-popover`, `--radius`, `--color-surface` fill, rows at 90% of `--size-row` with 12px sides.
 The panel floats over the screen rather than pushing it down, and scrolls inside itself past 60% of the screen height, so the field stays in view.
