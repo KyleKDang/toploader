@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Database } from '../../src/lib/database.types.ts';
 import {
   anonClient,
   seedTrader,
@@ -23,7 +24,7 @@ const COLLECTION_SET = 990_201;
 const HOLOFOIL_CENTS = 1_000;
 const REVERSE_HOLOFOIL_CENTS = 250;
 
-type Condition = 'NM' | 'LP' | 'MP' | 'HP' | 'DMG';
+type Condition = Database['public']['Enums']['card_condition'];
 
 let holofoil: number;
 let reverseHolofoil: number;
@@ -194,6 +195,33 @@ describe('Collection', () => {
       expect(await readCollection(actor.client)).toEqual([
         { card_variant_id: holofoil, condition: 'NM', quantity: 2 },
       ]);
+    });
+
+    it('cannot have a Copy added to it by a foreign Trader', async () => {
+      await addToCollection(actor.client, holofoil, 'NM', 2);
+
+      // add_to_collection names no Trader, so the only Collection a foreign
+      // Trader can reach with it is their own: what they add lands there and
+      // the actor's is untouched. That is the denial for this RPC - there is
+      // no argument through which to aim it at someone else.
+      await addToCollection(foreign.client, holofoil, 'NM', 7);
+
+      expect(await readCollection(actor.client)).toEqual([
+        { card_variant_id: holofoil, condition: 'NM', quantity: 2 },
+      ]);
+      expect(await readCollection(foreign.client)).toEqual([
+        { card_variant_id: holofoil, condition: 'NM', quantity: 7 },
+      ]);
+    });
+
+    it('cannot be added to by a signed-out visitor at all', async () => {
+      const { error } = await anonClient().rpc('add_to_collection', {
+        card_variant_id: holofoil,
+        condition: 'NM',
+        quantity: 1,
+      });
+
+      expect(error?.code).toBe('42501');
     });
   });
 

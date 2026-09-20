@@ -25,7 +25,12 @@ type StepperProps = {
   value: number;
   onChange: (value: number) => void;
   min?: number;
-  max?: number;
+  /**
+   * The ceiling. Required, because the right one is whatever the thing being
+   * counted is allowed to reach, and a control that cannot reach it is a
+   * quantity a Trader cannot correct.
+   */
+  max: number;
   className?: string;
 };
 
@@ -34,7 +39,7 @@ export function Stepper({
   value,
   onChange,
   min = 1,
-  max = 99,
+  max,
   className,
 }: StepperProps) {
   return (
@@ -48,7 +53,7 @@ export function Stepper({
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - 1))}
       >
-        <MinusIcon className="text-xl" />
+        <MinusIcon className="text-lg" />
       </StepButton>
 
       <output className="min-w-10 text-center text-lg font-bold tabular-nums text-ink">
@@ -60,7 +65,7 @@ export function Stepper({
         disabled={value >= max}
         onClick={() => onChange(Math.min(max, value + 1))}
       >
-        <PlusIcon className="text-xl" />
+        <PlusIcon className="text-lg" />
       </StepButton>
     </div>
   );

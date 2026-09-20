@@ -12,6 +12,12 @@ import { signInAsNewTrader } from './session.ts';
  * Wiring only. What a Collection holds, what it is worth, and that no other
  * Trader can read or write it are proven at seam 1
  * (tests/db/collection.test.ts).
+ *
+ * It does name the prices it expects, which looks like arithmetic and is
+ * not: the ticket asks this tracer to see "Market Price and the updated
+ * total-value line", and a tracer that accepted any number would pass with
+ * the wrong one wired to the screen. Seam 1 proves the sum is right; this
+ * proves the screen shows the sum the database computed.
  */
 
 // Card images are hotlinked from TCGplayer's image host; faked here at the

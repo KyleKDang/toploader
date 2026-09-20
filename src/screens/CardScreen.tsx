@@ -9,15 +9,16 @@ import {
   EmptyState,
   FormError,
   PlusIcon,
+  StatStrip,
   Stepper,
   TopBar,
 } from '../components';
 import { CONDITION_NAMES, CONDITIONS, type Condition } from '../lib/conditions';
-import { cx } from '../lib/cx';
 import { formatDay, formatPrice } from '../lib/format';
 import {
   cardCollectionQuery,
   collectionKey,
+  type CardCollectionEntry,
   type CatalogCard,
 } from '../lib/queries';
 import { supabase } from '../lib/supabase';
@@ -46,6 +47,16 @@ import { CollectionLink } from './CollectionLink';
  */
 
 const route = getRouteApi('/cards/$cardId');
+
+/**
+ * The quantity a Collection entry can hold, which collection_entries checks
+ * (see its migration). An entry can reach it through repeated adds, so the
+ * control that corrects an entry has to be able to reach it too.
+ */
+const MAX_COPIES = 9999;
+
+/** One add is a handful of Copies; a bigger number is a correction. */
+const MAX_PER_ADD = 99;
 
 export function CardScreen() {
   const { traderId, card } = route.useLoaderData();
@@ -107,17 +118,12 @@ function CardDetails({
         />
       ) : null}
 
-      <section
-        aria-label="Market Price"
-        className={cx(
-          'mx-4 flex flex-col gap-0.5 rounded-md border border-line bg-surface px-3.5 py-3',
-          // The chips' touch boxes already carry space under them.
-          variant ? 'mt-1.5' : 'mt-3.5',
-        )}
+      <StatStrip
+        name="Market Price"
+        label="Market Price · updated daily"
+        // The chips' touch boxes already carry space under them.
+        className={variant ? 'mt-1.5' : 'mt-3.5'}
       >
-        <p className="text-xs font-semibold text-muted">
-          Market Price · updated daily
-        </p>
         {variant?.market_price_cents != null &&
         variant.market_price_as_of != null ? (
           <>
@@ -133,7 +139,7 @@ function CardDetails({
             No market price for {variant ? variant.name : 'this card'} yet.
           </p>
         )}
-      </section>
+      </StatStrip>
 
       {variant ? (
         <AddToCollection
@@ -206,8 +212,17 @@ function AddToCollection({
       <p className="px-4 text-sm text-muted">{CONDITION_NAMES[condition]}</p>
 
       <div className="mt-3.5 flex items-center justify-between gap-2 px-4">
-        <span className="text-base font-semibold text-ink">Quantity</span>
-        <Stepper label="Quantity" value={quantity} onChange={setQuantity} />
+        {/* The stepper's own group is named "Quantity" too, so this word is
+            the visible half of that one label rather than a second one. */}
+        <span aria-hidden="true" className="text-base font-semibold text-ink">
+          Quantity
+        </span>
+        <Stepper
+          label="Quantity"
+          value={quantity}
+          onChange={setQuantity}
+          max={MAX_PER_ADD}
+        />
       </div>
 
       <div className="mt-3 flex px-4">
@@ -229,18 +244,20 @@ function AddToCollection({
   );
 }
 
-type OwnedEntry = { id: string; condition: Condition; quantity: number };
-
 function OwnedCopies({
   card,
   entries,
   onChanged,
 }: {
   card: CatalogCard;
-  entries: readonly (OwnedEntry & { card_variant_id: number })[];
+  entries: readonly CardCollectionEntry[];
   onChanged: () => Promise<void>;
 }) {
   const setQuantity = useMutation({
+    // One scope, so rapid taps on a stepper queue rather than race: this RPC
+    // sets a quantity outright, and out of order the slower write would be
+    // the one that stuck.
+    scope: { id: 'collection-quantity' },
     mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
       const { error } = await supabase.rpc('set_collection_quantity', {
         entry_id: id,
@@ -270,6 +287,7 @@ function OwnedCopies({
 
       <ul>
         {entries.map((entry) => {
+          const name = variantName(entry.card_variant_id);
           // The tap a Trader just made, until the write that follows it
           // lands, so the number under their finger moves when they press.
           const pending =
@@ -280,16 +298,16 @@ function OwnedCopies({
           return (
             <li key={entry.id} className="px-4 pt-3.5">
               <p className="truncate text-base text-ink">
-                {variantName(entry.card_variant_id)} ·{' '}
-                {CONDITION_NAMES[entry.condition]}
+                {name} · {CONDITION_NAMES[entry.condition]}
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <Stepper
-                  label={`Copies of ${variantName(entry.card_variant_id)} in ${CONDITION_NAMES[entry.condition]}`}
+                  label={`Copies of ${name} in ${CONDITION_NAMES[entry.condition]}`}
                   value={pending}
                   onChange={(quantity) =>
                     setQuantity.mutate({ id: entry.id, quantity })
                   }
+                  max={MAX_COPIES}
                 />
                 <Button
                   disabled={remove.isPending}
