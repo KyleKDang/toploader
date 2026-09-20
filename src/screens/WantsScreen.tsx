@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, useRouter } from '@tanstack/react-router';
 import {
   AppShell,
   Button,
@@ -40,20 +40,40 @@ const ANY = 'any';
 export function WantsScreen() {
   const { trader, traderId, card } = route.useLoaderData();
   const navigate = route.useNavigate();
+  const router = useRouter();
   const wants = useQuery(wantsQuery(traderId));
 
   /*
+   * Out of the drill-in, to wherever the Trader came from. A Trader who
+   * opened this screen from a link has nothing behind them, and back would
+   * leave the app; Search is where the Cards are, so that is the way out.
+   */
+  function goBack() {
+    if (router.history.canGoBack()) router.history.back();
+    else void navigate({ to: '/search' });
+  }
+
+  /*
    * The Card being narrowed into a Want, held in the URL rather than in
-   * state, so the card page's "Add to wants" arrives here on the same footing
-   * as a pick from the search field, and so backing out of the panel is the
-   * back button.
+   * state, so that the card page's "Add to wants" arrives here on the same
+   * footing as a pick from the search field.
+   *
+   * Replacing rather than pushing: picking a Card and cancelling out of it
+   * are moves within this screen, not places to go back to, so the back
+   * button always leaves Wants instead of first rewinding a Card choice.
    */
   function pickCard(cardId: number | undefined) {
-    void navigate({ search: cardId === undefined ? {} : { card: cardId } });
+    void navigate({
+      search: cardId === undefined ? {} : { card: cardId },
+      replace: true,
+    });
   }
 
   return (
-    <AppShell header={<TopBar title="Wants" />} {...useTabs('profile')}>
+    <AppShell
+      header={<TopBar title="Wants" onBack={goBack} />}
+      {...useTabs('profile')}
+    >
       <CardSearchField onSelect={pickCard} />
 
       {card ? (
@@ -141,7 +161,7 @@ function AddWant({
           label="Variant"
           showLabel
           options={[
-            { value: ANY, label: 'Any variant' },
+            { value: ANY, label: 'Any Variant' },
             ...variants.map(({ id, name }) => ({ value: id, label: name })),
           ]}
           value={variant}
@@ -151,10 +171,10 @@ function AddWant({
       ) : null}
 
       <ChipGroup
-        label="Minimum condition"
+        label="Minimum Condition"
         showLabel
         options={[
-          { value: ANY, label: 'Any condition' },
+          { value: ANY, label: 'Any Condition' },
           ...CONDITIONS.map((value) => ({
             value,
             label: CONDITION_NAMES[value],
@@ -211,16 +231,20 @@ function WantRow({ want, traderId }: { want: Want; traderId: string }) {
       // short, so line 3 is read in full rather than truncated.
       wrapRelation
       relationTrailing={
-        <button
-          type="button"
-          // The row is not itself tappable, so this control carries its own
-          // touch target rather than inheriting the row's.
-          className="-my-2 min-h-tap px-2 text-sm font-semibold text-muted"
-          disabled={removeWant.isPending}
-          onClick={() => removeWant.mutate()}
-        >
-          Remove
-        </button>
+        <span className="-my-2 flex min-h-tap items-center">
+          <button
+            type="button"
+            // Everything tappable has a visible edge, so this borrows the
+            // chip's: nothing in the design system is bare text. The row is
+            // not itself tappable, so the control carries its own touch
+            // target rather than inheriting the row's.
+            className="flex h-chip items-center rounded-full border-2 border-line bg-surface px-3 text-sm font-semibold text-ink disabled:opacity-60"
+            disabled={removeWant.isPending}
+            onClick={() => removeWant.mutate()}
+          >
+            Remove
+          </button>
+        </span>
       }
     />
   );
@@ -229,9 +253,9 @@ function WantRow({ want, traderId }: { want: Want; traderId: string }) {
 /** What a Want is narrowed to, in the words the chips used to set it. */
 function describeNarrowing(want: Want): string {
   return [
-    want.card_variant ? want.card_variant.name : 'Any variant',
+    want.card_variant ? want.card_variant.name : 'Any Variant',
     want.min_condition
       ? `${CONDITION_NAMES[want.min_condition]} or better`
-      : 'Any condition',
+      : 'Any Condition',
   ].join(' · ');
 }

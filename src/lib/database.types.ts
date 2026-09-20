@@ -328,6 +328,55 @@ export type Database = {
           },
         ]
       }
+      wants: {
+        Row: {
+          card_id: number
+          card_variant_id: number | null
+          created_at: string
+          id: string
+          min_condition: Database["public"]["Enums"]["card_condition"] | null
+          trader_id: string
+        }
+        Insert: {
+          card_id: number
+          card_variant_id?: number | null
+          created_at?: string
+          id?: string
+          min_condition?: Database["public"]["Enums"]["card_condition"] | null
+          trader_id: string
+        }
+        Update: {
+          card_id?: number
+          card_variant_id?: number | null
+          created_at?: string
+          id?: string
+          min_condition?: Database["public"]["Enums"]["card_condition"] | null
+          trader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wants_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wants_card_variant_id_card_id_fkey"
+            columns: ["card_variant_id", "card_id"]
+            isOneToOne: false
+            referencedRelation: "card_variants"
+            referencedColumns: ["id", "card_id"]
+          },
+          {
+            foreignKeyName: "wants_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       collection_value: {
@@ -357,6 +406,14 @@ export type Database = {
         }
         Returns: string
       }
+      add_want: {
+        Args: {
+          card_id: number
+          card_variant_id?: number
+          min_condition?: Database["public"]["Enums"]["card_condition"]
+        }
+        Returns: string
+      }
       apply_catalog_set: {
         Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
         Returns: undefined
@@ -366,6 +423,7 @@ export type Database = {
         Returns: undefined
       }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
+      remove_want: { Args: { want_id: string }; Returns: undefined }
       search_cards: {
         Args: { query: string }
         Returns: {

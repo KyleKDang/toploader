@@ -35,12 +35,18 @@ create table public.wants (
   -- true of the un-narrowed ones too, which are the common case: without it
   -- two Wants naming only a Card would both be stored, and Matching would
   -- pair a Listing with each of them.
+  --
+  -- This makes identical Wants one row, not overlapping ones: a Trader may
+  -- hold both (card, any Variant, any Condition) and (card, Holofoil, NM),
+  -- and one Listing can satisfy both. Collapsing that pair is Matching's
+  -- problem (#19), not a constraint's.
   unique nulls not distinct (trader_id, card_id, card_variant_id, min_condition)
 );
 
--- Matching walks from a Listing's Card to the Wants for it (#19), so that is
--- the direction the index covers. The unique constraint above already
--- indexes the owner's own list.
+-- Postgres does not index a foreign key's own column, and an unindexed one
+-- makes every cascading delete of a Card scan this whole table. It is also
+-- the direction Matching reads in (#19), from a Listing's Card to the Wants
+-- for it. The unique constraint above already indexes the owner's own list.
 create index wants_card_id_idx on public.wants (card_id);
 
 -- No client role holds a privilege until granted below (deny_by_default), and
