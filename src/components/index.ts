@@ -26,9 +26,9 @@ export { TextInput } from './TextInput';
 export { TopBar } from './TopBar';
 
 export {
-  BackIcon,
   CheckIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
   MatchesIcon,
   MinusIcon,
   PlusIcon,

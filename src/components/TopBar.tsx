@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BackIcon } from './icons';
+import { ChevronLeftIcon } from './icons';
 
 /*
  * The top bar every screen opens with: the screen title at --text-lg, and
@@ -32,7 +32,7 @@ export function TopBar({ title, subtitle, onBack, action }: TopBarProps) {
           // with the 16px edge the title would have had.
           className="-ml-3.5 flex size-tap shrink-0 items-center justify-center rounded-full text-ink"
         >
-          <BackIcon className="text-lg" />
+          <ChevronLeftIcon className="text-lg" />
         </button>
       ) : null}
 
