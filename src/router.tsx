@@ -10,10 +10,12 @@ import {
 import {
   cardQuery,
   citiesQuery,
+  cityListingsForCardQuery,
   collectionQuery,
   collectionValueQuery,
   currentTraderId,
   hasProfile,
+  listingQuery,
   safeSpotsQuery,
   traderQuery,
   wantsQuery,
@@ -47,7 +49,8 @@ async function loadSignedInTrader(queryClient: QueryClient) {
  * The signed-in Trader who has finished onboarding, or a redirect to set up
  * the profile when they have not. Every screen inside the app loads this.
  * The id comes back with the profile, because a screen reading rows of the
- * Trader's own - their Collection - keys them in the cache by it.
+ * Trader's own - their Collection - keys them in the cache by it, and a
+ * screen that writes needs it: a Listing's photos are stored under it.
  */
 async function loadOnboardedTrader(queryClient: QueryClient) {
   const { traderId, trader } = await loadSignedInTrader(queryClient);
@@ -160,15 +163,15 @@ const cardRoute = createRoute({
   path: '/cards/$cardId',
   loader: async ({ context: { queryClient }, params }) => {
     const { traderId } = await loadOnboardedTrader(queryClient);
-    // An id that is not a whole number names no Card, the same as one that
-    // is not in the Catalog, rather than a request that errors.
-    const cardId = Number(params.cardId);
-    return {
-      traderId,
-      card: Number.isSafeInteger(cardId)
-        ? await queryClient.ensureQueryData(cardQuery(cardId))
-        : null,
-    };
+    const cardId = catalogId(params.cardId);
+    if (cardId === null) return { traderId, card: null, listings: [] };
+    // The Listings come with the Card because the page shows them together;
+    // RLS is what keeps them to the Trader's own City.
+    const [card, listings] = await Promise.all([
+      queryClient.ensureQueryData(cardQuery(cardId)),
+      queryClient.ensureQueryData(cityListingsForCardQuery(cardId)),
+    ]);
+    return { traderId, card, listings };
   },
   component: lazyRouteComponent(
     () => import('./screens/CardScreen'),
@@ -196,6 +199,54 @@ const collectionRoute = createRoute({
   ),
 });
 
+const newListingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/cards/$cardId/list',
+  loader: async ({ context: { queryClient }, params }) => {
+    const { traderId } = await loadOnboardedTrader(queryClient);
+    const cardId = catalogId(params.cardId);
+    return {
+      traderId,
+      card:
+        cardId === null
+          ? null
+          : await queryClient.ensureQueryData(cardQuery(cardId)),
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/NewListingScreen'),
+    'NewListingScreen',
+  ),
+});
+
+const listingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/listings/$listingId',
+  loader: async ({ context: { queryClient }, params }) => {
+    const { traderId } = await loadOnboardedTrader(queryClient);
+    return {
+      traderId,
+      listing: await queryClient.ensureQueryData(
+        listingQuery(params.listingId),
+      ),
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/ListingScreen'),
+    'ListingScreen',
+  ),
+});
+
+/**
+ * A Catalog id from the URL, or null where it is not one. An id that is not
+ * a whole number names no Card, the same as one that is not in the Catalog,
+ * rather than a request that errors.
+ */
+function catalogId(param: string): number | null {
+  const id = Number(param);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 const routeTree = rootRoute.addChildren([
   signUpRoute,
   setUpProfileRoute,
@@ -205,6 +256,8 @@ const routeTree = rootRoute.addChildren([
   wantsRoute,
   cardRoute,
   collectionRoute,
+  newListingRoute,
+  listingRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

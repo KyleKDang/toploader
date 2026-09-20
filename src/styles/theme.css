@@ -32,6 +32,10 @@
   --color-alert: light-dark(#d4552b, #ff8a5e);
   --color-ok-ink: light-dark(#0b5d33, #7fe0a8);
   --color-ok-bg: light-dark(#ddf2e5, #123a25);
+  /* Behind a bottom sheet, and nothing else. An alpha rather than a flat
+     color, because it dims whatever it covers; heavier in dark mode, where
+     a 40% scrim over a near-black page does not read as a layer. */
+  --color-scrim: light-dark(rgb(0 0 0 / 0.4), rgb(0 0 0 / 0.6));
 
   /* Type. Atkinson Hyperlegible is self-hosted; see fonts.css for why.
      13px is the floor; nothing in the app is smaller. */

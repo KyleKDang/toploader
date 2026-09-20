@@ -15,8 +15,21 @@ export function authStorageKey() {
   return `sb-${new URL(requireEnv('SUPABASE_API_URL')).hostname.split('.')[0]}-auth-token`;
 }
 
-/** Signs a new Trader, onboarded in `city`, into the page. */
-export async function signInAsNewTrader(page: Page, city: string) {
+/**
+ * Signs a new Trader, onboarded in `city`, into the page, and hands back
+ * their id, display name, and a client holding the same session, for a
+ * tracer that has to check what the app stored as the Trader who stored it.
+ *
+ * A tracer that reads a City-scoped screen passes its own `displayName`.
+ * Playwright runs these files in parallel against one stack, so another
+ * tracer's Listing is legitimately in this Trader's City, and a name of
+ * one's own is what tells the two apart.
+ */
+export async function signInAsNewTrader(
+  page: Page,
+  city: string,
+  displayName = 'Priya R.',
+) {
   const client = createClient<Database>(
     requireEnv('SUPABASE_API_URL'),
     requireEnv('SUPABASE_PUBLISHABLE_KEY'),
@@ -36,7 +49,7 @@ export async function signInAsNewTrader(page: Page, city: string) {
     .single();
   if (cityError) throw cityError;
   const { error: profileError } = await client.rpc('set_trader_profile', {
-    display_name: 'Priya R.',
+    display_name: displayName,
     city_id: found.id,
     attests_adult: true,
   });
@@ -47,6 +60,8 @@ export async function signInAsNewTrader(page: Page, city: string) {
     ([key, session]) => localStorage.setItem(key, session),
     [authStorageKey(), JSON.stringify(data.session)],
   );
+
+  return { id: data.user?.id ?? '', displayName, client };
 }
 
 function requireEnv(name: string) {

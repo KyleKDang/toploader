@@ -22,3 +22,10 @@ The write discipline that keeps business logic in one place: reads go through RL
 A read that a select cannot express may be a function, as `search_cards` is: it ranks Cards by how well they match, which PostgREST's filters and ordering cannot.
 Such a function runs as its caller (`security invoker`, the default), never `security definer`, so the same RLS policies decide what it returns as would decide a select, and it ships with the same denial test.
 Writes are unchanged: every state change is still a named RPC or an edge function.
+
+## Amendment, 2026-09-19 (ticket #17)
+
+A file in Storage is written by the client directly, because there is no other way to write one: an RPC is a database call and cannot carry the bytes of a photo, and routing uploads through an edge function would spend the free tier's function budget to add a hop that changes nothing about who may write.
+So a Trader uploads a Listing's photos themselves, under a policy that allows writing only beneath their own id, and `create_listing` then refuses any path that is not theirs and any object that is not actually in the bucket.
+The discipline is kept where it matters: the row that makes those files a Listing is still written only by a named RPC, and a file nothing references is not a Listing, only litter the reaper collects.
+This exception is for file bytes alone. It is not a precedent for writing a table from a client.

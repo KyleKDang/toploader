@@ -104,3 +104,37 @@ export async function seedAdversarialTraders(): Promise<{
   ]);
   return { actor, counterparty, foreign };
 }
+
+/** The bucket a Listing's photos live in. */
+export const LISTING_PHOTOS_BUCKET = 'listing-photos';
+
+/**
+ * A real 1x1 WebP, 44 bytes: the smallest thing the bucket accepts, so a
+ * test about who may read or write a photo does not have to carry a
+ * photograph around to say so.
+ */
+export const TINY_WEBP = Buffer.from(
+  'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
+  'base64',
+);
+
+/**
+ * A full-size photo and its thumbnail, uploaded under the Trader's own
+ * prefix the way the browser path uploads them, ready for `create_listing`.
+ */
+export async function uploadListingPhoto(
+  trader: SeededTrader,
+): Promise<{ path: string; thumbnail_path: string }> {
+  const name = randomUUID();
+  const photo = {
+    path: `${trader.id}/${name}.webp`,
+    thumbnail_path: `${trader.id}/${name}-thumb.webp`,
+  };
+  for (const path of [photo.path, photo.thumbnail_path]) {
+    const { error } = await trader.client.storage
+      .from(LISTING_PHOTOS_BUCKET)
+      .upload(path, TINY_WEBP, { contentType: 'image/webp' });
+    if (error) throw error;
+  }
+  return photo;
+}

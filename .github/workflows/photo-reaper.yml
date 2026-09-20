@@ -1,0 +1,47 @@
+# The daily Listing photo reaper: gives back the Storage that withdrawn
+# Listings and abandoned uploads are holding, which is what keeps the free
+# tier's 1 GB lasting (ADR-0006). Photos of a Listing that went through a
+# Trade are never touched; they are the Trade Record's evidence.
+# Every run checks in with a Sentry cron monitor, so a failed or missing run
+# is an alert rather than silence.
+name: Listing photo reaper
+
+on:
+  schedule:
+    # Early UTC morning, well away from the Catalog sync and the nightly
+    # backup. Off the hour because GitHub delays scheduled runs most at the
+    # top of it. Keep in step with the monitor's schedule in
+    # scripts/sentry-checkin.sh.
+    - cron: '41 8 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: photo-reaper
+
+permissions:
+  contents: read
+
+jobs:
+  reap:
+    name: Reclaim withdrawn Listing photos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: scripts/sentry-checkin.sh photo-reaper in_progress
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      - run: node scripts/photo-reaper/main.ts
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      - if: always()
+        run: scripts/sentry-checkin.sh photo-reaper "$STATUS"
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          STATUS: ${{ job.status == 'success' && 'ok' || 'error' }}

@@ -54,6 +54,11 @@ Nothing in the codebase refers to "green" or "grey"; it refers to `accent` or `m
 | `--color-alert` | `#D4552B` | `#FF8A5E` | Unread and attention markers only, never a decorative color |
 | `--color-ok-ink` | `#0B5D33` | `#7FE0A8` | Verified badge text |
 | `--color-ok-bg` | `#DDF2E5` | `#123A25` | Verified badge fill |
+| `--color-scrim` | `rgb(0 0 0 / 0.40)` | `rgb(0 0 0 / 0.60)` | Behind a bottom sheet, and nothing else |
+
+`--color-scrim` was added in [#17](https://github.com/KyleKDang/toploader/issues/17), the ticket that first had to build the sheet primitive.
+It is not a new decision, only the value the Sheet entry below already implies: a sheet floats above the screen, so something has to dim what it covers.
+It is stated as an alpha rather than a flat color because it darkens whatever is behind it in both palettes, and it is darker in dark mode because a 40% scrim over a near-black page does not read as a layer at all.
 
 Three notes on why these values and not others.
 

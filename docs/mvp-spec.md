@@ -126,7 +126,9 @@ Catalog tables (synced, read-only to clients): `card_sets`, `cards`, `card_varia
 Every Catalog row has our own id, with TCGplayer's id beside it as a unique column, so the upstream stays swappable.
 Trader tables: `traders` (the public profile: display name, city_id, verified_at, `banned_at`, denormalized reputation counters, member-since), `trader_private` (fields only the owner reads: the 18-or-over attestation time), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
 A Trader's profile is split by audience because RLS scopes rows, not columns: a public field goes on `traders`, a private one on `trader_private`, so no column-level grant or RLS-bypassing view is ever a second place the rule can be wrong.
-Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (trader, variant, condition, photos, status: active / in_trade / traded / withdrawn; asking_price nullable), `wants` (trader, card, variant nullable, min_condition nullable).
+Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (trader, variant, condition, status: active / in_trade / traded / withdrawn; asking_price nullable), `listing_photos` (listing, position, the full-size path and the thumbnail path), `wants` (trader, card, variant nullable, min_condition nullable).
+The photos are their own table rather than a column on `listings`, decided on [#17](https://github.com/KyleKDang/toploader/issues/17): each one is two files in the bucket, they are ordered, and the reaper needs a list of what it may reclaim rather than an array it has to pick apart.
+A Listing's lifecycle is enforced by a trigger rather than by whichever RPC writes the status, so the Trade machine is held to the same transitions when it arrives.
 Matching: a SQL view joining active `listings` x `wants` within a City, plus a `match_events` table so notifications fire once per new pair.
 Trading: `trades` (proposer, recipient, status: proposed / accepted / scheduled / completed / cancelled / no_show, scheduled_at, safe_spot_id, completed_at), `trade_items` (trade, side, listing snapshot, cash_amount nullable), `messages` (trade, sender, body), `trade_feedback` (trade, from, to, thumb).
 Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks`.
@@ -189,6 +191,10 @@ What makes a good test here:
 - Two-Trader adversarial pairs are the default shape: the actor, the counterparty, and a foreign Trader in the same test file, asserting both what succeeds and what is denied.
 - Real Postgres always; nothing below a seam is mocked.
   The only fakes anywhere sit at the external HTTP edge.
+- Arranging a state no client path can reach is allowed, through a superuser connection, and only in the arrange step.
+  Added on [#17](https://github.com/KyleKDang/toploader/issues/17), where City browse and the photo reaper both had to answer for a `traded` Listing months before the Trade machine can produce one.
+  Assertions stay at the seam, as a signed-in Trader; the fixture walks the real transitions rather than jumping, so it cannot arrange a state the app could never produce.
+  The alternative was granting a client role or a scheduled job a power it does not otherwise have, purely so a test could use it, which would have put the test's convenience into the production surface.
 - Test names use the domain vocabulary of [CONTEXT.md](../CONTEXT.md) so the suite reads as this spec.
 
 ## Build sequence

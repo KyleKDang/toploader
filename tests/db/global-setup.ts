@@ -15,6 +15,9 @@ export default async function setup(project: TestProject) {
   project.provide('supabasePublishableKey', status.PUBLISHABLE_KEY);
   // The server-side key, for seam 2: the Catalog sync runs as service_role.
   project.provide('supabaseSecretKey', status.SECRET_KEY);
+  // A superuser connection, for arranging states no client can reach; see
+  // tests/db/arrange.ts.
+  project.provide('supabaseDbUrl', status.DB_URL);
 }
 
 /*
@@ -50,5 +53,6 @@ declare module 'vitest' {
     supabaseUrl: string;
     supabasePublishableKey: string;
     supabaseSecretKey: string;
+    supabaseDbUrl: string;
   }
 }
