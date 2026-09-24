@@ -6,6 +6,7 @@ import {
   cityId,
   ORANGE_COUNTY,
   seedTrader,
+  serviceClient,
   TEST_CITY,
   uploadListingPhoto,
   type Client,
@@ -97,13 +98,41 @@ describe('Matches', () => {
     const listingId = await list(lister, holofoil, 'NM');
 
     expect(await matchFor(foreign.client, listingId, wanter.id)).toBeNull();
-    expect(await matchEvents(foreign.client, listingId)).toEqual([]);
     const signedOut = await anonClient()
       .from('matches')
       .select('listing_id')
       .eq('listing_id', listingId);
     expect(signedOut.error?.code).toBe('42501');
   });
+
+  /*
+   * The two tables behind the view are the server's alone. match_pairs is
+   * every Trader's Wants against every Listing, and a match event outlives
+   * its pair, so either would tell a Trader what `matches` does not: whose
+   * Wants hold what, or that a Want now removed once held this Card.
+   */
+  it.each([
+    [
+      'match_pairs',
+      (client: Client) => client.from('match_pairs').select('listing_id'),
+    ],
+    [
+      'match_events',
+      (client: Client) => client.from('match_events').select('listing_id'),
+    ],
+  ] as const)(
+    'keeps %s from every Trader, even one party to the pair',
+    async (_table, read) => {
+      const { lister, wanter, foreign } = await seedPair();
+      await addWant(wanter, { card_id: examplemon });
+      await list(lister, holofoil, 'NM');
+
+      for (const trader of [lister, wanter, foreign]) {
+        const { error } = await read(trader.client);
+        expect(error?.code).toBe('42501');
+      }
+    },
+  );
 
   it('never pairs a Want with a Listing of another Card', async () => {
     const { lister, wanter } = await seedPair();
@@ -248,9 +277,7 @@ describe('Matches', () => {
       await addWant(wanter, { card_id: examplemon });
 
       expect(await matchFor(wanter.client, listingId, wanter.id)).toBeNull();
-      expect(await matchEvents(wanter.client, listingId, wanter.id)).toEqual(
-        [],
-      );
+      expect(await matchEvents(listingId, wanter.id)).toEqual([]);
     });
 
     it('matches again when a cancelled Trade puts the Listing back', async () => {
@@ -280,9 +307,7 @@ describe('Matches', () => {
         await matchFor(elsewhere.client, listingId, elsewhere.id),
       ).toBeNull();
       expect(await matchFor(lister.client, listingId, elsewhere.id)).toBeNull();
-      expect(await matchEvents(lister.client, listingId, elsewhere.id)).toEqual(
-        [],
-      );
+      expect(await matchEvents(listingId, elsewhere.id)).toEqual([]);
     });
 
     it('pairs them once the wanting Trader moves into the City', async () => {
@@ -299,9 +324,7 @@ describe('Matches', () => {
         lister_id: lister.id,
         wanter_id: mover.id,
       });
-      expect(await matchEvents(mover.client, listingId, mover.id)).toHaveLength(
-        1,
-      );
+      expect(await matchEvents(listingId, mover.id)).toHaveLength(1);
     });
 
     it('drops the Match when either Trader moves away', async () => {
@@ -317,14 +340,14 @@ describe('Matches', () => {
   });
 
   describe('records each new pair exactly once', () => {
-    it('records one match event for a new pair, readable by both Traders', async () => {
+    it('records one match event for a new pair, dated as both Traders see it', async () => {
       const { lister, wanter } = await seedPair();
       await addWant(wanter, { card_id: examplemon });
 
       const listingId = await list(lister, holofoil, 'NM');
 
-      const [event] = await matchEvents(wanter.client, listingId, wanter.id);
-      expect(await matchEvents(wanter.client, listingId, wanter.id)).toEqual([
+      const events = await matchEvents(listingId, wanter.id);
+      expect(events).toEqual([
         {
           listing_id: listingId,
           lister_id: lister.id,
@@ -332,14 +355,11 @@ describe('Matches', () => {
           created_at: expect.any(String) as string,
         },
       ]);
-      expect(await matchEvents(lister.client, listingId, wanter.id)).toEqual([
-        event,
-      ]);
-      expect(await matchFor(wanter.client, listingId, wanter.id)).toMatchObject(
-        {
-          matched_at: event?.created_at,
-        },
-      );
+      for (const trader of [lister, wanter]) {
+        expect(
+          await matchFor(trader.client, listingId, wanter.id),
+        ).toMatchObject({ matched_at: events[0]?.created_at });
+      }
     });
 
     it('collapses two overlapping Wants of one Trader into one Match', async () => {
@@ -356,16 +376,14 @@ describe('Matches', () => {
       expect(
         await matchesFor(wanter.client, listingId, wanter.id),
       ).toHaveLength(1);
-      expect(
-        await matchEvents(wanter.client, listingId, wanter.id),
-      ).toHaveLength(1);
+      expect(await matchEvents(listingId, wanter.id)).toHaveLength(1);
     });
 
     it('does not duplicate the event when the pair is evaluated again', async () => {
       const { lister, wanter } = await seedPair();
       const wantId = await addWant(wanter, { card_id: examplemon });
       const listingId = await list(lister, holofoil, 'NM');
-      const before = await matchEvents(wanter.client, listingId, wanter.id);
+      const before = await matchEvents(listingId, wanter.id);
       expect(before).toHaveLength(1);
 
       // Every path that re-evaluates this pair: the Listing coming back from
@@ -382,9 +400,7 @@ describe('Matches', () => {
       await moveTo(wanter, ORANGE_COUNTY);
       await moveTo(lister, ORANGE_COUNTY);
 
-      expect(await matchEvents(wanter.client, listingId, wanter.id)).toEqual(
-        before,
-      );
+      expect(await matchEvents(listingId, wanter.id)).toEqual(before);
       expect(
         await matchFor(wanter.client, listingId, wanter.id),
       ).not.toBeNull();
@@ -403,15 +419,11 @@ describe('Matches', () => {
       const other = await list(lister, reverseHolofoil, 'LP');
 
       for (const listingId of [one, other]) {
-        expect(
-          (await matchEvents(lister.client, listingId)).map((e) => e.wanter_id),
-        ).toEqual(expect.arrayContaining([first.id, second.id]));
-        expect(
-          await matchEvents(first.client, listingId, first.id),
-        ).toHaveLength(1);
-        expect(
-          await matchEvents(second.client, listingId, second.id),
-        ).toHaveLength(1);
+        expect((await matchEvents(listingId)).map((e) => e.wanter_id)).toEqual(
+          expect.arrayContaining([first.id, second.id]),
+        );
+        expect(await matchEvents(listingId, first.id)).toHaveLength(1);
+        expect(await matchEvents(listingId, second.id)).toHaveLength(1);
       }
     });
 
@@ -432,9 +444,7 @@ describe('Matches', () => {
 
       expect(insert.error?.code).toBe('42501');
       expect(remove.error?.code).toBe('42501');
-      expect(
-        await matchEvents(wanter.client, listingId, wanter.id),
-      ).toHaveLength(1);
+      expect(await matchEvents(listingId, wanter.id)).toHaveLength(1);
     });
   });
 
@@ -535,13 +545,13 @@ async function matchFor(client: Client, listingId: string, wanterId: string) {
   return matches[0] ?? null;
 }
 
-/** The match events the caller can read on a Listing, optionally for one wanting Trader. */
-async function matchEvents(
-  client: Client,
-  listingId: string,
-  wanterId?: string,
-) {
-  let query = client
+/**
+ * The match events on a Listing, optionally for one wanting Trader, read as
+ * service_role: the notifier's identity (#20), and the only role that may
+ * read them at all.
+ */
+async function matchEvents(listingId: string, wanterId?: string) {
+  let query = serviceClient()
     .from('match_events')
     .select('listing_id, lister_id, wanter_id, created_at')
     .eq('listing_id', listingId);

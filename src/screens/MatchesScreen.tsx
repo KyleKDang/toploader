@@ -35,11 +35,24 @@ export function MatchesScreen() {
   const navigate = useNavigate();
   const matches = useQuery(matchesQuery(traderId));
   const cityName = trader.city.name;
-  const you = `you: ${trader.verified_at ? 'Verified' : 'Not verified'} · ${trades(trader.completed_trade_count)}`;
 
   return (
     <AppShell
-      header={<TopBar title="Matches" subtitle={`${cityName} · ${you}`} />}
+      header={
+        <TopBar
+          title="Matches"
+          subtitle={
+            <>
+              {cityName} · You{' '}
+              <ReputationPill
+                verified={trader.verified_at !== null}
+                trades={trader.completed_trade_count}
+                className="align-middle"
+              />
+            </>
+          }
+        />
+      }
       {...useTabs('matches')}
     >
       {matches.data?.length ? (
@@ -115,8 +128,4 @@ function MatchRow({ match, traderId }: { match: Match; traderId: string }) {
       }
     />
   );
-}
-
-function trades(count: number) {
-  return `${count} ${count === 1 ? 'Trade' : 'Trades'}`;
 }
