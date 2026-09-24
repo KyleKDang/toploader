@@ -65,16 +65,15 @@ create table public.match_events (
 create index match_events_wanter_id_idx on public.match_events (wanter_id);
 create index match_events_lister_id_idx on public.match_events (lister_id);
 
--- Select is the only grant: an event is written by the trigger below and by
--- nothing a client can call.
+-- No client role reads or writes this table. An event outlives the pair it
+-- records, so a Trader reading it would learn things `matches` deliberately
+-- stops telling them: that a Trader whose Want is gone once wanted this
+-- Card. A Trader reads their Matches through `matches` below; the one reader
+-- here is the notifier (#20), which runs as service_role, the server-side
+-- identity no client holds. Writes come only from the trigger below.
 alter table public.match_events enable row level security;
 
-grant select on public.match_events to authenticated;
-
-create policy "A Trader can read the match events they are party to"
-  on public.match_events for select
-  to authenticated
-  using ((select auth.uid()) in (lister_id, wanter_id));
+grant select on public.match_events to service_role;
 
 -- Records whichever pairs a change has just made hold, and leaves the pairs
 -- already recorded alone: `on conflict do nothing` is what makes evaluating
@@ -90,8 +89,10 @@ create policy "A Trader can read the match events they are party to"
 -- Nothing else can: a Listing's Card, Variant and Condition are fixed once
 -- it is created, and a Want is never edited, only added and removed.
 --
--- security definer because the change is made as a Trader, and pairing reads
--- the Wants of Traders they cannot see.
+-- security definer so that it holds whoever makes the change. The RPCs that
+-- write these tables today already run as their owner, but pairing reads
+-- every Trader's Wants, and a trigger that only worked under a writer with
+-- that power would fail the first time a change came from anywhere else.
 create function public.record_new_matches()
   returns trigger
   language plpgsql
@@ -153,7 +154,9 @@ insert into public.match_events (listing_id, lister_id, wanter_id)
 -- It runs as its owner for the reason match_pairs does, so the filter on
 -- the caller is this view's policy: a Trader sees a pair only from one of
 -- its two sides, and the only thing the lister learns about the other
--- Trader's want-list is that it holds this one Card.
+-- Trader's want-list is that it holds this one Card, for as long as it does.
+-- This is the one read that is not RLS-guarded, recorded as an amendment to
+-- ADR-0001 (#19).
 create view public.matches as
   select
     event.listing_id,

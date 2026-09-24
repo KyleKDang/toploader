@@ -29,3 +29,14 @@ A file in Storage is written by the client directly, because there is no other w
 So a Trader uploads a Listing's photos themselves, under a policy that allows writing only beneath their own id, and `create_listing` then refuses any path that is not theirs and any object that is not actually in the bucket.
 The discipline is kept where it matters: the row that makes those files a Listing is still written only by a named RPC, and a file nothing references is not a Listing, only litter the reaper collects.
 This exception is for file bytes alone. It is not a precedent for writing a table from a client.
+
+## Amendment, 2026-09-24 (ticket #19)
+
+The `matches` view is the one read that is not RLS-guarded: it runs as its owner and filters to the calling Trader's own pairs itself.
+A Match pairs one Trader's Listing with another Trader's Want, and a Want is private to its owner, so a read running as the lister can never see the half that makes the pair.
+The alternatives each move the rule somewhere worse.
+A policy on `wants` letting the lister read a Want their Listing satisfies would hand over the Want itself, its Variant and minimum Condition, rather than only the fact of the pairing.
+A table of current pairs kept up to date by triggers would be RLS-guarded, but it is a second copy of what the view computes, and every change that can end a pair (a withdrawal, a Trade, a removed Want, a move, and later a ban or a block) would have to remember to delete from it; a path that forgets leaves a Match on screen that no longer holds.
+So the view is computed on every read, and its filter on the caller is its policy, in one place, with the foreign-Trader and signed-out denial tests every policy ships with.
+What it reads from is locked down the ordinary way: `match_pairs` and `match_events` are granted to no client role, and each has a test proving a Trader, even one party to the pair, is refused.
+This exception is for reads that must join one Trader's private rows to another's. It is not a precedent for an owner-run view over rows RLS could scope.

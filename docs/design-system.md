@@ -21,7 +21,7 @@ A later screen that is tempted to shrink something to fit more in is resolving i
 
 All four screens, at 375px, light and dark: **https://claude.ai/artifact/TqxHCqnRJBCCN7wxEMHFvQ**
 
-1. **Matches** - the landing view: Listings that satisfy a Want and Wants that a Listing satisfies, inside the City, with both Traders' Reputation on the row.
+1. **Matches** - the landing view: Listings that satisfy a Want and Wants that a Listing satisfies, inside the City, with both Traders' Reputation on screen: the other Trader's on each row, and the Trader's own once in the header, as the mockup draws it, since it would be the same pill on every row ([#19](https://github.com/KyleKDang/toploader/issues/19)).
 2. **Card page** - the Catalog search picker open above a Card: Variant, Condition, Market Price, and who in the City holds one.
 3. **Trade proposal** - two-sided item selection with the optional cash component on one side.
 4. **Trader profile** - Verified badge, completed Trades, member-since, cancellations, no-shows, Trade Feedback, and the Verified Trading mechanics.
@@ -252,7 +252,8 @@ Where the action's destination is not built yet, the button is still shown, disa
 Listing photos are photographs of the actual Copy, so they are never cropped in a way that hides the card.
 Thumbnails center-crop to 5:7 at 400px, which is the thumbnail size the spec's upload pipeline already produces.
 Full views show the whole photo uncropped on `--color-surface`, at the 1600px long-edge WebP the pipeline stores.
-Photos always carry alt text naming the Card and Condition.
+Photos always carry alt text naming the Card and Condition, except a thumbnail inside a list row that already names both, which takes empty alt text so a screen reader does not read the Card twice; the row is the photo's label there.
+Settled on [#17](https://github.com/KyleKDang/toploader/issues/17) for City browse and held on [#19](https://github.com/KyleKDang/toploader/issues/19) for Matches.
 
 ## Rules later tickets must follow
 

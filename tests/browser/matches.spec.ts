@@ -156,9 +156,10 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
     'src',
     new RegExp(photo.thumbnail_path),
   );
+  // The Trader's own Reputation, once, in the header.
   await expect(
-    wanterPage.getByText('Orange County · you: Not verified · 0 Trades'),
-  ).toBeVisible();
+    wanterPage.locator('header p', { hasText: 'Orange County · You' }),
+  ).toContainText('Not verified · 0 Trades');
   await expectNoHorizontalOverflow(wanterPage);
 
   // The lister's side: the same Match, as someone wanting their Listing.

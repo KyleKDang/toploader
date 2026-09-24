@@ -363,19 +363,28 @@ async function fetchCityListingsForCard(cardId: number) {
     .order('position', { referencedTable: 'listing_photos' });
   if (error) throw error;
 
-  const urls = await signedPhotoUrls(
-    data.flatMap((listing) => firstThumbnail(listing) ?? []),
-  );
-  return data.map((listing) => ({
-    ...listing,
-    thumbnailUrl: urls.get(firstThumbnail(listing) ?? '') ?? null,
-  }));
+  return withThumbnailUrls(data, (listing) => listing);
 }
 
-function firstThumbnail(listing: {
-  listing_photos: { thumbnail_path: string }[];
-}) {
-  return listing.listing_photos[0]?.thumbnail_path;
+/**
+ * A feed's rows, each with a signed URL for the thumbnail of its Listing's
+ * first photo, signed in one request for the whole feed. `listingOf` finds
+ * the Listing in a row, which is the row itself in City browse and an
+ * embedded one in Matches.
+ */
+async function withThumbnailUrls<Row>(
+  rows: Row[],
+  listingOf: (row: Row) => { listing_photos: { thumbnail_path: string }[] },
+): Promise<(Row & { thumbnailUrl: string | null })[]> {
+  const firstThumbnail = (row: Row) =>
+    listingOf(row).listing_photos[0]?.thumbnail_path;
+  const urls = await signedPhotoUrls(
+    rows.flatMap((row) => firstThumbnail(row) ?? []),
+  );
+  return rows.map((row) => ({
+    ...row,
+    thumbnailUrl: urls.get(firstThumbnail(row) ?? '') ?? null,
+  }));
 }
 
 /** A Listing as City browse shows it in a row. */
@@ -514,13 +523,7 @@ async function fetchMatches() {
     .order('position', { referencedTable: 'listings.listing_photos' });
   if (error) throw error;
 
-  const urls = await signedPhotoUrls(
-    data.flatMap(({ listing }) => firstThumbnail(listing) ?? []),
-  );
-  return data.map((match) => ({
-    ...match,
-    thumbnailUrl: urls.get(firstThumbnail(match.listing) ?? '') ?? null,
-  }));
+  return withThumbnailUrls(data, (match) => match.listing);
 }
 
 /** A Match as the Matches view shows it in a row. */
