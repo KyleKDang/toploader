@@ -63,3 +63,14 @@ export async function commitToTrade(listingId: string): Promise<void> {
       sql`update public.listings set status = 'in_trade' where id = ${listingId}`,
   );
 }
+
+/**
+ * Commits a Listing to a Trade that is then cancelled, so it is active
+ * again. It walks both steps for the reason `completeTradeFor` does.
+ */
+export async function cancelTradeFor(listingId: string): Promise<void> {
+  await arrange(async (sql) => {
+    await sql`update public.listings set status = 'in_trade' where id = ${listingId}`;
+    await sql`update public.listings set status = 'active' where id = ${listingId}`;
+  });
+}

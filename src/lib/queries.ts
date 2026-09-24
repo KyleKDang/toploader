@@ -18,10 +18,16 @@ export async function currentTraderId(): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
-/** A Trader's public profile, with their City. */
+/**
+ * A Trader's public profile, with their City and the Reputation basics a
+ * row or a header carries: whether they are verified and how many Trades
+ * they have completed.
+ */
 export type TraderProfile = {
   display_name: string | null;
   city: { id: string; name: string } | null;
+  verified_at: string | null;
+  completed_trade_count: number;
 };
 
 export function traderQuery(traderId: string) {
@@ -30,7 +36,9 @@ export function traderQuery(traderId: string) {
     queryFn: async (): Promise<TraderProfile> => {
       const { data, error } = await supabase
         .from('traders')
-        .select('display_name, city:cities(id, name)')
+        .select(
+          'display_name, verified_at, completed_trade_count, city:cities(id, name)',
+        )
         .eq('id', traderId)
         .single();
       if (error) throw error;
@@ -49,7 +57,7 @@ export function hasProfile(trader: TraderProfile): trader is OnboardedTrader {
 }
 
 /** A Trader who has finished onboarding: display name and City both set. */
-export type OnboardedTrader = {
+export type OnboardedTrader = TraderProfile & {
   display_name: string;
   city: NonNullable<TraderProfile['city']>;
 };
@@ -475,3 +483,45 @@ export async function withdrawListing(listingId: string): Promise<void> {
   });
   if (error) throw error;
 }
+
+/*
+ * Matches: the signed-in Trader's pairs that hold right now, from either
+ * side - their Listings that satisfy someone's Want, and other Traders'
+ * Listings that satisfy theirs. The `matches` view decides which pairs those
+ * are and that only their two Traders see them, so nothing here filters.
+ */
+
+/**
+ * The Trader's Matches, newest first, each with the Listing's Card, the
+ * thumbnail of its first photo - not the full-size photo, for the reason
+ * City browse gives - and both Traders' Reputation basics. The Trader is
+ * named in the key for the reason wantsQuery names them.
+ */
+export function matchesQuery(traderId: string) {
+  return queryOptions({
+    queryKey: ['matches', traderId],
+    queryFn: () => fetchMatches(),
+  });
+}
+
+async function fetchMatches() {
+  const { data, error } = await supabase
+    .from('matches')
+    .select(
+      'matched_at, listing:listings!inner(id, condition, card_variants(name, market_price_cents, cards(name, number, card_sets(name))), listing_photos(position, thumbnail_path)), lister:traders!lister_id!inner(id, display_name, verified_at, completed_trade_count), wanter:traders!wanter_id!inner(id, display_name, verified_at, completed_trade_count)',
+    )
+    .order('matched_at', { ascending: false })
+    .order('position', { referencedTable: 'listings.listing_photos' });
+  if (error) throw error;
+
+  const urls = await signedPhotoUrls(
+    data.flatMap(({ listing }) => firstThumbnail(listing) ?? []),
+  );
+  return data.map((match) => ({
+    ...match,
+    thumbnailUrl: urls.get(firstThumbnail(match.listing) ?? '') ?? null,
+  }));
+}
+
+/** A Match as the Matches view shows it in a row. */
+export type Match = Awaited<ReturnType<typeof fetchMatches>>[number];

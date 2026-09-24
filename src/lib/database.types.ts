@@ -221,6 +221,13 @@ export type Database = {
             referencedRelation: "listings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "listing_photos_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "match_pairs"
+            referencedColumns: ["listing_id"]
+          },
         ]
       }
       listings: {
@@ -268,6 +275,59 @@ export type Database = {
           {
             foreignKeyName: "listings_trader_id_fkey"
             columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_events: {
+        Row: {
+          created_at: string
+          id: string
+          lister_id: string
+          listing_id: string
+          wanter_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lister_id: string
+          listing_id: string
+          wanter_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lister_id?: string
+          listing_id?: string
+          wanter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_events_lister_id_fkey"
+            columns: ["lister_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "match_pairs"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "match_events_wanter_id_fkey"
+            columns: ["wanter_id"]
             isOneToOne: false
             referencedRelation: "traders"
             referencedColumns: ["id"]
@@ -473,6 +533,87 @@ export type Database = {
           {
             foreignKeyName: "collection_entries_trader_id_fkey"
             columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_pairs: {
+        Row: {
+          card_id: number | null
+          lister_id: string | null
+          listing_id: string | null
+          wanter_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_variants_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listings_trader_id_fkey"
+            columns: ["lister_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wants_trader_id_fkey"
+            columns: ["wanter_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matches: {
+        Row: {
+          lister_id: string | null
+          listing_id: string | null
+          matched_at: string | null
+          wanter_id: string | null
+        }
+        Insert: {
+          lister_id?: string | null
+          listing_id?: string | null
+          matched_at?: string | null
+          wanter_id?: string | null
+        }
+        Update: {
+          lister_id?: string | null
+          listing_id?: string | null
+          matched_at?: string | null
+          wanter_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_events_lister_id_fkey"
+            columns: ["lister_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "match_pairs"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "match_events_wanter_id_fkey"
+            columns: ["wanter_id"]
             isOneToOne: false
             referencedRelation: "traders"
             referencedColumns: ["id"]
