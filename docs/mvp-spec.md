@@ -130,6 +130,7 @@ Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (t
 The photos are their own table rather than a column on `listings`, decided on [#17](https://github.com/KyleKDang/toploader/issues/17): each one is two files in the bucket, they are ordered, and the reaper needs a list of what it may reclaim rather than an array it has to pick apart.
 A Listing's lifecycle is enforced by a trigger rather than by whichever RPC writes the status, so the Trade machine is held to the same transitions when it arrives.
 Matching: a SQL view joining active `listings` x `wants` within a City, plus a `match_events` table so notifications fire once per new pair.
+A pair is a Listing and a wanting Trader rather than a Listing and a Want, decided on [#19](https://github.com/KyleKDang/toploader/issues/19): a Trader's overlapping Wants for one Card make one Match, and a pair that lapses and holds again (a cancelled Trade, a Want removed and re-added) keeps its first event rather than notifying twice.
 Trading: `trades` (proposer, recipient, status: proposed / accepted / scheduled / completed / cancelled / no_show, scheduled_at, safe_spot_id, completed_at), `trade_items` (trade, side, listing snapshot, cash_amount nullable), `messages` (trade, sender, body), `trade_feedback` (trade, from, to, thumb).
 Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks`.
 

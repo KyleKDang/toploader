@@ -16,6 +16,7 @@ import {
   currentTraderId,
   hasProfile,
   listingQuery,
+  matchesQuery,
   safeSpotsQuery,
   traderQuery,
   wantsQuery,
@@ -91,8 +92,15 @@ const setUpProfileRoute = createRoute({
 const matchesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  loader: async ({ context: { queryClient } }) =>
-    await loadOnboardedTrader(queryClient),
+  // The Matches are loaded before the screen renders, so a Trader who has
+  // some never sees the empty state flash up first. The screen still reads
+  // them through the query, which refetches on each visit: a new Match can
+  // appear any time another Trader lists or wants something.
+  loader: async ({ context: { queryClient } }) => {
+    const { traderId, trader } = await loadOnboardedTrader(queryClient);
+    await queryClient.ensureQueryData(matchesQuery(traderId));
+    return { traderId, trader };
+  },
   component: lazyRouteComponent(
     () => import('./screens/MatchesScreen'),
     'MatchesScreen',
