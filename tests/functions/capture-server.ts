@@ -1,4 +1,12 @@
-import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
+import { readFileSync } from 'node:fs';
+import {
+  createServer as createHttpServer,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 
 /*
@@ -9,7 +17,10 @@ import type { AddressInfo } from 'node:net';
  * subscription the push service has forgotten or a Resend outage.
  *
  * The seam-2 notifier test runs two of these: one as Resend, one as the
- * push service every test subscription's endpoint points at.
+ * push service every test subscription's endpoint points at. The push
+ * service speaks TLS, because a push endpoint is only ever https and the
+ * database refuses any other, with the self-signed certificate under
+ * fixtures/tls; the test tells its own process to accept it.
  */
 
 export interface CapturedRequest {
@@ -29,11 +40,15 @@ export interface CaptureServer {
   close(): Promise<void>;
 }
 
-export async function startCaptureServer(): Promise<CaptureServer> {
+const TLS_FIXTURES = new URL('./fixtures/tls/', import.meta.url);
+
+export async function startCaptureServer({
+  tls = false,
+}: { tls?: boolean } = {}): Promise<CaptureServer> {
   const statuses = new Map<string, number>();
   const requests: CapturedRequest[] = [];
 
-  const server: Server = createServer((request, response) => {
+  const capture = (request: IncomingMessage, response: ServerResponse) => {
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
     request.on('end', () => {
@@ -50,13 +65,23 @@ export async function startCaptureServer(): Promise<CaptureServer> {
         })
         .end('{}');
     });
-  });
+  };
+
+  const server: Server = tls
+    ? createHttpsServer(
+        {
+          key: readFileSync(new URL('key.pem', TLS_FIXTURES)),
+          cert: readFileSync(new URL('cert.pem', TLS_FIXTURES)),
+        },
+        capture,
+      )
+    : createHttpServer(capture);
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
 
   return {
-    baseUrl: `http://127.0.0.1:${port}`,
+    baseUrl: `${tls ? 'https' : 'http'}://127.0.0.1:${port}`,
     requests,
     answer: (path, status) => void statuses.set(path, status),
     reset() {

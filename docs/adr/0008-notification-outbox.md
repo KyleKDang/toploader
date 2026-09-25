@@ -1,6 +1,6 @@
 # Notifications go through an outbox the database wakes a function to drain
 
-The spec puts side effects that leave the database in edge functions ([ADR-0001](0001-supabase-write-discipline.md)) and names web push and Resend as the channels ([ADR-0006](adr/0006-operational-vendors.md)), but leaves open how a row committing in Postgres becomes a message on a phone: what records that it is owed, what sends it, and what starts the sender.
+The spec puts side effects that leave the database in edge functions ([ADR-0001](0001-supabase-write-discipline.md)) and names web push and Resend as the channels ([ADR-0006](0006-operational-vendors.md)), but leaves open how a row committing in Postgres becomes a message on a phone: what records that it is owed, what sends it, and what starts the sender.
 This ADR pins the shape, decided on ticket [#20](https://github.com/KyleKDang/toploader/issues/20), because every later event (proposals, meetups, chat, verification) rides it and would otherwise re-invent it.
 
 ## The shape
@@ -13,7 +13,8 @@ Which channels a row goes out on is the spec's notification matrix, held in SQL 
 **A claim, not a scan.**
 The sender takes rows through `claim_notifications`, which marks a batch claimed with `for update skip locked` in the one statement.
 Two senders running at once therefore never hold the same row, and neither waits for the other.
-Delivery is recorded per channel, so a run that pushed and then could not email retries only the email; a claim lapses after five minutes, and a row is given up after five claims or a day.
+Delivery is recorded per channel, so a run that pushed and then could not email retries only the email; a claim lapses after five minutes, and a row that keeps failing is retried until it is a day old, because email is the reliability floor and a Resend outage is not a reason to lose a verification result.
+Every failing run is a Sentry error, so a day of retries is not a quiet one.
 
 **A Deno edge function as the sender, woken by the database.**
 `supabase/functions/notify` drains the outbox.
@@ -41,6 +42,7 @@ The Deno file around it holds only secrets, the caller check, and Sentry, and `d
 
 - Every later notification is a producer trigger writing rendered rows to the outbox and nothing else; the matrix, the claim, the channels and the wake are already there.
 - The outbox is server-only: a row names what another Trader listed or wants and outlives the pair it was about, so no client role reads it, and `match_events`' denial tests have their counterparts here.
-- Delivery is at-least-once per channel; a browser collapses a repeated push by its topic, and an email retried after a push service failure is the one case a Trader could see twice.
+- Delivery is at-least-once per channel: a channel that succeeded but whose mark did not land is sent again by the next run.
+  A browser collapses a repeated push by its topic, so an email is the one thing a Trader could see twice, and only when Resend accepted it and the database was unreachable in the same instant.
 - The wake crosses Docker's edge and has no automated seam; it is verified by hand when the function is first deployed, and the sweep is what makes a misconfigured wake a latency problem rather than a lost one.
 - Two new extensions on the hosted database, `pg_net` and `pg_cron`, and one edge function CI deploys on every merge to `main`.

@@ -28,9 +28,8 @@ import {
   addWant,
   cityId,
   createListing,
-  EXAMPLEMON,
   ORANGE_COUNTY,
-  seededCard,
+  seededExamplemon,
   seedTrader,
   serviceClient,
   type SeededTrader,
@@ -72,7 +71,10 @@ interface EmailRequest {
   text: string;
 }
 
-describe('The notifier', () => {
+// Each test seeds two Traders, a photo and a Listing, then drains an outbox
+// the whole suite is writing to at once; under a full parallel run that
+// takes longer than vitest's five-second default.
+describe('The notifier', { timeout: 30_000 }, () => {
   const service = serviceClient();
   let pushService: CaptureServer;
   let resend: CaptureServer;
@@ -82,21 +84,21 @@ describe('The notifier', () => {
 
   beforeAll(async () => {
     [pushService, resend] = await Promise.all([
-      startCaptureServer(),
+      startCaptureServer({ tls: true }),
       startCaptureServer(),
     ]);
+    // The fake push service's certificate is self-signed, and this is how
+    // Node's fetch is told to accept one. It reaches only this test's own
+    // worker process, and nothing else in it speaks TLS.
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     vapid = { subject: `mailto:${REPLY_TO}`, ...(await generateVapidKeys()) };
-    const card = await seededCard(
+    ({ card: examplemon, holofoil } = await seededExamplemon(
       (await seedTrader('Catalog reader')).client,
-      EXAMPLEMON,
-    );
-    examplemon = card.id;
-    const variant = card.card_variants.find((v) => v.name === 'Holofoil');
-    if (!variant) throw new Error('No Holofoil Variant in the seeded Catalog');
-    holofoil = variant.id;
+    ));
   });
 
   afterAll(async () => {
+    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
     // The stack outlives this run, and so would these subscriptions: the
     // next run's Listings would queue pushes to a server that is gone.
     const { error } = await service
@@ -263,17 +265,19 @@ describe('The notifier', () => {
   async function queue(
     trader: SeededTrader,
     kind: 'new_proposal' | 'new_match',
-    overrides: { createdAt?: string; attempts?: number } = {},
+    { createdAt = new Date().toISOString() }: { createdAt?: string } = {},
   ) {
     const topic = `test:${randomUUID()}`;
+    const [title, body, url] =
+      kind === 'new_proposal'
+        ? ['New trade proposal', 'Ash proposed a trade.', '/trades/example']
+        : ['New match', 'Ash wants the Examplemon you listed.', '/'];
     await arrange(
       (sql) =>
         sql`insert into public.notifications
-              (trader_id, kind, topic, title, body, url, created_at, attempts)
-            values (${trader.id}, ${kind}, ${topic}, 'New trade proposal',
-              'Ash proposed a trade.', '/trades/example',
-              ${overrides.createdAt ?? new Date().toISOString()},
-              ${overrides.attempts ?? 0})`,
+              (trader_id, kind, topic, title, body, url, created_at)
+            values (${trader.id}, ${kind}, ${topic}, ${title}, ${body}, ${url},
+              ${createdAt})`,
     );
     return topic;
   }
@@ -410,7 +414,8 @@ describe('The notifier', () => {
     const [row] = await outbox(topic);
     expect(row?.sent_at).toBeNull();
 
-    // The claim on the row has to lapse before another run may take it.
+    // The second act's arrange: the claim on the row has to lapse before
+    // another run may take it, and nothing but time does that.
     await arrange(
       (sql) =>
         sql`update public.notifications
@@ -464,13 +469,12 @@ describe('The notifier', () => {
     expect(row?.attempts).toBe(0);
   });
 
-  it('leaves a day-old notification, and one tried five times, unsent', async () => {
+  it('leaves a day-old notification unsent', async () => {
     const trader = await seedTrader('Proposed to');
     const browser = await subscribe(trader);
     const stale = await queue(trader, 'new_proposal', {
       createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
     });
-    const hopeless = await queue(trader, 'new_proposal', { attempts: 5 });
 
     await deliver();
 
@@ -478,9 +482,8 @@ describe('The notifier', () => {
     expect(emails().filter((email) => email.to.includes(trader.email))).toEqual(
       [],
     );
-    for (const topic of [stale, hopeless]) {
-      const [row] = await outbox(topic);
-      expect(row?.sent_at).toBeNull();
-    }
+    const [row] = await outbox(stale);
+    expect(row?.sent_at).toBeNull();
+    expect(row?.attempts).toBe(0);
   });
 });

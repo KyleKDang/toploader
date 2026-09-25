@@ -30,15 +30,28 @@ function required(name: string): string {
   return value;
 }
 
-Deno.serve(async (request) => {
-  if (
-    request.headers.get('authorization') !==
-    `Bearer ${required('NOTIFIER_SECRET')}`
-  ) {
-    return new Response('Unauthorized', { status: 401 });
+/**
+ * Whether two strings are the same, taking the same time whether they
+ * differ at the first character or the last, so the comparison itself
+ * gives away nothing about the secret.
+ */
+function sameSecret(given: string, expected: string): boolean {
+  const a = new TextEncoder().encode(given);
+  const b = new TextEncoder().encode(expected);
+  let difference = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    difference |= (a[i] ?? 0) ^ (b[i] ?? 0);
   }
+  return difference === 0;
+}
 
+Deno.serve(async (request) => {
   try {
+    const bearer = request.headers.get('authorization') ?? '';
+    if (!sameSecret(bearer, `Bearer ${required('NOTIFIER_SECRET')}`)) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
     const report = await deliverNotifications({
       supabaseUrl: required('SUPABASE_URL'),
       supabaseSecretKey: required('SUPABASE_SERVICE_ROLE_KEY'),

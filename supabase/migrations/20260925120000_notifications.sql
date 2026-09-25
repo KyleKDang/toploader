@@ -25,10 +25,14 @@ create extension if not exists pg_cron with schema pg_catalog;
 -- the browser generated, which the notifier encrypts each message to
 -- (RFC 8291). The endpoint is unique on its own, not per Trader, because a
 -- browser has one subscription whoever is signed in on it.
+--
+-- The endpoint is https or nothing. A browser never hands out anything
+-- else (RFC 8030), and the notifier posts to whatever is stored here, so a
+-- plain-http endpoint would let a Trader point it at any host they liked.
 create table public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
   trader_id uuid not null references public.traders (id) on delete cascade,
-  endpoint text not null unique check (endpoint ~ '^https?://'),
+  endpoint text not null unique check (endpoint ~ '^https://'),
   p256dh text not null check (p256dh <> ''),
   auth text not null check (auth <> ''),
   created_at timestamptz not null default now()
@@ -184,7 +188,9 @@ create table public.notifications (
   created_at timestamptz not null default now(),
   -- Claiming, so two notifier runs never send the same row: a claim holds
   -- for five minutes, long past any run, and then the row is free again for
-  -- a run that finds it unsent. Each claim counts as an attempt.
+  -- a run that finds it unsent. Each claim counts as an attempt, which is
+  -- kept for the operator: how many runs a row took says how the sending
+  -- is going.
   claimed_at timestamptz,
   attempts integer not null default 0,
   push_sent_at timestamptz,
@@ -213,9 +219,11 @@ grant select on public.notifications to service_role;
 -- A row older than a day is left alone: a "new match" from last week is
 -- noise, and this is where an outbox that could not be drained for a while
 -- (the notifier unconfigured, its secrets not yet set) is kept from
--- flushing every stale row the moment it can. So is a row claimed five
--- times already: whatever is wrong with it is not going to come right on
--- the sixth.
+-- flushing every stale row the moment it can. Until then a row that keeps
+-- failing keeps being retried, every five minutes as its claim lapses,
+-- because email is the reliability floor and a Resend outage is not a
+-- reason to lose a verification result; each failing run is a Sentry error,
+-- so a row that fails all day is not failing quietly.
 --
 -- A push-only row for a Trader with no browser subscribed is nothing to
 -- send, and is marked sent here rather than handed out: most Traders will
@@ -258,7 +266,6 @@ as $$
       from public.notifications n
       where n.sent_at is null
         and n.created_at > now() - interval '1 day'
-        and n.attempts < 5
         and (n.claimed_at is null
           or n.claimed_at < now() - interval '5 minutes')
       order by n.created_at

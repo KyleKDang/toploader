@@ -39,8 +39,14 @@ self.addEventListener('notificationclick', (event) => {
         );
         if (open) {
           await open.focus();
-          if ('navigate' in open) await open.navigate(url);
-          return;
+          // A tab this worker does not control yet refuses to be navigated;
+          // it still gets the focus, and the URL opens beside it.
+          try {
+            await open.navigate(url);
+            return;
+          } catch {
+            // Falls through to a new window.
+          }
         }
         await self.clients.openWindow(url);
       }),
