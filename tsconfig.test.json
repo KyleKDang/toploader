@@ -21,5 +21,13 @@
     "noUncheckedSideEffectImports": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["tests", "scripts", "vitest.config.ts", "playwright.config.ts"]
+  "include": [
+    "tests",
+    "scripts",
+    // The notifier's body, which the seam-2 suite runs under Node. Its Deno
+    // edge (supabase/functions/notify/index.ts) is Deno's to check.
+    "supabase/functions/_shared",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
 }

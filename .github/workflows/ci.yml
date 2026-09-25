@@ -1,7 +1,8 @@
 # The authority on validation: what is green here is green. Runs on every
 # push to every branch, and on main it then applies new migrations to the
-# hosted database. Render deploys main only after every check on the commit
-# passes (render.yaml), so the schema always lands before the app that uses it.
+# hosted database and deploys the edge functions. Render deploys main only
+# after every check on the commit passes (render.yaml), so the schema always
+# lands before the app that uses it.
 name: CI
 
 on:
@@ -61,7 +62,7 @@ jobs:
           retention-days: 7
 
   migrate:
-    name: Apply migrations to the hosted database
+    name: Apply migrations and deploy functions to the hosted project
     if: github.ref == 'refs/heads/main'
     needs: [static, suites]
     runs-on: ubuntu-latest
@@ -77,3 +78,10 @@ jobs:
         run: npx supabase db push --db-url "$SUPABASE_DB_URL"
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      # The edge functions, after the schema they read. Bundled by the API
+      # rather than Docker, which the runner does not have set up for it.
+      # The project ref is the hosted project's (supabase/config.toml).
+      - name: supabase functions deploy
+        run: npx supabase functions deploy --use-api --project-ref kokkeqbbfmogfbmbafyz
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
