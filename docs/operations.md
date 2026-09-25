@@ -11,6 +11,7 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 | Name | Where | Used by |
 |---|---|---|
 | `SUPABASE_DB_URL` | GitHub secret | CI `migrate`, nightly backup |
+| `SUPABASE_ACCESS_TOKEN` | GitHub secret | CI `migrate` (deploys the edge functions) |
 | `BACKUP_PASSPHRASE` | GitHub secret, and the shared inbox | nightly backup |
 | `SENTRY_DSN` | GitHub secret | the cron check-ins of the nightly backup, the Catalog sync, and the photo reaper |
 | `SUPABASE_SECRET_KEY` | GitHub secret | Catalog sync, photo reaper |
@@ -19,8 +20,16 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 | `VITE_SUPABASE_URL` | Render env | the app |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Render env | the app |
 | `VITE_SENTRY_DSN` | Render env | the app |
+| `VITE_VAPID_PUBLIC_KEY` | Render env | the app, subscribing a browser to push |
 | `SENTRY_ORG`, `SENTRY_PROJECT` | Render env | source map upload |
 | `SENTRY_AUTH_TOKEN` | Render env | source map upload |
+| `NOTIFIER_SECRET` | Supabase function secret, and Vault secret `notifier_secret` | the database waking the notifier |
+| `notifier_url` | Vault secret | the database waking the notifier |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Supabase function secrets | the notifier, signing pushes |
+| `RESEND_API_KEY` | Supabase function secret | the notifier, sending email; set on #30 with the first real sending |
+| `NOTIFICATION_REPLY_TO` | Supabase function secret | the notifier: the shared venture inbox |
+| `APP_URL` | Supabase function secret | the notifier: `https://toploaderapp.com`, for the links in an email |
+| `SENTRY_DSN` | also a Supabase function secret | the notifier |
 
 `SUPABASE_DB_URL` is the **session pooler** connection string from the Supabase dashboard's Connect panel, with the database password filled in.
 The direct connection will not work from GitHub's runners: it is IPv6-only, and they are IPv4-only.
@@ -29,6 +38,34 @@ The direct connection will not work from GitHub's runners: it is IPv6-only, and 
 It acts as `service_role`, which bypasses RLS, so it exists only as this GitHub secret and never reaches the app.
 
 The Supabase URL and publishable key ship in the app's JavaScript, so in GitHub they are variables rather than secrets.
+
+`SUPABASE_ACCESS_TOKEN` is a personal access token from the Supabase dashboard's Account > Access Tokens, which is what `supabase functions deploy` authenticates with; the database URL cannot deploy a function.
+
+The VAPID pair comes from `npm run vapid:generate`, once.
+The public key is set in both places the table names with the same value; the private key exists only as the function secret.
+Generating a new pair invalidates every browser's subscription, so the pair is kept for the life of the app.
+`VAPID_SUBJECT` is `mailto:` the shared venture inbox.
+
+Supabase function secrets are set with `npx supabase secrets set NAME=value --project-ref kokkeqbbfmogfbmbafyz` and listed, values hidden, with `npx supabase secrets list`.
+
+## The notifier
+
+The `notify` edge function drains the notification outbox ([ADR-0008](adr/0008-notification-outbox.md)).
+The database wakes it: a trigger on every insert into `notifications`, and a `pg_cron` job once a minute.
+Both call `wake_notifier()`, which reads the function's URL and its bearer secret from Vault and does nothing while either is missing, so a stack without them has notifications queueing and none sent.
+
+On the hosted project the two Vault secrets are created once, in the dashboard's SQL editor, with `NOTIFIER_SECRET` the same value the function secret holds:
+
+```sql
+select vault.create_secret('https://kokkeqbbfmogfbmbafyz.supabase.co/functions/v1/notify', 'notifier_url');
+select vault.create_secret('<the NOTIFIER_SECRET value>', 'notifier_secret');
+```
+
+To check the wake is reaching the function, read the last responses `pg_net` recorded: `select status_code, content, created from net._http_response order by created desc limit 5`.
+A 200 carries the run's report; a 401 means the two copies of the secret differ; nothing at all means the Vault secrets are missing.
+
+On the local stack the wake is inert by default, which is what the suites rely on: the seam-2 tests run the notifier in-process, and a Docker copy draining the same outbox would race them.
+To watch a real push locally, set the function's secrets in `supabase/functions/.env` (git-ignored), create the two Vault secrets against the local database with `notifier_url` as `http://host.docker.internal:54321/functions/v1/notify`, and do not run `npm test` while they exist.
 
 ## Hosted Auth settings
 
@@ -56,7 +93,9 @@ The domain's DNS records, including SPF, DKIM and DMARC for `mail.`, are in Clou
 ## What runs where
 
 - **Every push:** `.github/workflows/ci.yml` runs every check.
-- **Merge to `main`:** CI's `migrate` job applies new migrations to the hosted database; Render deploys the app once every check on the commit has passed (`render.yaml`).
+- **Merge to `main`:** CI's `migrate` job applies new migrations to the hosted database and deploys the edge functions; Render deploys the app once every check on the commit has passed (`render.yaml`).
+- **On every notification, and once a minute:** the database wakes the `notify` edge function, which sends whatever the outbox holds ([The notifier](#the-notifier)).
+  A run that fails reports to Sentry as an error.
 - **Nightly, 10:17 UTC:** `.github/workflows/nightly-backup.yml` dumps and encrypts the database, keeps it as an artifact for 30 days, restores it into a throwaway stack to prove it restores, and checks in with the Sentry cron monitor `nightly-backup`.
   A failed run, or no run at all, raises a Sentry issue.
 - **Daily, 21:23 UTC:** `.github/workflows/catalog-sync.yml` syncs the Catalog from TCGCSV, which publishes around 20:00 UTC, and checks in with the Sentry cron monitor `catalog-sync`.

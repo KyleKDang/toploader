@@ -334,6 +334,65 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          attempts: number
+          body: string
+          channels: Database["public"]["Enums"]["notification_channel"][]
+          claimed_at: string | null
+          created_at: string
+          email_sent_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          push_sent_at: string | null
+          sent_at: string | null
+          title: string
+          topic: string
+          trader_id: string
+          url: string
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          channels?: Database["public"]["Enums"]["notification_channel"][]
+          claimed_at?: string | null
+          created_at?: string
+          email_sent_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          push_sent_at?: string | null
+          sent_at?: string | null
+          title: string
+          topic: string
+          trader_id: string
+          url: string
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          channels?: Database["public"]["Enums"]["notification_channel"][]
+          claimed_at?: string | null
+          created_at?: string
+          email_sent_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          push_sent_at?: string | null
+          sent_at?: string | null
+          title?: string
+          topic?: string
+          trader_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_snapshots: {
         Row: {
           as_of: string
@@ -356,6 +415,41 @@ export type Database = {
             columns: ["card_variant_id"]
             isOneToOne: false
             referencedRelation: "card_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          trader_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          trader_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          trader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
             referencedColumns: ["id"]
           },
         ]
@@ -642,6 +736,23 @@ export type Database = {
         Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
         Returns: undefined
       }
+      claim_notifications: {
+        Args: { batch?: number }
+        Returns: {
+          body: string
+          channels: Database["public"]["Enums"]["notification_channel"][]
+          created_at: string
+          email: string
+          email_sent_at: string
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          push_sent_at: string
+          title: string
+          topic: string
+          trader_id: string
+          url: string
+        }[]
+      }
       compact_price_snapshots: {
         Args: { sync_day: string }
         Returns: undefined
@@ -656,8 +767,27 @@ export type Database = {
         }
         Returns: string
       }
+      mark_notification_sent: {
+        Args: {
+          channel: Database["public"]["Enums"]["notification_channel"]
+          notification_id: string
+        }
+        Returns: undefined
+      }
+      notification_channels: {
+        Args: { kind: Database["public"]["Enums"]["notification_kind"] }
+        Returns: Database["public"]["Enums"]["notification_channel"][]
+      }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
+      remove_push_subscription: {
+        Args: { endpoint: string }
+        Returns: undefined
+      }
       remove_want: { Args: { want_id: string }; Returns: undefined }
+      save_push_subscription: {
+        Args: { auth: string; endpoint: string; p256dh: string }
+        Returns: undefined
+      }
       search_cards: {
         Args: { query: string }
         Returns: {
@@ -690,11 +820,22 @@ export type Database = {
           path: string
         }[]
       }
+      wake_notifier: { Args: never; Returns: undefined }
       withdraw_listing: { Args: { listing_id: string }; Returns: undefined }
     }
     Enums: {
       card_condition: "DMG" | "HP" | "MP" | "LP" | "NM"
       listing_status: "active" | "in_trade" | "traded" | "withdrawn"
+      notification_channel: "push" | "email"
+      notification_kind:
+        | "new_match"
+        | "new_proposal"
+        | "proposal_accepted"
+        | "proposal_countered"
+        | "meetup_confirmed"
+        | "meetup_reminder"
+        | "chat_message"
+        | "verification_result"
       safe_spot_kind: "police_station" | "monitored_site"
     }
     CompositeTypes: {
@@ -828,6 +969,17 @@ export const Constants = {
     Enums: {
       card_condition: ["DMG", "HP", "MP", "LP", "NM"],
       listing_status: ["active", "in_trade", "traded", "withdrawn"],
+      notification_channel: ["push", "email"],
+      notification_kind: [
+        "new_match",
+        "new_proposal",
+        "proposal_accepted",
+        "proposal_countered",
+        "meetup_confirmed",
+        "meetup_reminder",
+        "chat_message",
+        "verification_result",
+      ],
       safe_spot_kind: ["police_station", "monitored_site"],
     },
   },
