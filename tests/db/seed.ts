@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { inject } from 'vitest';
+import type { Condition } from '../../src/lib/conditions.ts';
 import type { Database } from '../../src/lib/database.types.ts';
 
 export type Client = SupabaseClient<Database>;
@@ -137,4 +138,62 @@ export async function uploadListingPhoto(
     if (error) throw error;
   }
   return photo;
+}
+
+/*
+ * The pair Matching is made of, for a test whose subject is what happens
+ * once a Match exists rather than whether it does. Both go through the RPCs
+ * the app calls, so nothing here reaches a state the app could not.
+ */
+
+/** Cards from the made-up set supabase/seed.sql syncs. */
+export const EXAMPLEMON = 990_900_001;
+
+/** A Card's id and its Variants, read as any signed-in Trader may. */
+export async function seededCard(client: Client, productId: number) {
+  const { data, error } = await client
+    .from('cards')
+    .select('id, card_variants (id, name)')
+    .eq('tcgplayer_product_id', productId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function addWant(
+  trader: SeededTrader,
+  want: {
+    card_id: number;
+    card_variant_id?: number;
+    min_condition?: Condition;
+  },
+): Promise<string> {
+  const { data, error } = await trader.client.rpc('add_want', want);
+  if (error) throw error;
+  return data;
+}
+
+/** An active Listing of one Copy, with one photo uploaded for it. */
+export async function createListing(
+  trader: SeededTrader,
+  cardVariantId: number,
+  condition: Condition,
+): Promise<string> {
+  const { data, error } = await trader.client.rpc('create_listing', {
+    card_variant_id: cardVariantId,
+    condition,
+    photos: [await uploadListingPhoto(trader)],
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** Examplemon's id and its Holofoil Variant, the pair most Matching tests list. */
+export async function seededExamplemon(
+  client: Client,
+): Promise<{ card: number; holofoil: number }> {
+  const card = await seededCard(client, EXAMPLEMON);
+  const variant = card.card_variants.find((v) => v.name === 'Holofoil');
+  if (!variant) throw new Error('No Holofoil Variant in the seeded Catalog');
+  return { card: card.id, holofoil: variant.id };
 }

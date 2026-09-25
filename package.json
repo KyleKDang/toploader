@@ -7,13 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "tsc -b --noEmit && deno check --config supabase/functions/notify/deno.json supabase/functions/notify/index.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:browser": "playwright test",
-    "db:types": "supabase gen types typescript --local > src/lib/database.types.ts"
+    "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
+    "vapid:generate": "node scripts/notifications/generate-vapid-keys.ts"
   },
   "dependencies": {
     "@sentry/react": "^10.75.0",
@@ -24,6 +25,7 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@block65/webcrypto-web-push": "^2.0.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@sentry/vite-plugin": "^5.4.0",
@@ -32,10 +34,12 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "deno": "^2.9.6",
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.12.0",
+    "http_ece": "^1.2.1",
     "postgres": "^3.4.9",
     "prettier": "^3.9.8",
     "supabase": "^2.117.0",
