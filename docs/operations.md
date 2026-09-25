@@ -5,7 +5,7 @@ The vendors themselves, and why each was chosen, are in [ADR-0006](adr/0006-oper
 
 ## Configuration
 
-Every value below lives in exactly one place, and none of them is ever pasted into an issue or committed.
+Every value below lives in exactly one place, except where two systems must each hold a copy and the table says so; none of them is ever pasted into an issue or committed.
 The backup passphrase is kept in the shared venture inbox from #32, beside the account passwords, because losing it makes every stored backup useless.
 
 | Name | Where | Used by |
@@ -13,7 +13,7 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 | `SUPABASE_DB_URL` | GitHub secret | CI `migrate`, nightly backup |
 | `SUPABASE_ACCESS_TOKEN` | GitHub secret | CI `migrate` (deploys the edge functions) |
 | `BACKUP_PASSPHRASE` | GitHub secret, and the shared inbox | nightly backup |
-| `SENTRY_DSN` | GitHub secret | the cron check-ins of the nightly backup, the Catalog sync, and the photo reaper |
+| `SENTRY_DSN` | GitHub secret, and a Supabase function secret | the cron check-ins of the nightly backup, the Catalog sync, and the photo reaper; the notifier |
 | `SUPABASE_SECRET_KEY` | GitHub secret | Catalog sync, photo reaper |
 | `SUPABASE_URL` | GitHub variable | nightly backup (reads the hosted service versions), Catalog sync, photo reaper |
 | `SUPABASE_PUBLISHABLE_KEY` | GitHub variable | nightly backup |
@@ -26,10 +26,9 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 | `NOTIFIER_SECRET` | Supabase function secret, and Vault secret `notifier_secret` | the database waking the notifier |
 | `notifier_url` | Vault secret | the database waking the notifier |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Supabase function secrets | the notifier, signing pushes |
-| `RESEND_API_KEY` | Supabase function secret | the notifier, sending email; set on #30 with the first real sending |
+| `RESEND_API_KEY` | Supabase function secret | the notifier, sending email; a second Resend key, sending-only, created before the first emailing event ships (#21) |
 | `NOTIFICATION_REPLY_TO` | Supabase function secret | the notifier: the shared venture inbox |
 | `APP_URL` | Supabase function secret | the notifier: `https://toploaderapp.com`, for the links in an email |
-| `SENTRY_DSN` | also a Supabase function secret | the notifier |
 
 `SUPABASE_DB_URL` is the **session pooler** connection string from the Supabase dashboard's Connect panel, with the database password filled in.
 The direct connection will not work from GitHub's runners: it is IPv6-only, and they are IPv4-only.
@@ -45,6 +44,7 @@ The VAPID pair comes from `npm run vapid:generate`, once.
 The public key is set in both places the table names with the same value; the private key exists only as the function secret.
 Generating a new pair invalidates every browser's subscription, so the pair is kept for the life of the app.
 `VAPID_SUBJECT` is `mailto:` the shared venture inbox.
+The VAPID public key and `NOTIFIER_SECRET` are the two values held in two places on purpose: a browser and the notifier must agree on the key, and the database and the notifier on the secret.
 
 Supabase function secrets are set with `npx supabase secrets set NAME=value --project-ref kokkeqbbfmogfbmbafyz` and listed, values hidden, with `npx supabase secrets list`.
 

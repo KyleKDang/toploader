@@ -4,9 +4,8 @@ import {
   addWant,
   anonClient,
   createListing,
-  EXAMPLEMON,
   seedAdversarialTraders,
-  seededCard,
+  seededExamplemon,
   seedTrader,
   serviceClient,
   type Client,
@@ -130,14 +129,9 @@ describe('The notification outbox', () => {
   let holofoil: number;
 
   beforeAll(async () => {
-    const card = await seededCard(
+    ({ card: examplemon, holofoil } = await seededExamplemon(
       (await seedTrader('Catalog reader')).client,
-      EXAMPLEMON,
-    );
-    examplemon = card.id;
-    const variant = card.card_variants.find((v) => v.name === 'Holofoil');
-    if (!variant) throw new Error('No Holofoil Variant in the seeded Catalog');
-    holofoil = variant.id;
+    ));
   });
 
   it('queues one push-only notification for each Trader of a new Match', async () => {

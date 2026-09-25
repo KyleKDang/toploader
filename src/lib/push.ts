@@ -7,9 +7,9 @@ import { supabase } from './supabase';
  * under the signed-in Trader through `save_push_subscription`, and keeps it
  * saved.
  *
- * The permission is asked on a gesture, never on load (ADR-0002): a browser
- * asked out of nowhere says no, and a no is remembered. Until #29 puts the
- * ask on the install step, Matches offers it.
+ * The permission is asked on a gesture, never on load (the spec's Onboarding
+ * flow, step 2): a browser asked out of nowhere says no, and a no is
+ * remembered. Until #29 puts the ask on the install step, Matches offers it.
  *
  * The VAPID public key is the one the notifier signs with; a browser hands
  * it to its push service at subscribe time, and a message signed with any
@@ -67,7 +67,9 @@ async function saveThisBrowser(): Promise<void> {
     (await registration.pushManager.getSubscription()) ??
     (await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: fromBase64Url(vapidPublicKey!),
+      // The key as the notifier's configuration holds it, base64url, which
+      // every browser that can push at all takes as is.
+      applicationServerKey: vapidPublicKey,
     }));
   const { endpoint, keys } = subscription.toJSON();
   if (!endpoint || !keys?.p256dh || !keys.auth) {
@@ -79,12 +81,4 @@ async function saveThisBrowser(): Promise<void> {
     auth: keys.auth,
   });
   if (error) throw error;
-}
-
-/** The key as bytes: what every browser's `subscribe` accepts. */
-function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
-  const padded =
-    text.replace(/-/g, '+').replace(/_/g, '/') +
-    '='.repeat((4 - (text.length % 4)) % 4);
-  return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
 }

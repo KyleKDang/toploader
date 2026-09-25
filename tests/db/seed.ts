@@ -187,3 +187,13 @@ export async function createListing(
   if (error) throw error;
   return data;
 }
+
+/** Examplemon's id and its Holofoil Variant, the pair most Matching tests list. */
+export async function seededExamplemon(
+  client: Client,
+): Promise<{ card: number; holofoil: number }> {
+  const card = await seededCard(client, EXAMPLEMON);
+  const variant = card.card_variants.find((v) => v.name === 'Holofoil');
+  if (!variant) throw new Error('No Holofoil Variant in the seeded Catalog');
+  return { card: card.id, holofoil: variant.id };
+}

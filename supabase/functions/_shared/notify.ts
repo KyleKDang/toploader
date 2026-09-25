@@ -80,11 +80,14 @@ const PUSH_TTL_SECONDS = 24 * 60 * 60;
  */
 const MAX_CLAIMS = 100;
 
+/** The notification matrix's columns: public.notification_channel. */
+type Channel = 'push' | 'email';
+
 /** What claim_notifications hands back. */
 interface ClaimedNotification {
   id: string;
   trader_id: string;
-  channels: ('push' | 'email')[];
+  channels: Channel[];
   topic: string;
   title: string;
   body: string;
@@ -168,7 +171,7 @@ export async function deliverNotifications(
     }
   }
 
-  async function mark(notificationId: string, channel: 'push' | 'email') {
+  async function mark(notificationId: string, channel: Channel) {
     const { error } = await supabase.rpc('mark_notification_sent', {
       notification_id: notificationId,
       channel,
