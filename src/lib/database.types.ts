@@ -492,6 +492,43 @@ export type Database = {
           },
         ]
       }
+      trade_items: {
+        Row: {
+          listing_id: string
+          trade_id: string
+        }
+        Insert: {
+          listing_id: string
+          trade_id: string
+        }
+        Update: {
+          listing_id?: string
+          trade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_items_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_items_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "match_pairs"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "trade_items_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trader_private: {
         Row: {
           adult_attested_at: string | null
@@ -561,6 +598,64 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trades: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          proposer_cash_cents: number | null
+          proposer_id: string
+          recipient_cash_cents: number | null
+          recipient_id: string
+          responder_id: string | null
+          status: Database["public"]["Enums"]["trade_status"]
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          proposer_cash_cents?: number | null
+          proposer_id: string
+          recipient_cash_cents?: number | null
+          recipient_id: string
+          responder_id?: string | null
+          status?: Database["public"]["Enums"]["trade_status"]
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          proposer_cash_cents?: number | null
+          proposer_id?: string
+          recipient_cash_cents?: number | null
+          recipient_id?: string
+          responder_id?: string | null
+          status?: Database["public"]["Enums"]["trade_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trades_proposer_id_fkey"
+            columns: ["proposer_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_responder_id_fkey"
+            columns: ["responder_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
             referencedColumns: ["id"]
           },
         ]
@@ -716,6 +811,7 @@ export type Database = {
       }
     }
     Functions: {
+      accept_trade: { Args: { trade_id: string }; Returns: undefined }
       add_to_collection: {
         Args: {
           card_variant_id: number
@@ -757,6 +853,15 @@ export type Database = {
         Args: { sync_day: string }
         Returns: undefined
       }
+      counter_trade: {
+        Args: {
+          listing_ids: string[]
+          offered_cash_cents?: number
+          requested_cash_cents?: number
+          trade_id: string
+        }
+        Returns: undefined
+      }
       create_listing: {
         Args: {
           asking_price_cents?: number
@@ -767,6 +872,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_trade: {
+        Args: {
+          listing_ids: string[]
+          offered_cash_cents?: number
+          recipient_id: string
+          requested_cash_cents?: number
+        }
+        Returns: string
+      }
+      decline_trade: { Args: { trade_id: string }; Returns: undefined }
       mark_notification_sent: {
         Args: {
           channel: Database["public"]["Enums"]["notification_channel"]
@@ -784,6 +899,13 @@ export type Database = {
         Returns: undefined
       }
       remove_want: { Args: { want_id: string }; Returns: undefined }
+      require_turn: {
+        Args: {
+          caller: string
+          trade: Database["public"]["Tables"]["trades"]["Row"]
+        }
+        Returns: undefined
+      }
       save_push_subscription: {
         Args: { auth: string; endpoint: string; p256dh: string }
         Returns: undefined
@@ -810,9 +932,40 @@ export type Database = {
         Args: { entry_id: string; quantity: number }
         Returns: undefined
       }
+      set_trade_terms: {
+        Args: {
+          author: string
+          listing_ids: string[]
+          offered_cash_cents: number
+          requested_cash_cents: number
+          trade_id: string
+        }
+        Returns: undefined
+      }
       set_trader_profile: {
         Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
+      }
+      trade_caller: { Args: { verified_to?: string }; Returns: string }
+      trade_for_participant: {
+        Args: { caller: string; trade_id: string }
+        Returns: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          proposer_cash_cents: number | null
+          proposer_id: string
+          recipient_cash_cents: number | null
+          recipient_id: string
+          responder_id: string | null
+          status: Database["public"]["Enums"]["trade_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "trades"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       unreferenced_listing_photos: {
         Args: { uploaded_before: string }
@@ -837,6 +990,14 @@ export type Database = {
         | "chat_message"
         | "verification_result"
       safe_spot_kind: "police_station" | "monitored_site"
+      trade_status:
+        | "proposed"
+        | "accepted"
+        | "declined"
+        | "scheduled"
+        | "completed"
+        | "cancelled"
+        | "no_show"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -981,6 +1142,15 @@ export const Constants = {
         "verification_result",
       ],
       safe_spot_kind: ["police_station", "monitored_site"],
+      trade_status: [
+        "proposed",
+        "accepted",
+        "declined",
+        "scheduled",
+        "completed",
+        "cancelled",
+        "no_show",
+      ],
     },
   },
 } as const

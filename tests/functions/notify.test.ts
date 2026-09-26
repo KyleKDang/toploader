@@ -23,7 +23,7 @@ import {
   toBase64Url,
   type VapidKeys,
 } from '../../supabase/functions/_shared/vapid.ts';
-import { arrange, cancelTradeFor } from '../db/arrange.ts';
+import { arrange, cancelTradeFor, verifyTrader } from '../db/arrange.ts';
 import {
   addWant,
   cityId,
@@ -258,9 +258,9 @@ describe('The notifier', { timeout: 30_000 }, () => {
   }
 
   /**
-   * A notification of a kind whose producer is a later ticket, written the
-   * way that producer will write it. The email path has to be proven before
-   * anything rides it.
+   * A notification written straight into the outbox the way its producer
+   * writes one, for a test about what the notifier does with a row -
+   * failing, retrying, going stale - rather than about what queued it.
    */
   async function queue(
     trader: SeededTrader,
@@ -281,6 +281,45 @@ describe('The notifier', { timeout: 30_000 }, () => {
     );
     return topic;
   }
+
+  /**
+   * Two Verified Traders of one City, each with a Listing and a browser
+   * subscribed, and a Trade proposal from one to the other of both Listings.
+   */
+  async function proposedTrade() {
+    const [proposer, recipient] = await Promise.all([
+      seedTrader('Proposer'),
+      seedTrader('Recipient'),
+    ]);
+    await Promise.all([verifyTrader(proposer.id), verifyTrader(recipient.id)]);
+    const [proposerBrowser, recipientBrowser, mine, theirs] = await Promise.all(
+      [
+        subscribe(proposer),
+        subscribe(recipient),
+        createListing(proposer, holofoil, 'NM'),
+        createListing(recipient, holofoil, 'LP'),
+      ],
+    );
+    const { data: tradeId, error } = await proposer.client.rpc('create_trade', {
+      recipient_id: recipient.id,
+      listing_ids: [mine, theirs],
+    });
+    if (error) throw error;
+    return {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      mine,
+      theirs,
+      tradeId,
+      topic: `trade:${tradeId}`,
+    };
+  }
+
+  /** The emails sent to one Trader. */
+  const emailsTo = (trader: SeededTrader) =>
+    emails().filter((email) => email.to.includes(trader.email));
 
   it('pushes a new Match to each Trader once, and emails neither', async () => {
     const { lister, wanter, listerBrowser, wanterBrowser, listingId, topic } =
@@ -356,6 +395,140 @@ describe('The notifier', { timeout: 30_000 }, () => {
 
     expect(pushesTo(wanterBrowser, topic)).toHaveLength(1);
     expect(pushesTo(listerBrowser, topic)).toHaveLength(1);
+  });
+
+  it('pushes and emails a new Trade proposal to its recipient alone', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+    } = await proposedTrade();
+
+    await deliver();
+
+    const url = `/trades/${tradeId}`;
+    expect(pushesTo(recipientBrowser, topic)).toEqual([
+      {
+        title: 'New trade proposal',
+        body: 'Proposer proposed a trade.',
+        url,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(recipient)).toEqual([
+      {
+        from: 'Toploader <noreply@mail.toploaderapp.com>',
+        to: [recipient.email],
+        reply_to: REPLY_TO,
+        subject: 'New trade proposal',
+        text: `Proposer proposed a trade.\n\n${APP_URL}${url}\n`,
+      },
+    ]);
+    expect(pushesTo(proposerBrowser, topic)).toEqual([]);
+    expect(emailsTo(proposer)).toEqual([]);
+  });
+
+  it('pushes and emails a counter to the Trader whose answer it now waits on', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      mine,
+      theirs,
+      tradeId,
+      topic,
+    } = await proposedTrade();
+    await deliver();
+    pushService.reset();
+    resend.reset();
+
+    const { error } = await recipient.client.rpc('counter_trade', {
+      trade_id: tradeId,
+      listing_ids: [mine, theirs],
+      requested_cash_cents: 2_000,
+    });
+    if (error) throw error;
+    await deliver();
+
+    expect(pushesTo(proposerBrowser, topic)).toEqual([
+      {
+        title: 'Trade proposal countered',
+        body: 'Recipient countered your trade proposal.',
+        url: `/trades/${tradeId}`,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(proposer).map((email) => email.subject)).toEqual([
+      'Trade proposal countered',
+    ]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
+    expect(emailsTo(recipient)).toEqual([]);
+  });
+
+  it('pushes and emails an accept to the Trader who proposed', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+    } = await proposedTrade();
+    await deliver();
+    pushService.reset();
+    resend.reset();
+
+    const { error } = await recipient.client.rpc('accept_trade', {
+      trade_id: tradeId,
+    });
+    if (error) throw error;
+    await deliver();
+
+    expect(pushesTo(proposerBrowser, topic)).toEqual([
+      {
+        title: 'Trade proposal accepted',
+        body: 'Recipient accepted your trade proposal.',
+        url: `/trades/${tradeId}`,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(proposer).map((email) => email.subject)).toEqual([
+      'Trade proposal accepted',
+    ]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
+    expect(emailsTo(recipient)).toEqual([]);
+  });
+
+  it('tells nobody about a declined proposal', async () => {
+    // The matrix has no row for a decline: the proposer sees it on the
+    // Trade, and a no is not something to be woken up for.
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+    } = await proposedTrade();
+    await deliver();
+    pushService.reset();
+    resend.reset();
+
+    const { error } = await recipient.client.rpc('decline_trade', {
+      trade_id: tradeId,
+    });
+    if (error) throw error;
+    await deliver();
+
+    expect(pushesTo(proposerBrowser, topic)).toEqual([]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
+    expect(emailsTo(proposer)).toEqual([]);
+    expect(emailsTo(recipient)).toEqual([]);
+    expect(await outbox(topic)).toHaveLength(1);
   });
 
   it('emails through Resend, and pushes too, for a kind the matrix emails', async () => {
