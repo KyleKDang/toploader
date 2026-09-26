@@ -196,6 +196,9 @@ What makes a good test here:
 - Two-Trader adversarial pairs are the default shape: the actor, the counterparty, and a foreign Trader in the same test file, asserting both what succeeds and what is denied.
 - Real Postgres always; nothing below a seam is mocked.
   The only fakes anywhere sit at the external HTTP edge.
+  One exception: the browser's own prompts.
+  A headless browser never offers an install and answers a notification permission request by itself, so the seam-3 tracers fake `beforeinstallprompt` and `Notification.requestPermission` and record when the app calls them.
+  Added on [#29](https://github.com/KyleKDang/toploader/issues/29), whose install step exists to ask for exactly those two things on one tap; they are the browser's UI, outside the app the way the push service is, and nothing of the app's own is faked.
 - Arranging a state no client path can reach is allowed, through a superuser connection, and only in the arrange step.
   Added on [#17](https://github.com/KyleKDang/toploader/issues/17), where City browse and the photo reaper both had to answer for a `traded` Listing months before the Trade machine can produce one.
   Assertions stay at the seam, as a signed-in Trader; the fixture walks the real transitions rather than jumping, so it cannot arrange a state the app could never produce.
