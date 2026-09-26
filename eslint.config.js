@@ -67,6 +67,12 @@ export default tseslint.config([
     },
   },
 
+  // The service worker runs in a worker, whose globals are not a page's.
+  {
+    files: ['src/sw.ts'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+
   // The seam-1 suite and the configs run under Node, not in the browser.
   {
     files: ['tests/**/*.ts', '*.config.ts'],

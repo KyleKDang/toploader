@@ -21,6 +21,7 @@ import {
   traderQuery,
   wantsQuery,
 } from './lib/queries';
+import { installOffer, installStepDue } from './lib/install';
 import { RouteErrorScreen } from './screens/RouteErrorScreen';
 
 /*
@@ -89,6 +90,19 @@ const setUpProfileRoute = createRoute({
   ),
 });
 
+const installRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/install',
+  loader: async ({ context: { queryClient } }) => {
+    await loadOnboardedTrader(queryClient);
+    if (installOffer() === null) throw redirect({ to: '/' });
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/InstallScreen'),
+    'InstallScreen',
+  ),
+});
+
 const matchesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
@@ -98,6 +112,10 @@ const matchesRoute = createRoute({
   // appear any time another Trader lists or wants something.
   loader: async ({ context: { queryClient } }) => {
     const { traderId, trader } = await loadOnboardedTrader(queryClient);
+    // Onboarding's last step comes before its landing view, once per
+    // browser. Only here, not on every screen: a notification's tap opens the
+    // screen it names, never a detour.
+    if (installStepDue()) throw redirect({ to: '/install' });
     await queryClient.ensureQueryData(matchesQuery(traderId));
     return { traderId, trader };
   },
@@ -258,6 +276,7 @@ function catalogId(param: string): number | null {
 const routeTree = rootRoute.addChildren([
   signUpRoute,
   setUpProfileRoute,
+  installRoute,
   matchesRoute,
   safeSpotsRoute,
   searchRoute,

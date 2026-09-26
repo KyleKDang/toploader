@@ -16,11 +16,25 @@
     <meta name="robots" content="noindex, nofollow" />
 
     <!--
-      No icon yet. The app icon and the rest of the PWA manifest land with
-      installability in #29; this declares the absence so the browser stops
-      asking for a favicon that is not there.
+      The app icon (scripts/pwa/render-icons.ts). The manifest, linked in by
+      the build, carries the installed app's icons; iOS reads its home-screen
+      icon from apple-touch-icon instead.
     -->
-    <link rel="icon" href="data:," />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Toploader" />
+
+    <!-- The browser's frame around the page matches --color-bg. -->
+    <meta
+      name="theme-color"
+      content="#ffffff"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0b0b0c"
+      media="(prefers-color-scheme: dark)"
+    />
 
     <title>Toploader</title>
     <meta

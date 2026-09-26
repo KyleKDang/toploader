@@ -9,7 +9,7 @@ import { supabase } from './supabase';
  *
  * The permission is asked on a gesture, never on load (the spec's Onboarding
  * flow, step 2): a browser asked out of nowhere says no, and a no is
- * remembered. Until #29 puts the ask on the install step, Matches offers it.
+ * remembered. The install step is where it is asked (src/lib/install.ts).
  *
  * The VAPID public key is the one the notifier signs with; a browser hands
  * it to its push service at subscribe time, and a message signed with any
@@ -32,12 +32,6 @@ export function pushSupported(): boolean {
 /** Whether to offer alerts: push is possible and the browser has not been asked. */
 export function canOfferPush(): boolean {
   return pushSupported() && Notification.permission === 'default';
-}
-
-/** Registers the worker that shows a push. Called once, as the app starts. */
-export async function registerServiceWorker(): Promise<void> {
-  if (!('serviceWorker' in navigator)) return;
-  await navigator.serviceWorker.register('/sw.js');
 }
 
 /**

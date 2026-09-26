@@ -1,16 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import {
+  browserPrompts,
+  fakeBrowserPrompts,
+  offerInstall,
+} from './browser-prompts';
+import { INSTALL_STEP_KEY, signInAsNewTrader } from './session';
 
 /*
  * The Onboarding flow, end to end at 375px: attest to being 18 or over, sign
- * up with email, set a display name, pick the area, land on Matches.
+ * up with email, set a display name, pick the area, take or skip the install
+ * step, land on Matches.
  *
  * Wiring only. That the attestation is required and that a Trader can only
  * set their own profile are proven at seam 1 (tests/db/traders.test.ts).
  */
-test('a new Trader signs up, sets up their profile in Orange County, and lands on an empty Matches view', async ({
+test('a new Trader signs up, sets up their profile in Orange County, installs with alerts, and lands on an empty Matches view', async ({
   page,
 }) => {
+  await fakeBrowserPrompts(page);
   const email = `trader-${randomUUID()}@example.test`;
 
   await page.goto('/');
@@ -27,7 +35,18 @@ test('a new Trader signs up, sets up their profile in Orange County, and lands o
   await page.getByLabel('Area').selectOption({ label: 'Orange County' });
   await page.getByRole('button', { name: 'Start trading' }).click();
 
+  // Nothing is asked of the browser until the Trader taps.
+  await expect(page).toHaveURL(/\/install$/);
+  await offerInstall(page);
+  const install = page.getByRole('button', {
+    name: 'Install and turn on alerts',
+  });
+  await expect(install).toBeVisible();
+  expect(await browserPrompts(page)).toEqual([]);
+  await install.click();
+
   await expect(page).toHaveURL(/\/$/);
+  expect(await browserPrompts(page)).toEqual(['install', 'notifications']);
   await expect(page.getByText('No matches in Orange County yet')).toBeVisible();
 
   const tabs = page.getByRole('navigation', { name: 'Sections' });
@@ -37,6 +56,40 @@ test('a new Trader signs up, sets up their profile in Orange County, and lands o
   for (const name of ['Trades', 'Profile']) {
     await expect(tabs.getByRole('button', { name })).toBeDisabled();
   }
+});
+
+test.describe('on an iPhone', () => {
+  test.use({
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  });
+
+  test('the install step shows Add to Home Screen instructions, and skipping it lands on Matches for good', async ({
+    page,
+  }) => {
+    await fakeBrowserPrompts(page);
+    await signInAsNewTrader(page, 'Orange County');
+    await page.evaluate(
+      (key) => localStorage.removeItem(key),
+      INSTALL_STEP_KEY,
+    );
+
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/install$/);
+    await expect(
+      page.getByRole('heading', { name: 'Install to get trade alerts' }),
+    ).toBeVisible();
+    await expect(page.getByText('Add to Home Screen')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Skip for now' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { name: 'Matches' })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Matches' })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    expect(await browserPrompts(page)).toEqual([]);
+  });
 });
 
 /**

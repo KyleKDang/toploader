@@ -6,6 +6,9 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["node"],
+    // vite-plugin-pwa's declarations name service worker globals and an
+    // optional peer's types that a Node config has no business loading.
+    "skipLibCheck": true,
 
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
