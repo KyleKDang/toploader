@@ -104,7 +104,7 @@ interface PushSubscriptionRow {
   auth: string;
 }
 
-/** What the service worker receives, once decrypted (public/sw.js). */
+/** What the service worker receives, once decrypted (src/sw.ts). */
 interface PushPayload {
   title: string;
   body: string;

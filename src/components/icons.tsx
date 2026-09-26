@@ -119,3 +119,12 @@ export function CameraIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Safari's Share button, drawn as iOS draws it, for the install step. */
+export function ShareIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 14.5V3m0 0L8 7m4-4 4 4M8.5 10H5v11h14V10h-3.5" />
+    </Icon>
+  );
+}

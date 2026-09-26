@@ -10,6 +10,13 @@ import type { Database } from '../../src/lib/database.types.ts';
  * where supabase-js in the page will find it.
  */
 
+/**
+ * Where the app remembers that this browser has been through the install
+ * step (src/lib/install.ts). A Trader signed in here has finished
+ * Onboarding, so the step is marked done along with the session.
+ */
+export const INSTALL_STEP_KEY = 'toploader:install-step-done';
+
 /** supabase-js's default storage key: `sb-` and the API host's first label. */
 export function authStorageKey() {
   return `sb-${new URL(requireEnv('SUPABASE_API_URL')).hostname.split('.')[0]}-auth-token`;
@@ -57,8 +64,11 @@ export async function signInAsNewTrader(
 
   await page.goto('/sign-up');
   await page.evaluate(
-    ([key, session]) => localStorage.setItem(key, session),
-    [authStorageKey(), JSON.stringify(data.session)],
+    ([key, session, installStepKey]) => {
+      localStorage.setItem(key, session);
+      localStorage.setItem(installStepKey, '1');
+    },
+    [authStorageKey(), JSON.stringify(data.session), INSTALL_STEP_KEY],
   );
 
   return { id: data.user?.id ?? '', displayName, client };

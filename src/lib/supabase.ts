@@ -10,5 +10,14 @@ if (!url || !publishableKey) {
   );
 }
 
-/** The one client the app talks to Supabase through, signed in as the Trader. */
-export const supabase = createClient<Database>(url, publishableKey);
+/**
+ * The one client the app talks to Supabase through, signed in as the Trader.
+ *
+ * Its own retries are off, so TanStack Query's are the only ones (src/main.tsx):
+ * every read goes through a query, and two retry layers stacked would try a
+ * failed read sixteen times, and hold a Trader who is offline on a blank
+ * screen for most of a minute.
+ */
+export const supabase = createClient<Database>(url, publishableKey, {
+  db: { retry: false },
+});

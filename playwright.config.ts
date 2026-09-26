@@ -56,6 +56,12 @@ export default defineConfig({
       // does not catch them gets a 404 from the preview server, and nothing
       // ever reaches a real Sentry project.
       VITE_SENTRY_DSN: `http://public@127.0.0.1:${PORT}/1`,
+      // A VAPID public key whose private half was thrown away, so the app
+      // counts push as supported and the install step offers alerts. Nothing
+      // is ever subscribed: the tracers' permission prompt answers "denied"
+      // (tests/browser/browser-prompts.ts).
+      VITE_VAPID_PUBLIC_KEY:
+        'BBjFjtk4OPPoggXfABCsGrEO77qsS9qCJGwHV9S_EnxE06olT5ZibbZ74HZD-vT-dgErxYcVp1vw8vNY-P8QdnE',
     },
   },
 });

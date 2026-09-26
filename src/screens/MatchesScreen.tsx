@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import {
   AppShell,
-  Button,
   CardTile,
   EmptyState,
   ListRow,
@@ -11,7 +10,7 @@ import {
   TopBar,
 } from '../components';
 import { formatPrice } from '../lib/format';
-import { canOfferPush, enablePush, syncPushSubscription } from '../lib/push';
+import { syncPushSubscription } from '../lib/push';
 import { matchesQuery, type Match } from '../lib/queries';
 import { useTabs } from '../lib/tabs';
 
@@ -29,10 +28,6 @@ import { useTabs } from '../lib/tabs';
  * the one reference both sides of a pairing share, whereas an asking price
  * exists on only some Listings and means nothing on a Want. The Listing's
  * own page, one tap away, carries the asking price.
- *
- * This is also where alerts are offered, until #29 moves the ask onto the
- * install step: a new Match is the first thing the app has to say to a
- * Trader who is not looking at it, and this is the screen it is about.
  */
 
 const route = getRouteApi('/');
@@ -44,8 +39,7 @@ export function MatchesScreen() {
   const cityName = trader.city.name;
 
   // A browser that already said yes stays subscribed under whoever is
-  // signed in; one that has not been asked is offered it below.
-  const [offerPush, setOfferPush] = useState(canOfferPush);
+  // signed in. The asking is the install step's (src/lib/install.ts).
   useEffect(() => {
     void syncPushSubscription();
   }, []);
@@ -69,22 +63,6 @@ export function MatchesScreen() {
       }
       {...useTabs('matches')}
     >
-      {offerPush ? (
-        <div className="flex flex-col gap-3 border-b border-line bg-surface-2 px-4 py-3">
-          <p className="text-sm leading-prose text-ink">
-            Get an alert when you have a new match, even with the app closed.
-          </p>
-          <Button
-            onClick={() => {
-              // Asked or refused, the offer is done either way: a browser
-              // remembers a no, and asking again would not be answered.
-              void enablePush().finally(() => setOfferPush(false));
-            }}
-          >
-            Turn on alerts
-          </Button>
-        </div>
-      ) : null}
       {matches.data?.length ? (
         <>
           <ul aria-label="Your matches">

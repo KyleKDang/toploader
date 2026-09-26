@@ -36,6 +36,7 @@ export {
   PlusIcon,
   ProfileIcon,
   SearchIcon,
+  ShareIcon,
   ShieldIcon,
   TradesIcon,
 } from './icons';
