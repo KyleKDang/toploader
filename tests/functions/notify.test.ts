@@ -32,6 +32,7 @@ import {
   seededExamplemon,
   seedTrader,
   serviceClient,
+  TEST_CITY,
   type SeededTrader,
 } from '../db/seed.ts';
 import { startCaptureServer, type CaptureServer } from './capture-server.ts';
@@ -285,11 +286,13 @@ describe('The notifier', { timeout: 30_000 }, () => {
   /**
    * Two Verified Traders of one City, each with a Listing and a browser
    * subscribed, and a Trade proposal from one to the other of both Listings.
+   * Test City, for the reason tests/db/trades.test.ts gives: a Trade needs
+   * no Match, and in Orange County each Listing would make dozens.
    */
   async function proposedTrade() {
     const [proposer, recipient] = await Promise.all([
-      seedTrader('Proposer'),
-      seedTrader('Recipient'),
+      seedTrader('Proposer', TEST_CITY),
+      seedTrader('Recipient', TEST_CITY),
     ]);
     await Promise.all([verifyTrader(proposer.id), verifyTrader(recipient.id)]);
     const [proposerBrowser, recipientBrowser, mine, theirs] = await Promise.all(
@@ -501,6 +504,48 @@ describe('The notifier', { timeout: 30_000 }, () => {
     ]);
     expect(pushesTo(recipientBrowser, topic)).toEqual([]);
     expect(emailsTo(recipient)).toEqual([]);
+  });
+
+  it('pushes and emails an accept of a counter to the Trader who countered', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      mine,
+      theirs,
+      tradeId,
+      topic,
+    } = await proposedTrade();
+    const countered = await recipient.client.rpc('counter_trade', {
+      trade_id: tradeId,
+      listing_ids: [mine, theirs],
+      requested_cash_cents: 2_000,
+    });
+    if (countered.error) throw countered.error;
+    await deliver();
+    pushService.reset();
+    resend.reset();
+
+    const { error } = await proposer.client.rpc('accept_trade', {
+      trade_id: tradeId,
+    });
+    if (error) throw error;
+    await deliver();
+
+    expect(pushesTo(recipientBrowser, topic)).toEqual([
+      {
+        title: 'Trade proposal accepted',
+        body: 'Proposer accepted your trade proposal.',
+        url: `/trades/${tradeId}`,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(recipient).map((email) => email.subject)).toEqual([
+      'Trade proposal accepted',
+    ]);
+    expect(pushesTo(proposerBrowser, topic)).toEqual([]);
+    expect(emailsTo(proposer)).toEqual([]);
   });
 
   it('tells nobody about a declined proposal', async () => {
