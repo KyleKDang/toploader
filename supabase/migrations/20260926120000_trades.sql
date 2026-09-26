@@ -70,8 +70,7 @@ create table public.trade_items (
   primary key (trade_id, listing_id)
 );
 
--- Which Trades a Listing is on, for accepting one and, later, for closing
--- the others.
+-- Which Trades a Listing is on, for accepting one.
 create index trade_items_listing_id_idx on public.trade_items (listing_id);
 
 -- Only the two participants read a Trade. Select is the only grant: every
@@ -101,7 +100,6 @@ create policy "A Trader can read the items of a Trade they can read"
 -- that moves a Trade, in this ticket and the ones after it, is held to it
 -- rather than carrying its own copy.
 --
---   proposed  -> proposed   countered, the ball handed back
 --   proposed  -> accepted   the Trader it waited on said yes
 --   proposed  -> declined   ... or no
 --   proposed  -> cancelled  withdrawn before an answer (#25)
@@ -111,17 +109,30 @@ create policy "A Trader can read the items of a Trade they can read"
 --   scheduled -> cancelled
 --   scheduled -> no_show    one Trader reported the other absent (#25)
 --
--- declined, completed, cancelled, and no_show are terminal, and a terminal
--- Trade is frozen whole: a completed one is the Trade Record.
+-- A Trade may also change without changing state - a counter while
+-- proposed, a Meetup put forward while accepted, one Trader's Complete tap
+-- while scheduled - but never once it is declined, completed, cancelled, or
+-- no_show: those are terminal, and a terminal Trade is frozen whole, since a
+-- completed one is the Trade Record. Its two Traders never change at all.
 create function public.enforce_trade_lifecycle()
   returns trigger
   language plpgsql
   set search_path = ''
 as $$
 begin
-  if old.status in ('declined', 'completed', 'cancelled', 'no_show')
-    or old.status::text || ' to ' || new.status::text not in (
-      'proposed to proposed',
+  if old.status in ('declined', 'completed', 'cancelled', 'no_show') then
+    raise exception 'a % Trade cannot change', old.status
+      using errcode = '22023';
+  end if;
+
+  if new.proposer_id <> old.proposer_id
+    or new.recipient_id <> old.recipient_id then
+    raise exception 'the Traders of a Trade cannot change'
+      using errcode = '22023';
+  end if;
+
+  if new.status <> old.status
+    and old.status::text || ' to ' || new.status::text not in (
       'proposed to accepted',
       'proposed to declined',
       'proposed to cancelled',
@@ -131,12 +142,11 @@ begin
       'scheduled to cancelled',
       'scheduled to no_show'
     )
-    or new.proposer_id <> old.proposer_id
-    or new.recipient_id <> old.recipient_id
   then
     raise exception 'a Trade cannot go from % to %', old.status, new.status
       using errcode = '22023';
   end if;
+
   return new;
 end;
 $$;
@@ -145,12 +155,25 @@ create trigger enforce_trade_lifecycle
   before update on public.trades
   for each row execute function public.enforce_trade_lifecycle();
 
--- The rules a Trader's call on a Trade answers to before anything else:
--- signed in, and, where the step sends or accepts, a Verified Trader.
--- Verification is what the Safety Program promises about the other side of
--- a Meetup, so it gates the two steps that commit anyone to one; declining
--- commits nobody, and needs none.
-create function public.trade_caller(verified_to text default null)
+-- The Trader on the other side of a Trade from the one given.
+create function public.other_trader(trade public.trades, trader uuid)
+  returns uuid
+  language sql
+  immutable
+  set search_path = ''
+as $$
+  select case
+    when trader = trade.proposer_id then trade.recipient_id
+    else trade.proposer_id
+  end
+$$;
+
+-- The calling Trader, refused if signed out and, where the step sends or
+-- accepts a proposal, if not a Verified Trader. Verification is what the
+-- Safety Program promises about the other side of a Meetup, so it gates the
+-- two steps that commit anyone to one; declining commits nobody, and needs
+-- none.
+create function public.require_trader(verified boolean)
   returns uuid
   language plpgsql
   stable
@@ -165,12 +188,11 @@ begin
       using errcode = '42501';
   end if;
 
-  if verified_to is not null and not exists (
+  if require_trader.verified and not exists (
     select 1 from public.traders
     where traders.id = caller and traders.verified_at is not null
   ) then
-    raise exception 'only a Verified Trader can % a Trade proposal',
-      verified_to
+    raise exception 'only a Verified Trader can send or accept a Trade proposal'
       using errcode = '42501';
   end if;
 
@@ -196,7 +218,9 @@ begin
     where trades.id = trade_for_participant.trade_id
     for update;
 
-  if not found or caller not in (trade.proposer_id, trade.recipient_id) then
+  if not found
+    or trade_for_participant.caller
+      not in (trade.proposer_id, trade.recipient_id) then
     raise exception 'a Trader can only act on a Trade they are party to'
       using errcode = '42501';
   end if;
@@ -230,13 +254,15 @@ $$;
 -- A proposal has to be a trade: at least one Listing, each side giving
 -- something, every Listing on offer and belonging to one of the two
 -- Traders. Proposing commits nothing, so the Listings stay active and may be
--- on other proposals too; which one wins is settled on accept.
+-- on other proposals too; which one wins is settled on accept, and a
+-- proposal that loses stands, unacceptable, until it is answered or
+-- withdrawn.
 create function public.set_trade_terms(
-  trade_id uuid,
+  trade public.trades,
   author uuid,
   listing_ids uuid[],
-  offered_cash_cents integer,
-  requested_cash_cents integer
+  offered_cash_cents integer default null,
+  requested_cash_cents integer default null
 )
   returns void
   language plpgsql
@@ -244,45 +270,41 @@ create function public.set_trade_terms(
   set search_path = ''
 as $$
 declare
-  trade public.trades;
-  other uuid;
+  other uuid := public.other_trader(set_trade_terms.trade, author);
   from_author integer;
   from_other integer;
 begin
-  select * into trade from public.trades where id = set_trade_terms.trade_id;
-  other := case
-    when author = trade.proposer_id then trade.recipient_id
-    else trade.proposer_id
-  end;
-
-  if coalesce(cardinality(listing_ids), 0) = 0 then
+  if coalesce(cardinality(set_trade_terms.listing_ids), 0) = 0 then
     raise exception 'a Trade needs at least one Listing'
       using errcode = '22023';
   end if;
 
-  if (select count(distinct id) from unnest(listing_ids) as id)
-    <> cardinality(listing_ids) then
+  if (select count(distinct named.id)
+        from unnest(set_trade_terms.listing_ids) as named (id))
+    <> cardinality(set_trade_terms.listing_ids) then
     raise exception 'a Listing can be on a Trade only once'
       using errcode = '22023';
   end if;
 
-  if offered_cash_cents <= 0 or requested_cash_cents <= 0 then
+  if set_trade_terms.offered_cash_cents <= 0
+    or set_trade_terms.requested_cash_cents <= 0 then
     raise exception 'a cash amount must be more than zero'
       using errcode = '22023';
   end if;
 
-  if offered_cash_cents is not null and requested_cash_cents is not null then
+  if set_trade_terms.offered_cash_cents is not null
+    and set_trade_terms.requested_cash_cents is not null then
     raise exception 'cash can be on one side of a Trade, not both'
       using errcode = '22023';
   end if;
 
   if exists (
-    select 1 from unnest(listing_ids) as named (id)
+    select 1 from unnest(set_trade_terms.listing_ids) as named (id)
     where not exists (
       select 1 from public.listings
       where listings.id = named.id
         and listings.status = 'active'
-        and listings.trader_id in (author, other)
+        and listings.trader_id in (set_trade_terms.author, other)
     )
   ) then
     raise exception 'a Trade can hold only active Listings of its two Traders'
@@ -290,32 +312,36 @@ begin
   end if;
 
   select
-    count(*) filter (where listings.trader_id = author),
+    count(*) filter (where listings.trader_id = set_trade_terms.author),
     count(*) filter (where listings.trader_id = other)
     into from_author, from_other
     from public.listings
-    where listings.id = any(listing_ids);
+    where listings.id = any(set_trade_terms.listing_ids);
 
-  if (from_author = 0 and offered_cash_cents is null)
-    or (from_other = 0 and requested_cash_cents is null) then
+  if (from_author = 0 and set_trade_terms.offered_cash_cents is null)
+    or (from_other = 0 and set_trade_terms.requested_cash_cents is null) then
     raise exception 'each side of a Trade must give a Listing or cash'
       using errcode = '22023';
   end if;
 
-  delete from public.trade_items where trade_items.trade_id = trade.id;
+  delete from public.trade_items
+    where trade_items.trade_id = (set_trade_terms.trade).id;
   insert into public.trade_items (trade_id, listing_id)
-    select trade.id, id from unnest(listing_ids) as id;
+    select (set_trade_terms.trade).id, named.id
+      from unnest(set_trade_terms.listing_ids) as named (id);
 
   update public.trades
     set proposer_cash_cents = case
-          when author = trade.proposer_id then offered_cash_cents
-          else requested_cash_cents
+          when set_trade_terms.author = trades.proposer_id
+            then set_trade_terms.offered_cash_cents
+          else set_trade_terms.requested_cash_cents
         end,
         recipient_cash_cents = case
-          when author = trade.proposer_id then requested_cash_cents
-          else offered_cash_cents
+          when set_trade_terms.author = trades.proposer_id
+            then set_trade_terms.requested_cash_cents
+          else set_trade_terms.offered_cash_cents
         end
-    where id = trade.id;
+    where trades.id = (set_trade_terms.trade).id;
 end;
 $$;
 
@@ -333,8 +359,8 @@ create function public.create_trade(
   set search_path = ''
 as $$
 declare
-  caller uuid := public.trade_caller(verified_to => 'send');
-  new_trade uuid;
+  caller uuid := public.require_trader(verified => true);
+  trade public.trades;
 begin
   -- Trading happens within a City, so the recipient has to be in the
   -- caller's: someone the caller could have seen a Listing of.
@@ -352,13 +378,17 @@ begin
 
   insert into public.trades (proposer_id, recipient_id, responder_id)
     values (caller, create_trade.recipient_id, create_trade.recipient_id)
-    returning id into new_trade;
+    returning * into trade;
 
   perform public.set_trade_terms(
-    new_trade, caller, listing_ids, offered_cash_cents, requested_cash_cents
+    trade,
+    caller,
+    create_trade.listing_ids,
+    create_trade.offered_cash_cents,
+    create_trade.requested_cash_cents
   );
 
-  return new_trade;
+  return trade.id;
 end;
 $$;
 
@@ -376,21 +406,23 @@ create function public.counter_trade(
   set search_path = ''
 as $$
 declare
-  caller uuid := public.trade_caller(verified_to => 'send');
-  trade public.trades := public.trade_for_participant(trade_id, caller);
+  caller uuid := public.require_trader(verified => true);
+  trade public.trades :=
+    public.trade_for_participant(counter_trade.trade_id, caller);
 begin
   perform public.require_turn(trade, caller);
 
   perform public.set_trade_terms(
-    trade.id, caller, listing_ids, offered_cash_cents, requested_cash_cents
+    trade,
+    caller,
+    counter_trade.listing_ids,
+    counter_trade.offered_cash_cents,
+    counter_trade.requested_cash_cents
   );
 
   update public.trades
-    set responder_id = case
-          when caller = trade.proposer_id then trade.recipient_id
-          else trade.proposer_id
-        end
-    where id = trade.id;
+    set responder_id = public.other_trader(trade, caller)
+    where trades.id = trade.id;
 end;
 $$;
 
@@ -404,21 +436,32 @@ create function public.accept_trade(trade_id uuid)
   set search_path = ''
 as $$
 declare
-  caller uuid := public.trade_caller(verified_to => 'accept');
-  trade public.trades := public.trade_for_participant(trade_id, caller);
+  caller uuid := public.require_trader(verified => true);
+  trade public.trades :=
+    public.trade_for_participant(accept_trade.trade_id, caller);
   committed integer;
 begin
   perform public.require_turn(trade, caller);
 
-  -- Only the Listings still active move, and every one must: two accepts
-  -- racing for one Listing each take their own Trade's lock, not the
-  -- Listing's, so this condition is what the second one fails on once the
-  -- first commits.
+  -- Two accepts racing for the same Listings each hold their own Trade's
+  -- lock, not the Listings', so the Listings are locked here, always in the
+  -- same order: two accepts sharing several Listings then queue on the
+  -- first rather than each taking one and deadlocking on the other.
+  perform 1 from public.listings
+    where listings.id in (
+      select trade_items.listing_id from public.trade_items
+      where trade_items.trade_id = trade.id
+    )
+    order by listings.id
+    for update;
+
+  -- Only the Listings still active move, and every one must: once the
+  -- first accept commits, this is what the second fails on.
   update public.listings
     set status = 'in_trade'
-    where status = 'active'
-      and id in (
-        select listing_id from public.trade_items
+    where listings.status = 'active'
+      and listings.id in (
+        select trade_items.listing_id from public.trade_items
         where trade_items.trade_id = trade.id
       );
   get diagnostics committed = row_count;
@@ -435,7 +478,7 @@ begin
     set status = 'accepted',
         responder_id = null,
         accepted_at = now()
-    where id = trade.id;
+    where trades.id = trade.id;
 end;
 $$;
 
@@ -448,15 +491,16 @@ create function public.decline_trade(trade_id uuid)
   set search_path = ''
 as $$
 declare
-  caller uuid := public.trade_caller();
-  trade public.trades := public.trade_for_participant(trade_id, caller);
+  caller uuid := public.require_trader(verified => false);
+  trade public.trades :=
+    public.trade_for_participant(decline_trade.trade_id, caller);
 begin
   perform public.require_turn(trade, caller);
 
   update public.trades
     set status = 'declined',
         responder_id = null
-    where id = trade.id;
+    where trades.id = trade.id;
 end;
 $$;
 
@@ -504,10 +548,7 @@ begin
     kind := 'proposal_accepted';
     -- Whoever the proposal was waiting on said yes; the other Trader is
     -- the one who made it.
-    recipient := case
-      when old.responder_id = new.proposer_id then new.recipient_id
-      else new.proposer_id
-    end;
+    recipient := public.other_trader(new, old.responder_id);
     title := 'Trade proposal accepted';
     verb := 'accepted';
   else
@@ -516,10 +557,7 @@ begin
 
   -- Who is told is one Trader of the two, and what they are told about is
   -- the other.
-  actor := case
-    when recipient = new.proposer_id then new.recipient_id
-    else new.proposer_id
-  end;
+  actor := public.other_trader(new, recipient);
 
   insert into public.notifications (trader_id, kind, topic, title, body, url)
     select

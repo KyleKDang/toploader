@@ -893,12 +893,20 @@ export type Database = {
         Args: { kind: Database["public"]["Enums"]["notification_kind"] }
         Returns: Database["public"]["Enums"]["notification_channel"][]
       }
+      other_trader: {
+        Args: {
+          trade: Database["public"]["Tables"]["trades"]["Row"]
+          trader: string
+        }
+        Returns: string
+      }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
       remove_push_subscription: {
         Args: { endpoint: string }
         Returns: undefined
       }
       remove_want: { Args: { want_id: string }; Returns: undefined }
+      require_trader: { Args: { verified: boolean }; Returns: string }
       require_turn: {
         Args: {
           caller: string
@@ -936,9 +944,9 @@ export type Database = {
         Args: {
           author: string
           listing_ids: string[]
-          offered_cash_cents: number
-          requested_cash_cents: number
-          trade_id: string
+          offered_cash_cents?: number
+          requested_cash_cents?: number
+          trade: Database["public"]["Tables"]["trades"]["Row"]
         }
         Returns: undefined
       }
@@ -946,7 +954,6 @@ export type Database = {
         Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
       }
-      trade_caller: { Args: { verified_to?: string }; Returns: string }
       trade_for_participant: {
         Args: { caller: string; trade_id: string }
         Returns: {

@@ -4,7 +4,7 @@ import { commitToTrade, verifyTrader } from './arrange.ts';
 import {
   anonClient,
   createListing,
-  seedAdversarialTraders,
+  ORANGE_COUNTY,
   seededExamplemon,
   seedTrader,
   TEST_CITY,
@@ -95,9 +95,18 @@ describe('Trades', () => {
   /**
    * The adversarial trio, the first two verified, each of those two with
    * two active Listings to put on the table.
+   *
+   * They trade in Test City rather than the launch City. Every other suite
+   * leaves Wants for Examplemon in Orange County on the stack, so each
+   * Listing there becomes a Match, and its notifications, with every one of
+   * them; a Trade needs no Match, and this file lists dozens of Copies.
    */
   async function seedTable() {
-    const { actor, counterparty, foreign } = await seedAdversarialTraders();
+    const [actor, counterparty, foreign] = await Promise.all([
+      seedTrader('Actor', TEST_CITY),
+      seedTrader('Counterparty', TEST_CITY),
+      seedTrader('Foreign', TEST_CITY),
+    ]);
     await Promise.all([verifyTrader(actor.id), verifyTrader(counterparty.id)]);
     const [mine, mine2, theirs, theirs2] = await Promise.all([
       createListing(actor, holofoil, 'NM'),
@@ -235,7 +244,7 @@ describe('Trades', () => {
 
     it('cannot be sent to yourself, or to a Trader in another City', async () => {
       const { actor, mine, mine2 } = await seedTable();
-      const elsewhere = await seedTrader('Elsewhere', TEST_CITY);
+      const elsewhere = await seedTrader('Elsewhere', ORANGE_COUNTY);
       await verifyTrader(elsewhere.id);
       const theirs = await createListing(elsewhere, holofoil, 'NM');
 
@@ -450,7 +459,7 @@ describe('Trades', () => {
   describe('Verified Traders', () => {
     it('are the only ones who may send a proposal or a counter', async () => {
       const { actor, mine } = await seedTable();
-      const unverified = await seedTrader('Unverified');
+      const unverified = await seedTrader('Unverified', TEST_CITY);
       const theirOwn = await createListing(unverified, holofoil, 'NM');
 
       const sent = await unverified.client.rpc('create_trade', {
@@ -480,7 +489,7 @@ describe('Trades', () => {
 
     it('are the only ones who may accept, though anyone may decline', async () => {
       const { actor, mine } = await seedTable();
-      const unverified = await seedTrader('Unverified');
+      const unverified = await seedTrader('Unverified', TEST_CITY);
       const theirOwn = await createListing(unverified, holofoil, 'NM');
       const tradeId = await propose(actor, unverified, {
         listing_ids: [mine, theirOwn],
@@ -567,6 +576,44 @@ describe('Trades', () => {
 
       expect(real.error?.code).toBe(missing.error?.code);
       expect(real.error?.message).toBe(missing.error?.message);
+    });
+  });
+
+  /*
+   * The steps the four RPCs share run as their owner and take the Trader
+   * they act for as an argument, so a client calling one directly could
+   * rewrite any proposal as anyone. No client role may execute them.
+   */
+  it('keeps the machine’s internal steps from every client', async () => {
+    const { actor, counterparty, mine, theirs } = await seedTable();
+    const tradeId = await propose(actor, counterparty, {
+      listing_ids: [mine, theirs],
+    });
+    const { data: trade, error } = await actor.client
+      .from('trades')
+      .select('*')
+      .eq('id', tradeId)
+      .single();
+    if (error) throw error;
+
+    const rewrite = await actor.client.rpc('set_trade_terms', {
+      trade,
+      author: counterparty.id,
+      listing_ids: [theirs],
+      offered_cash_cents: 1,
+    });
+    const lock = await actor.client.rpc('trade_for_participant', {
+      trade_id: tradeId,
+      caller: counterparty.id,
+    });
+    const gate = await anonClient().rpc('require_trader', { verified: false });
+
+    expect(rewrite.error?.code).toBe('42501');
+    expect(lock.error?.code).toBe('42501');
+    expect(gate.error?.code).toBe('42501');
+    expect(await readTrade(actor.client, tradeId)).toMatchObject({
+      recipient_cash_cents: null,
+      listing_ids: [mine, theirs].sort(),
     });
   });
 
