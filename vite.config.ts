@@ -42,7 +42,6 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        orientation: 'portrait',
         // --color-bg, light: the splash screen and the window's frame. The
         // page itself sets a dark theme color for dark mode (index.html).
         background_color: '#ffffff',

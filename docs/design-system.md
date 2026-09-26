@@ -239,6 +239,7 @@ Each is a 26px icon over a 13px label, `--size-tap` minimum, `--color-muted` at 
 An `--color-alert` dot rides the icon when that tab has something new.
 The bar is present on every top-level screen and hidden on nothing; a screen reached by drilling in keeps it and gains a back button in the top bar.
 The one exception is before a Trader is inside the app at all: sign up and setting up the profile have no sections to move between, so they have no bar ([#13](https://github.com/KyleKDang/toploader/issues/13)).
+The install step between setting up the profile and Matches is part of that same stretch of Onboarding, and has no bar either ([#29](https://github.com/KyleKDang/toploader/issues/29)).
 The Card page is not drilled into, so it has no back button: it is the Search tab's own screen, with the search picker open above the Card as the chosen mockup draws it, and the next Card is one search away rather than one step back ([#15](https://github.com/KyleKDang/toploader/issues/15)).
 A tab whose screen is not built yet stays on the bar, visibly inactive and disabled, rather than being left off.
 

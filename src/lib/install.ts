@@ -39,15 +39,17 @@ const listeners = new Set<() => void>();
  */
 export function listenForInstallPrompt(): void {
   window.addEventListener('beforeinstallprompt', (event) => {
-    // Keeps the browser's own install banner away: the install step is where
-    // the offer is made, on the Trader's tap.
+    // Keeps the browser's own install banner away while the install step is
+    // still to come, since that is where the offer is made, on the Trader's
+    // tap. Once the step is done, the browser offers install its own way.
+    if (installStepDone()) return;
     event.preventDefault();
     installPrompt = event as InstallPromptEvent;
-    changed();
+    notifyListeners();
   });
   window.addEventListener('appinstalled', () => {
     installPrompt = null;
-    changed();
+    notifyListeners();
   });
 }
 
@@ -66,11 +68,21 @@ export function useInstallOffer(): InstallOffer | null {
   return useSyncExternalStore(subscribe, installOffer);
 }
 
-/** Whether the Trader should be taken through the install step. */
+/**
+ * Whether the Trader should be taken through the install step, decided the
+ * first time they land on Matches in this browser. Where there is nothing
+ * to offer then, the step is passed rather than put off, so an offer that
+ * turns up later never detours a Trader who is well past Onboarding.
+ */
 export function installStepDue(): boolean {
-  return (
-    localStorage.getItem(STEP_DONE_KEY) === null && installOffer() !== null
-  );
+  if (installStepDone()) return false;
+  if (installOffer() !== null) return true;
+  finishInstallStep();
+  return false;
+}
+
+function installStepDone(): boolean {
+  return localStorage.getItem(STEP_DONE_KEY) !== null;
 }
 
 /** Records the step as done on this browser, answered or skipped. */
@@ -79,15 +91,20 @@ export function finishInstallStep(): void {
 }
 
 /**
- * On the Trader's tap: the browser's install prompt where it has one, and
- * the push permission. Both are asked before anything is awaited, because a
+ * On the Trader's tap: the push permission, and the browser's install prompt
+ * where it has one. Both are asked before anything is awaited, because a
  * browser grants a prompt only while the tap is fresh, and waiting on the
- * Trader's answer to the first would spend it.
+ * Trader's answer to the first would spend it. The permission goes first:
+ * asking it leaves the tap unspent, where Chrome's install prompt uses it up.
+ *
+ * The step is done from the tap on, so an app window the install opens does
+ * not start with the step again.
  */
 export async function installWithAlerts(): Promise<void> {
-  const installing = installPrompt?.prompt();
+  finishInstallStep();
   const alerts = enablePush();
-  await Promise.all([installing, alerts]);
+  const installing = installPrompt?.prompt();
+  await Promise.all([alerts, installing]);
 }
 
 function isIos(): boolean {
@@ -111,6 +128,6 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-function changed() {
+function notifyListeners() {
   for (const listener of listeners) listener();
 }

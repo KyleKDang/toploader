@@ -46,7 +46,7 @@ test('a new Trader signs up, sets up their profile in Orange County, installs wi
   await install.click();
 
   await expect(page).toHaveURL(/\/$/);
-  expect(await browserPrompts(page)).toEqual(['install', 'notifications']);
+  expect(await browserPrompts(page)).toEqual(['notifications', 'install']);
   await expect(page.getByText('No matches in Orange County yet')).toBeVisible();
 
   const tabs = page.getByRole('navigation', { name: 'Sections' });

@@ -30,8 +30,10 @@ export function InstallScreen() {
   // Nothing left to offer, as when the app was installed from the browser's
   // own menu while this screen was open.
   useEffect(() => {
-    if (offer === null) leave();
-  });
+    if (offer !== null) return;
+    finishInstallStep();
+    void navigate({ to: '/', replace: true });
+  }, [offer, navigate]);
 
   function ask() {
     setAsking(true);
@@ -58,7 +60,8 @@ export function InstallScreen() {
           <ol className="flex list-decimal flex-col gap-2 pl-6 text-base leading-prose text-ink">
             <li>
               Tap the Share button{' '}
-              <ShareIcon className="inline align-text-bottom" /> in Safari.
+              <ShareIcon className="inline align-text-bottom" /> in your
+              browser.
             </li>
             <li>
               Choose <strong>Add to Home Screen</strong>.
@@ -72,6 +75,11 @@ export function InstallScreen() {
   }
 
   const install = offer === 'install';
+  const askLabel = !install
+    ? 'Turn on alerts'
+    : canOfferPush()
+      ? 'Install and turn on alerts'
+      : 'Install';
   return (
     <AppShell
       header={
@@ -87,11 +95,7 @@ export function InstallScreen() {
         </p>
         <div className="flex">
           <Button variant="primary" onClick={ask} disabled={asking}>
-            {!install
-              ? 'Turn on alerts'
-              : canOfferPush()
-                ? 'Install and turn on alerts'
-                : 'Install'}
+            {askLabel}
           </Button>
         </div>
         {skip}
