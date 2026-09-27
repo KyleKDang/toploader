@@ -52,6 +52,9 @@ alter table public.trades
 -- Only a completed Trade opens its Listings this way. A Trade that ended
 -- otherwise hands them back to their Traders, who may withdraw them, and a
 -- withdrawn Listing is nobody else's to see.
+--
+-- Which Trades count is not a second rule: the subquery reads `trades`
+-- under its own policy, so it finds only the caller's.
 create policy "A Trader can read the Listings of their Trade Records"
   on public.listings for select
   to authenticated
@@ -70,13 +73,15 @@ create policy "A Trader can read the Listings of their Trade Records"
 -- completes, active when it ends any other way. A Trade still proposed
 -- never committed them, so it has nothing to move, and they may be
 -- committed to another Trade entirely.
-create function public.release_trade_listings(
+--
+-- It runs as its caller, and its only callers are the RPCs below: no client
+-- role may execute it (deny_by_default).
+create function public.move_trade_listings(
   trade public.trades,
   status public.listing_status
 )
   returns void
   language plpgsql
-  security definer
   set search_path = ''
 as $$
 begin
@@ -93,12 +98,25 @@ begin
     for update;
 
   update public.listings
-    set status = release_trade_listings.status
+    set status = move_trade_listings.status
     where listings.id in (
       select trade_items.listing_id from public.trade_items
       where trade_items.trade_id = trade.id
     );
 end;
+$$;
+
+-- Whether the given Trader has tapped Complete on the Trade.
+create function public.has_tapped_complete(trade public.trades, trader uuid)
+  returns boolean
+  language sql
+  immutable
+  set search_path = ''
+as $$
+  select case
+    when trader = trade.proposer_id then trade.proposer_completed_at is not null
+    else trade.recipient_completed_at is not null
+  end
 $$;
 
 -- One Trader's Complete tap at the Meetup. The first records their side;
@@ -114,17 +132,26 @@ declare
   caller uuid := public.require_trader(verified => false);
   trade public.trades :=
     public.trade_for_participant(complete_trade.trade_id, caller);
+  completes boolean;
 begin
   if trade.status <> 'scheduled' then
     raise exception 'a Trade is completed only at its scheduled Meetup'
       using errcode = '22023';
   end if;
 
-  if (caller = trade.proposer_id and trade.proposer_completed_at is not null)
-    or (caller = trade.recipient_id and trade.recipient_completed_at is not null)
-  then
+  if public.has_tapped_complete(trade, caller) then
     raise exception 'this Trade is waiting on the other Trader to complete it'
       using errcode = '22023';
+  end if;
+
+  -- The Trade is locked, so the other side's tap cannot land between
+  -- reading it here and writing this one.
+  completes := public.has_tapped_complete(
+    trade, public.other_trader(trade, caller)
+  );
+
+  if completes then
+    perform public.move_trade_listings(trade, 'traded');
   end if;
 
   update public.trades
@@ -135,25 +162,18 @@ begin
         recipient_completed_at = case
           when caller = trades.recipient_id then now()
           else trades.recipient_completed_at
-        end
-    where trades.id = trade.id
-    returning * into trade;
-
-  if trade.proposer_completed_at is not null
-    and trade.recipient_completed_at is not null then
-    perform public.release_trade_listings(trade, 'traded');
-    update public.trades
-      set status = 'completed',
-          completed_at = now()
-      where trades.id = trade.id;
-  end if;
+        end,
+        status = case when completes then 'completed' else trades.status end,
+        completed_at = case when completes then now() end
+    where trades.id = trade.id;
 end;
 $$;
 
 -- Ends a Trade that has not completed, for either Trader. A proposal is
 -- the exception: the Trader it waits on declines it rather than cancelling
 -- it, since a cancellation counts against Reputation and turning down an
--- offer does not (#21), so only its proposer may withdraw it.
+-- offer does not (#21). So a proposal is withdrawn only by the Trader whose
+-- terms are standing: its proposer, or after a counter, whoever countered.
 create function public.cancel_trade(trade_id uuid)
   returns void
   language plpgsql
@@ -175,7 +195,7 @@ begin
       using errcode = '22023';
   end if;
 
-  perform public.release_trade_listings(trade, 'active');
+  perform public.move_trade_listings(trade, 'active');
 
   update public.trades
     set status = 'cancelled',
@@ -211,14 +231,12 @@ begin
       using errcode = '22023';
   end if;
 
-  if (caller = trade.proposer_id and trade.proposer_completed_at is not null)
-    or (caller = trade.recipient_id and trade.recipient_completed_at is not null)
-  then
+  if public.has_tapped_complete(trade, caller) then
     raise exception 'you have completed this Trade, so cannot report a no-show'
       using errcode = '22023';
   end if;
 
-  perform public.release_trade_listings(trade, 'active');
+  perform public.move_trade_listings(trade, 'active');
 
   update public.trades
     set status = 'no_show',

@@ -280,6 +280,20 @@ describe('Ending a Trade', () => {
           .update({ status: 'active' })
           .eq('id', mine),
         actor.client.from('listing_photos').delete().eq('listing_id', mine),
+        actor.client
+          .from('listing_photos')
+          .update({ position: 2 })
+          .eq('listing_id', mine),
+        actor.client.from('listing_photos').insert({
+          listing_id: mine,
+          position: 2,
+          path: `${actor.id}/${randomUUID()}.webp`,
+          thumbnail_path: `${actor.id}/${randomUUID()}.webp`,
+        }),
+        actor.client
+          .from('trade_items')
+          .update({ listing_id: mine })
+          .eq('trade_id', tradeId),
       ]);
 
       for (const write of writes) expect(write.error?.code).toBe('42501');
@@ -369,17 +383,34 @@ describe('Ending a Trade', () => {
     });
 
     it('ends an accepted Trade, a Meetup waiting on an answer or not', async () => {
-      const trade = await acceptedTrade();
+      for (const meetupWaiting of [false, true]) {
+        const trade = await acceptedTrade();
+        if (meetupWaiting) {
+          const { data: spots, error } = await trade.actor.client
+            .from('safe_spots')
+            .select('id');
+          if (error) throw error;
+          const proposed = await trade.actor.client.rpc('propose_meetup', {
+            trade_id: trade.tradeId,
+            meetup_at: hoursFromNow(24),
+            safe_spot_id: spots[0].id,
+          });
+          if (proposed.error) throw proposed.error;
+        }
 
-      const { error } = await cancel(trade.actor, trade.tradeId);
+        const { error } = await cancel(trade.counterparty, trade.tradeId);
 
-      expect(error).toBeNull();
-      expect(await readEnding(trade.actor.client, trade.tradeId)).toMatchObject(
-        { status: 'cancelled', responder_id: null },
-      );
-      expect(await listingStatus(trade.actor.client, trade.mine)).toBe(
-        'active',
-      );
+        expect(error).toBeNull();
+        expect(
+          await readEnding(trade.actor.client, trade.tradeId),
+        ).toMatchObject({ status: 'cancelled', responder_id: null });
+        expect(await listingStatus(trade.actor.client, trade.mine)).toBe(
+          'active',
+        );
+        expect(
+          await listingStatus(trade.counterparty.client, trade.theirs),
+        ).toBe('active');
+      }
     });
 
     it('works after one Complete tap, from either side', async () => {
@@ -411,6 +442,39 @@ describe('Ending a Trade', () => {
       expect(await listingStatus(trade.actor.client, trade.mine)).toBe(
         'active',
       );
+    });
+
+    it('withdraws a countered proposal by whoever countered, not the first proposer', async () => {
+      const trade = await proposedTrade();
+      const countered = await trade.counterparty.client.rpc('counter_trade', {
+        trade_id: trade.tradeId,
+        listing_ids: [trade.theirs],
+        requested_cash_cents: 500,
+      });
+      if (countered.error) throw countered.error;
+
+      const byFirstProposer = await cancel(trade.actor, trade.tradeId);
+      const byCounterer = await cancel(trade.counterparty, trade.tradeId);
+
+      expect(byFirstProposer.error?.code).toBe('22023');
+      expect(byCounterer.error).toBeNull();
+      expect(await readEnding(trade.actor.client, trade.tradeId)).toMatchObject(
+        { status: 'cancelled', cancelled_by: trade.counterparty.id },
+      );
+    });
+
+    it('hands the Listings back, so one withdrawn after is the other Trader’s to see no longer', async () => {
+      const trade = await scheduledTrade();
+      const cancelled = await cancel(trade.actor, trade.tradeId);
+      if (cancelled.error) throw cancelled.error;
+      const withdrawn = await trade.actor.client.rpc('withdraw_listing', {
+        listing_id: trade.mine,
+      });
+      if (withdrawn.error) throw withdrawn.error;
+
+      expect(
+        await listingStatus(trade.counterparty.client, trade.mine),
+      ).toBeNull();
     });
 
     it('is terminal', async () => {
@@ -546,6 +610,30 @@ describe('Ending a Trade', () => {
       expect(await readEnding(trade.actor.client, trade.tradeId)).toEqual(
         before,
       );
+    });
+
+    it('cannot call the helpers the endings are built from, even as a participant', async () => {
+      const { actor, tradeId } = await scheduledTrade();
+      const { data: trade, error } = await actor.client
+        .from('trades')
+        .select('*')
+        .eq('id', tradeId)
+        .single();
+      if (error) throw error;
+
+      // Moves any Trade's Listings, to any status: a client calling it could
+      // trade away or free up anyone's cards.
+      const move = await actor.client.rpc('move_trade_listings', {
+        trade,
+        status: 'active',
+      });
+      const tapped = await actor.client.rpc('has_tapped_complete', {
+        trade,
+        trader: actor.id,
+      });
+
+      expect(move.error?.code).toBe('42501');
+      expect(tapped.error?.code).toBe('42501');
     });
 
     it('is refused a Trade that does not exist the same way', async () => {
