@@ -19,7 +19,14 @@ import {
   type TradeListing,
   type TradeTerms,
 } from '../lib/queries';
-import { cashOf, isTradersTurn, otherTraderOf } from '../lib/trades';
+import {
+  cashOf,
+  isTradersTurn,
+  otherTraderOf,
+  sidesOf,
+  traderName,
+  type TradeTrader,
+} from '../lib/trades';
 import { useTabs } from '../lib/tabs';
 import {
   CashRow,
@@ -28,7 +35,7 @@ import {
   TradeListingRow,
   TradeSide,
   VerificationNeeded,
-} from './TradeTerms';
+} from './TradeSections';
 
 /*
  * Putting terms on the table: a new proposal from a Match, and a counter,
@@ -50,6 +57,7 @@ export function ProposeTradeScreen() {
   const { trader, traderId, other, listings, listingId } =
     proposeRoute.useLoaderData();
   const router = useRouter();
+  const navigate = useNavigate();
   const tabs = useTabs('trades');
 
   if (!other) {
@@ -85,6 +93,15 @@ export function ProposeTradeScreen() {
       }}
       submitLabel="Send proposal"
       send={(terms) => proposeTrade(other.id, terms)}
+      // The Trade replaces the picker, so going back from it does not
+      // reopen terms that are already sent.
+      onSent={(tradeId) =>
+        void navigate({
+          to: '/trades/$tradeId',
+          params: { tradeId },
+          replace: true,
+        })
+      }
     />
   );
 }
@@ -126,6 +143,9 @@ export function CounterTradeScreen() {
         await counterTrade(trade.id, terms);
         return trade.id;
       }}
+      // Back to the Trade the counter was opened from, rather than a second
+      // copy of it on top.
+      onSent={() => router.history.back()}
     />
   );
 }
@@ -137,17 +157,14 @@ type TermsPickerProps = {
   title: string;
   verified: boolean;
   traderId: string;
-  other: {
-    id: string;
-    display_name: string | null;
-    verified_at: string | null;
-    completed_trade_count: number;
-  };
+  other: TradeTrader;
   listings: TradeListing[];
   initial: TradeTerms;
   submitLabel: string;
   /** Sends the terms, and returns the id of the Trade they are on. */
   send: (terms: TradeTerms) => Promise<string>;
+  /** Leaves the picker once the terms are sent. */
+  onSent: (tradeId: string) => void;
 };
 
 function TermsPicker({
@@ -159,12 +176,12 @@ function TermsPicker({
   initial,
   submitLabel,
   send,
+  onSent,
 }: TermsPickerProps) {
   const router = useRouter();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const tabs = useTabs('trades');
-  const name = other.display_name ?? 'the other trader';
+  const name = traderName(other);
 
   // A Listing in the initial terms that is no longer active is not in
   // `listings`, so it is dropped here rather than sent to be refused.
@@ -188,8 +205,7 @@ function TermsPicker({
     return cents ? (cents / 100).toFixed(2) : '';
   });
 
-  const yours = listings.filter((listing) => listing.trader_id === traderId);
-  const theirs = listings.filter((listing) => listing.trader_id !== traderId);
+  const { give: yours, get: theirs } = sidesOf(listings, traderId);
   const pickedYours = yours.filter(({ id }) => picked.has(id));
   const pickedTheirs = theirs.filter(({ id }) => picked.has(id));
 
@@ -210,18 +226,12 @@ function TermsPicker({
         offeredCashCents: giveCash,
         requestedCashCents: getCash,
       }),
-    onSuccess: async (tradeId) => {
+    onSuccess: (tradeId) => {
       // Loaders read through ensureQueryData, which hands back whatever the
-      // cache holds, so the Trades are dropped rather than marked stale.
+      // cache holds, so the Trades are dropped rather than marked stale, and
+      // the screen left for reads them fresh.
       queryClient.removeQueries({ queryKey: TRADES_KEY });
-      await router.invalidate();
-      // Replacing the picker, so going back from the Trade does not reopen
-      // terms that are already sent.
-      void navigate({
-        to: '/trades/$tradeId',
-        params: { tradeId },
-        replace: true,
-      });
+      onSent(tradeId);
     },
   });
 
@@ -339,7 +349,7 @@ function TermsPicker({
               <p className="text-center text-sm leading-prose text-muted">
                 {eachSideGives
                   ? `${name} can accept, decline, or counter.`
-                  : 'Each side needs to give a card or cash.'}
+                  : 'Each side needs to give a listing or cash.'}
               </p>
             </>
           ) : (

@@ -599,12 +599,12 @@ async function fetchTrade(tradeId: string) {
   if (!data) return null;
 
   const { trade_items, ...trade } = data;
+  const listings = visibleListings(trade_items);
   return {
     ...trade,
-    listings: await withThumbnailUrls(
-      visibleListings(trade_items),
-      (listing) => listing,
-    ),
+    listings: await withThumbnailUrls(listings, (listing) => listing),
+    /** Listings on the table the Trader can no longer see, and so not above. */
+    hiddenListingCount: trade_items.length - listings.length,
   };
 }
 

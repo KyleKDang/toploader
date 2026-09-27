@@ -21,6 +21,17 @@ type TradeRoles = Pick<
   | 'recipient'
 >;
 
+/** A Trader as a Trade names them: who, and their Reputation basics. */
+export type TradeTrader = TradeDetail['proposer'];
+
+/**
+ * A Trader's name as a Trade screen says it. A profile with no display name
+ * cannot be traded with (onboarding sets one), so this is a fallback only.
+ */
+export function traderName(trader: Pick<TradeTrader, 'display_name'>) {
+  return trader.display_name ?? 'another trader';
+}
+
 /** The other Trader of a Trade. */
 export function otherTraderOf(trade: TradeRoles, traderId: string) {
   return trade.proposer_id === traderId ? trade.recipient : trade.proposer;

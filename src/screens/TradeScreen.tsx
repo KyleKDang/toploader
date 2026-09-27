@@ -23,6 +23,7 @@ import {
   otherTraderOf,
   sidesOf,
   STATUS_LABELS,
+  traderName,
 } from '../lib/trades';
 import { useTabs } from '../lib/tabs';
 import {
@@ -33,7 +34,7 @@ import {
   TradeListingRow,
   TradeSide,
   VerificationNeeded,
-} from './TradeTerms';
+} from './TradeSections';
 
 /*
  * One Trade, the page every Trade notification links to: the terms from the
@@ -56,7 +57,10 @@ const route = getRouteApi('/trades/$tradeId');
 export function TradeScreen() {
   const { traderId, trader, tradeId } = route.useLoaderData();
   const router = useRouter();
-  const trade = useQuery(tradeQuery(tradeId)).data;
+  const trade = useQuery({
+    ...tradeQuery(tradeId ?? ''),
+    enabled: tradeId !== null,
+  }).data;
   const tabs = useTabs('trades');
 
   if (!trade) {
@@ -104,24 +108,28 @@ function Trade({
   verified: boolean;
 }) {
   const navigate = useNavigate();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [confirmingDecline, setConfirmingDecline] = useState(false);
 
   const other = otherTraderOf(trade, traderId);
-  const name = other.display_name ?? 'the other trader';
+  const name = traderName(other);
   const sides = sidesOf(trade.listings, traderId);
   const cash = cashOf(trade, traderId);
   const answering = isTradersTurn(trade, traderId);
 
   async function refresh() {
-    // An answer moves the Trade and, on accept, every Listing on it, so
-    // both are dropped from the cache rather than marked stale: a loader
-    // reads through ensureQueryData, which hands back whatever is cached.
-    queryClient.removeQueries({ queryKey: TRADES_KEY });
+    // An answer moves the Trade and, on accept, every Listing on it. What
+    // other screens read is dropped from the cache rather than marked stale,
+    // since a loader reads through ensureQueryData, which hands back whatever
+    // is cached. This Trade is refetched in place instead: dropping the
+    // query this screen is watching would draw it as not available until
+    // the refetch lands.
+    queryClient.removeQueries({ queryKey: [...TRADES_KEY, 'list'] });
     queryClient.removeQueries({ queryKey: ['listing'] });
     queryClient.removeQueries({ queryKey: ['listings'] });
-    await router.invalidate();
+    await queryClient.invalidateQueries({
+      queryKey: tradeQuery(trade.id).queryKey,
+    });
   }
 
   const accept = useMutation({
@@ -172,6 +180,16 @@ function Trade({
         {cash.get !== null ? <CashRow from={name} cents={cash.get} /> : null}
       </TradeSide>
 
+      {trade.hiddenListingCount > 0 ? (
+        // Another Trader's Listing goes out of sight once it is taken down or
+        // traded. It is still on the table, so the terms above are short of
+        // it, and the Trader is told rather than shown less without a word.
+        <p className="px-4 pt-3 text-sm leading-prose text-ink">
+          {trade.hiddenListingCount === 1
+            ? '1 listing on this trade is no longer available, so it is not shown or counted.'
+            : `${trade.hiddenListingCount} listings on this trade are no longer available, so they are not shown or counted.`}
+        </p>
+      ) : null}
       <TradeBalance
         give={{ listings: sides.give, cashCents: cash.give }}
         get={{ listings: sides.get, cashCents: cash.get }}
@@ -254,9 +272,9 @@ function statusSentence(trade: TradeDetail, traderId: string): string {
     case 'proposed':
       return isTradersTurn(trade, traderId)
         ? 'Waiting on your answer.'
-        : `Waiting on ${otherTraderOf(trade, traderId).display_name ?? 'the other trader'} to answer.`;
+        : `Waiting on ${traderName(otherTraderOf(trade, traderId))} to answer.`;
     case 'accepted':
-      return 'Next, you agree a time and a safe spot to meet at.';
+      return 'You both agreed to these terms.';
     case 'declined':
       return 'This trade is over.';
     default:
