@@ -56,7 +56,8 @@ import { startCaptureServer, type CaptureServer } from './capture-server.ts';
 const APP_URL = 'https://toploaderapp.com';
 const REPLY_TO = 'hello@toploaderapp.com';
 const RESEND_API_KEY = 're_test_key';
-const MINUTE = 60 * 1000;
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 // Test City's, from supabase/seed.sql.
 const TEST_CITY_TIME_ZONE = 'America/New_York';
@@ -263,6 +264,16 @@ describe('The notifier', { timeout: 30_000 }, () => {
     };
   }
 
+  /** How `queue` renders a row of each kind: title, body, the app path. */
+  const RENDERED = {
+    new_proposal: [
+      'New trade proposal',
+      'Ash proposed a trade.',
+      '/trades/example',
+    ],
+    new_match: ['New match', 'Ash wants the Examplemon you listed.', '/'],
+  } as const;
+
   /**
    * A notification written straight into the outbox the way its producer
    * writes one, for a test about what the notifier does with a row -
@@ -270,14 +281,11 @@ describe('The notifier', { timeout: 30_000 }, () => {
    */
   async function queue(
     trader: SeededTrader,
-    kind: 'new_proposal' | 'new_match',
+    kind: keyof typeof RENDERED,
     { createdAt = new Date().toISOString() }: { createdAt?: string } = {},
   ) {
     const topic = `test:${randomUUID()}`;
-    const [title, body, url] =
-      kind === 'new_proposal'
-        ? ['New trade proposal', 'Ash proposed a trade.', '/trades/example']
-        : ['New match', 'Ash wants the Examplemon you listed.', '/'];
+    const [title, body, url] = RENDERED[kind];
     await arrange(
       (sql) =>
         sql`insert into public.notifications
@@ -299,26 +307,32 @@ describe('The notifier', { timeout: 30_000 }, () => {
     createdAt: string,
   ) {
     const prefix = `test:${randomUUID()}`;
+    const [title, body, url] = RENDERED.new_match;
     await arrange(
       (sql) =>
         sql`insert into public.notifications
               (trader_id, kind, topic, title, body, url, created_at)
             select ${trader.id}, 'new_match', ${prefix} || ':' || g,
-              'New match', 'Ash wants the Examplemon you listed.', '/',
-              ${createdAt}
+              ${title}, ${body}, ${url}, ${createdAt}
             from generate_series(1, ${count}::integer) g`,
     );
     return prefix;
   }
 
-  /** The outbox rows whose topic starts with the given prefix. */
-  async function outboxLike(prefix: string) {
-    const { data, error } = await service
-      .from('notifications')
-      .select('sent_at, attempts')
-      .like('topic', `${prefix}:%`);
-    if (error) throw error;
-    return data;
+  /**
+   * How the rows `queueMatches` wrote under one prefix stand, counted: more
+   * of them than one read of the API returns.
+   */
+  async function outboxByTopicPrefix(prefix: string) {
+    const [counts] = await arrange(
+      (sql) => sql<{ rows: number; unsent: number; attempted: number }[]>`
+        select count(*)::integer as rows,
+            count(*) filter (where sent_at is null)::integer as unsent,
+            count(*) filter (where attempts > 0)::integer as attempted
+          from public.notifications
+          where topic like ${`${prefix}:%`}`,
+    );
+    return counts;
   }
 
   /**
@@ -1017,29 +1031,25 @@ describe('The notifier', { timeout: 30_000 }, () => {
   });
 
   it('drains a backlog larger than one run handles over the runs after it', async () => {
-    // A run at a batch of one makes at most a hundred calls, so this is
-    // more than one run reaches.
+    // A run at a batch of one makes at most a hundred calls, each settling
+    // at most fifty silent rows, so this is more than one run reaches. Rows
+    // left unsent ahead of these on a long-lived stack only mean more runs.
     const trader = await seedTrader('Unsubscribed');
-    const backlog = await queueMatches(trader, 250, headOfTheDay());
+    const backlog = await queueMatches(trader, 6_000, headOfTheDay());
 
     await deliver({ batch: 1 });
 
-    const afterOne = await outboxLike(backlog);
-    expect(afterOne.some((row) => row.sent_at === null)).toBe(true);
-    expect(afterOne.some((row) => row.sent_at !== null)).toBe(true);
+    expect((await outboxByTopicPrefix(backlog)).unsent).toBeGreaterThan(0);
 
     for (let runs = 0; runs < 5; runs += 1) {
       await deliver({ batch: 1 });
-      if ((await outboxLike(backlog)).every((row) => row.sent_at !== null)) {
-        break;
-      }
+      if ((await outboxByTopicPrefix(backlog)).unsent === 0) break;
     }
-    const drained = await outboxLike(backlog);
-    expect(drained).toHaveLength(250);
-    for (const row of drained) {
-      expect(row.sent_at).not.toBeNull();
-      expect(row.attempts).toBe(0);
-    }
+    expect(await outboxByTopicPrefix(backlog)).toEqual({
+      rows: 6_000,
+      unsent: 0,
+      attempted: 0,
+    });
   });
 
   it('delivers a notification queued behind several batches of silent ones, in one run', async () => {
@@ -1049,17 +1059,19 @@ describe('The notifier', { timeout: 30_000 }, () => {
     ]);
     const browser = await subscribe(proposedTo);
     const head = headOfTheDay();
-    const silentRows = await queueMatches(silent, 10, head);
+    // A call at a batch of two settles at most a hundred silent rows.
+    const silentRows = await queueMatches(silent, 300, head);
     const topic = await queue(proposedTo, 'new_proposal', {
-      createdAt: new Date(Date.parse(head) + 1000).toISOString(),
+      createdAt: new Date(Date.parse(head) + SECOND).toISOString(),
     });
 
     await deliver({ batch: 2 });
 
-    for (const row of await outboxLike(silentRows)) {
-      expect(row.sent_at).not.toBeNull();
-      expect(row.attempts).toBe(0);
-    }
+    expect(await outboxByTopicPrefix(silentRows)).toEqual({
+      rows: 300,
+      unsent: 0,
+      attempted: 0,
+    });
     expect(pushesTo(browser, topic)).toHaveLength(1);
     expect(emailsTo(proposedTo)).toHaveLength(1);
     const [row] = await outbox(topic);

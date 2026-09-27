@@ -7,12 +7,21 @@
 -- timeout, every call was canceled and rolled back, nothing was settled or
 -- claimed, and the outbox never drained again.
 --
--- Now a call takes the oldest `batch` rows that are its to take, in the
--- order notifications_pending_idx holds them, and does both jobs on those
--- alone: a silent row is marked sent there and then, and every other row is
--- claimed and handed out. However large the backlog, a call reads and
--- writes at most `batch` rows, and a backlog larger than one call drains
--- over the calls after it.
+-- Now a call takes the oldest rows that are its to take, in the order
+-- notifications_pending_idx holds them, fifty batches' worth at most, and
+-- does both jobs on those alone: every silent row among them is marked sent
+-- there and then, and the first `batch` of the rest are claimed and handed
+-- out. However large the backlog, a call reads and writes at most fifty
+-- batches of rows, and a backlog larger than one call drains over the calls
+-- after it.
+--
+-- Fifty, because the two jobs cost different things. A claimed row is a
+-- network send or two, which is what `batch` is sized for; a silent row is
+-- one write, a few microseconds. And silent rows come in floods: a Listing
+-- in a busy City matches every Want for the card there, and most of those
+-- Traders have no browser subscribed. At one batch a call, a run of the
+-- notifier would settle two thousand of them; at fifty, a hundred thousand,
+-- in a few milliseconds a call.
 --
 -- A call can therefore settle a batch of silent rows and have nothing to
 -- hand out while deliverable rows wait behind them, so it says how many it
@@ -56,15 +65,19 @@ create function public.claim_notifications(batch integer default 20)
   set search_path = ''
 as $$
   with taken as (
-    select n.id, n.trader_id, n.channels
+    select n.id, n.created_at,
+        n.channels = '{push}' and not exists (
+          select 1 from public.push_subscriptions subscription
+          where subscription.trader_id = n.trader_id
+        ) as silent
       from public.notifications n
       where n.sent_at is null
         and n.created_at > now() - interval '1 day'
         and (n.claimed_at is null
           or n.claimed_at < now() - interval '5 minutes')
       order by n.created_at
-      limit batch
-      for update skip locked
+      limit batch * 50
+      for update of n skip locked
   ),
   settled as (
     update public.notifications n
@@ -72,20 +85,20 @@ as $$
           sent_at = now()
       from taken
       where n.id = taken.id
-        and taken.channels = '{push}'
-        and not exists (
-          select 1 from public.push_subscriptions subscription
-          where subscription.trader_id = taken.trader_id
-        )
+        and taken.silent
       returning n.id
   ),
   claimed as (
     update public.notifications n
       set claimed_at = now(),
           attempts = n.attempts + 1
-      from taken, auth.users account
-      where n.id = taken.id
-        and not exists (select 1 from settled where settled.id = taken.id)
+      from (
+        select taken.id from taken
+          where not taken.silent
+          order by taken.created_at
+          limit batch
+      ) deliverable, auth.users account
+      where n.id = deliverable.id
         and account.id = n.trader_id
       returning
         n.id, n.trader_id, n.kind, n.channels, n.topic, n.title, n.body,

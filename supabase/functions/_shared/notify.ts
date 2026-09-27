@@ -84,9 +84,9 @@ const MAX_CLAIMS = 100;
 type Channel = 'push' | 'email';
 
 /**
- * What one claim_notifications call did: the silent rows it marked sent,
- * a push-only row for a Trader with no browser subscribed, and the rows it
- * claimed for this run to send.
+ * What one claim_notifications call did: how many silent rows it marked
+ * sent (push-only, for a Trader with no browser subscribed), and the rows
+ * it claimed for this run to send.
  */
 interface Claim {
   settled: number;
