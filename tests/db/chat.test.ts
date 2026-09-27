@@ -27,6 +27,12 @@ async function send(by: SeededTrader, tradeId: string, body: string) {
   return by.client.rpc('send_message', { trade_id: tradeId, body });
 }
 
+/** Sends a message a test needs sent, failing loudly where it is refused. */
+async function say(by: SeededTrader, tradeId: string, body: string) {
+  const { error } = await send(by, tradeId, body);
+  if (error) throw error;
+}
+
 /** A Trade's messages as one Trader reads them, oldest first. */
 async function readMessages(client: Client, tradeId: string) {
   const { data, error } = await client
@@ -178,11 +184,11 @@ describe('Trade chat', { timeout: 30_000 }, () => {
     ]);
 
     try {
-      await send(actor, tradeId, 'On my way.');
+      await say(actor, tradeId, 'On my way.');
       // Realtime delivers changes to a feed in the order they committed, so
       // once this later message reaches the foreign Trader, the earlier one
       // would have too, had it been going to.
-      await send(actor, foreignTradeId, 'Barrier');
+      await say(actor, foreignTradeId, 'Barrier');
 
       await counterpartyFeed.until(1);
       await foreignFeed.until(1);
@@ -199,7 +205,7 @@ describe('Trade chat', { timeout: 30_000 }, () => {
 
   it('is closed to a Trader outside the Trade, who can neither read nor send', async () => {
     const { actor, counterparty, foreign, tradeId } = await seedTrade();
-    await send(actor, tradeId, 'Meet Saturday?');
+    await say(actor, tradeId, 'Meet Saturday?');
 
     const foreignSend = await send(foreign, tradeId, 'Hi, I have one too');
     const signedOutSend = await send(
@@ -238,16 +244,18 @@ describe('Trade chat', { timeout: 30_000 }, () => {
     expect(await readMessages(actor.client, tradeId)).toEqual([]);
   });
 
-  it('refuses a blank message, or one longer than 2,000 characters', async () => {
+  it('refuses a message of only whitespace, or one longer than 2,000 characters', async () => {
     const { actor, tradeId } = await seedTrade();
 
     const empty = await send(actor, tradeId, '');
     const blank = await send(actor, tradeId, ' \n\t ');
+    const unicodeBlank = await send(actor, tradeId, '\u00a0\u3000');
     const tooLong = await send(actor, tradeId, 'a'.repeat(2_001));
     const longest = await send(actor, tradeId, 'a'.repeat(2_000));
 
     expect(empty.error?.code).toBe('22023');
     expect(blank.error?.code).toBe('22023');
+    expect(unicodeBlank.error?.code).toBe('22023');
     expect(tooLong.error?.code).toBe('22023');
     expect(longest.error).toBeNull();
     expect(await readMessages(actor.client, tradeId)).toHaveLength(1);
@@ -255,7 +263,7 @@ describe('Trade chat', { timeout: 30_000 }, () => {
 
   it('closes to new messages once the Trade has ended, and keeps what was said', async () => {
     const { actor, counterparty, tradeId } = await seedTrade();
-    await send(actor, tradeId, 'Any chance you add cash?');
+    await say(actor, tradeId, 'Any chance you add cash?');
     const { error } = await counterparty.client.rpc('decline_trade', {
       trade_id: tradeId,
     });
@@ -271,7 +279,7 @@ describe('Trade chat', { timeout: 30_000 }, () => {
 
   it('cannot be edited or deleted by anyone', async () => {
     const { actor, counterparty, tradeId } = await seedTrade();
-    await send(actor, tradeId, 'As listed.');
+    await say(actor, tradeId, 'As listed.');
 
     const edit = await counterparty.client
       .from('messages')

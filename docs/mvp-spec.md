@@ -139,6 +139,8 @@ Scheduling reuses it, settled on [#23](https://github.com/KyleKDang/toploader/is
 `scheduled_at` is when the Meetup was confirmed, like `accepted_at`, and a reminder is pushed two hours before `meetup_at` unless it was confirmed inside those two hours.
 A City carries its time zone, so a Meetup's notifications tell its time as the clocks at its Safe Spot read it.
 Cash is two nullable columns on the Trade, at most one of them set, rather than a field on an item, because cash is a side's figure and not a Listing; an item's side is its Listing's owner, since a Listing never changes hands, and the Listing itself is the snapshot, since a traded Listing is frozen.
+Settled on [#24](https://github.com/KyleKDang/toploader/issues/24): a message is 1 to 2,000 characters and never edited or deleted, and chat is open only while its Trade is: once the Trade is declined, completed, cancelled, or a no-show, what was said stays readable and nothing more can be sent, because an ended Trade is frozen whole.
+A message is pushed under the Trade's chat as its own topic rather than the Trade's, so it never replaces an unread proposal or accept on the screen.
 Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks`.
 
 RLS posture: every table deny-by-default.
