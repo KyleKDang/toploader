@@ -637,11 +637,10 @@ describe('The notifier', { timeout: 30_000 }, () => {
   });
 
   /**
-   * A proposal the recipient has accepted and a Meetup the proposer has put
-   * forward at the first Safe Spot of their City, the given number of hours
-   * out, with everything queued so far already delivered.
+   * A proposal the recipient has accepted, with everything queued so far
+   * already delivered, and the first two Safe Spots of the Traders' City.
    */
-  async function meetupPutForward(hoursAway: number) {
+  async function acceptedTrade() {
     const trade = await proposedTrade();
     const { proposer, recipient, tradeId } = trade;
     const accepted = await recipient.client.rpc('accept_trade', {
@@ -653,22 +652,56 @@ describe('The notifier', { timeout: 30_000 }, () => {
       .select('id, name')
       .order('name');
     if (error) throw error;
-    const [spot] = spots;
-    if (!spot) throw new Error('No Safe Spot seeded in Test City');
+    const [spot, otherSpot] = spots;
+    if (!spot || !otherSpot) {
+      throw new Error('Fewer than two Safe Spots seeded in Test City');
+    }
+    await deliver();
+    pushService.reset();
+    resend.reset();
+    return { ...trade, spot, otherSpot };
+  }
+
+  /**
+   * Puts a Meetup forward on a Trade as the given Trader, at the Safe Spot,
+   * the given number of hours out, and says when it is.
+   */
+  async function putMeetupForward(
+    trader: SeededTrader,
+    tradeId: string,
+    spot: { id: string },
+    hoursAway: number,
+  ) {
     // On the minute, so the time told reads exactly as it was put forward.
     const meetupAt = new Date(
       Math.ceil((Date.now() + hoursAway * HOUR) / MINUTE) * MINUTE,
     );
-    const proposed = await proposer.client.rpc('propose_meetup', {
+    const { error } = await trader.client.rpc('propose_meetup', {
       trade_id: tradeId,
       meetup_at: meetupAt.toISOString(),
       safe_spot_id: spot.id,
     });
-    if (proposed.error) throw proposed.error;
+    if (error) throw error;
+    return meetupAt;
+  }
+
+  /**
+   * An accepted Trade and a Meetup the proposer has put forward at the
+   * first Safe Spot of their City, the given number of hours out, with
+   * everything queued so far already delivered.
+   */
+  async function meetupPutForward(hoursAway: number) {
+    const trade = await acceptedTrade();
+    const meetupAt = await putMeetupForward(
+      trade.proposer,
+      trade.tradeId,
+      trade.spot,
+      hoursAway,
+    );
     await deliver();
     pushService.reset();
     resend.reset();
-    return { ...trade, spotName: spot.name, meetupAt };
+    return { ...trade, spotName: trade.spot.name, meetupAt };
   }
 
   /**
@@ -784,18 +817,104 @@ describe('The notifier', { timeout: 30_000 }, () => {
     ]);
   });
 
-  it('tells nobody about a Meetup only put forward', async () => {
-    // The matrix has a row for a confirmed Meetup and none for one put
-    // forward; the other Trader finds it on the Trade.
-    const { proposer, recipient, proposerBrowser, recipientBrowser, topic } =
-      await meetupPutForward(24);
+  it('pushes and emails a Meetup put forward to the other Trader alone', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+      spot,
+    } = await acceptedTrade();
 
+    const meetupAt = await putMeetupForward(proposer, tradeId, spot, 24);
     await deliver();
 
+    const url = `/trades/${tradeId}`;
+    const body = `Proposer proposed meeting at ${spot.name} on ${testCityTime(meetupAt, { withDay: true })}.`;
+    expect(pushesTo(recipientBrowser, topic)).toEqual([
+      { title: 'Meetup proposed', body, url, tag: topic },
+    ]);
+    expect(emailsTo(recipient)).toEqual([
+      {
+        from: 'Toploader <noreply@mail.toploaderapp.com>',
+        to: [recipient.email],
+        reply_to: REPLY_TO,
+        subject: 'Meetup proposed',
+        text: `${body}\n\n${APP_URL}${url}\n`,
+      },
+    ]);
     expect(pushesTo(proposerBrowser, topic)).toEqual([]);
-    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
     expect(emailsTo(proposer)).toEqual([]);
+  });
+
+  it('tells the Trader it now waits on when a different Meetup is put forward', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+      otherSpot,
+    } = await meetupPutForward(24);
+
+    const meetupAt = await putMeetupForward(recipient, tradeId, otherSpot, 48);
+    await deliver();
+
+    expect(pushesTo(proposerBrowser, topic)).toEqual([
+      {
+        title: 'Meetup proposed',
+        body: `Recipient proposed meeting at ${otherSpot.name} on ${testCityTime(meetupAt, { withDay: true })}.`,
+        url: `/trades/${tradeId}`,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(proposer).map((email) => email.subject)).toEqual([
+      'Meetup proposed',
+    ]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
     expect(emailsTo(recipient)).toEqual([]);
+  });
+
+  it('tells the other Trader again when a lapsed Meetup is put forward anew', async () => {
+    // The Trade still waits on the same Trader, so who is asked does not
+    // change; only the Meetup does.
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+      spot,
+    } = await meetupPutForward(24);
+    await arrange(
+      (sql) =>
+        sql`update public.trades set meetup_at = now() - interval '1 hour'
+              where id = ${tradeId}`,
+    );
+    await deliver();
+    pushService.reset();
+    resend.reset();
+
+    const meetupAt = await putMeetupForward(proposer, tradeId, spot, 48);
+    await deliver();
+
+    expect(pushesTo(recipientBrowser, topic)).toEqual([
+      {
+        title: 'Meetup proposed',
+        body: `Proposer proposed meeting at ${spot.name} on ${testCityTime(meetupAt, { withDay: true })}.`,
+        url: `/trades/${tradeId}`,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(recipient).map((email) => email.subject)).toEqual([
+      'Meetup proposed',
+    ]);
+    expect(pushesTo(proposerBrowser, topic)).toEqual([]);
+    expect(emailsTo(proposer)).toEqual([]);
   });
 
   it('reminds both Traders by push alone before the Meetup, once', async () => {
