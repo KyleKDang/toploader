@@ -475,9 +475,19 @@ describe('Meetups', () => {
       body_format: 'Anything at all',
       time_format: 'HH',
     });
+    // The same to one Trader, whichever it is handed.
+    const queueOne = await actor.client.rpc('queue_meetup_notification', {
+      trade,
+      recipient: actor.id,
+      kind: 'meetup_proposed',
+      title: 'Meetup proposed',
+      body_format: 'Anything at all',
+      time_format: 'HH',
+    });
 
     expect(sweep.error?.code).toBe('42501');
     expect(signedOut.error?.code).toBe('42501');
     expect(queue.error?.code).toBe('42501');
+    expect(queueOne.error?.code).toBe('42501');
   });
 });

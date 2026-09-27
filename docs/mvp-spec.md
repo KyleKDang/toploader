@@ -173,6 +173,7 @@ Every policy and RPC ships with a test proving what a foreign user cannot do.
 | New Match | yes | no |
 | New Trade proposal | yes | yes |
 | Proposal accepted / countered | yes | yes |
+| Meetup proposed | yes | yes |
 | Meetup confirmed + reminder | yes | yes (confirm only) |
 | Chat message | yes | no |
 | Verification result | yes | yes |

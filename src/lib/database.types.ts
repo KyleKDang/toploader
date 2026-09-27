@@ -967,6 +967,17 @@ export type Database = {
         Args: { meetup_at: string; safe_spot_id: string; trade_id: string }
         Returns: undefined
       }
+      queue_meetup_notification: {
+        Args: {
+          body_format: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          recipient: string
+          time_format: string
+          title: string
+          trade: Database["public"]["Tables"]["trades"]["Row"]
+        }
+        Returns: undefined
+      }
       queue_meetup_notifications: {
         Args: {
           body_format: string
@@ -1082,6 +1093,7 @@ export type Database = {
         | "new_proposal"
         | "proposal_accepted"
         | "proposal_countered"
+        | "meetup_proposed"
         | "meetup_confirmed"
         | "meetup_reminder"
         | "chat_message"
@@ -1233,6 +1245,7 @@ export const Constants = {
         "new_proposal",
         "proposal_accepted",
         "proposal_countered",
+        "meetup_proposed",
         "meetup_confirmed",
         "meetup_reminder",
         "chat_message",
