@@ -46,3 +46,14 @@ The Deno file around it holds only secrets, the caller check, and Sentry, and `d
   A browser collapses a repeated push by its topic, so an email is the one thing a Trader could see twice, and only when Resend accepted it and the database was unreachable in the same instant.
 - The wake crosses Docker's edge and has no automated seam; it is verified by hand when the function is first deployed, and the sweep is what makes a misconfigured wake a latency problem rather than a lost one.
 - Two new extensions on the hosted database, `pg_net` and `pg_cron`, and one edge function CI deploys on every merge to `main`.
+
+## Amendment, 2026-09-27 (ticket #72)
+
+A new Match alerts only the Trader on the other side of the change that made the pair hold.
+A Listing going active alerts the Traders who want it, a Want being added alerts the Traders whose Listings satisfy it, and a Trader changing City alerts the Traders they now match; the Trader whose Listing, Want, or move it was gets no alert for it.
+The first producer wrote a row for both Traders of every pair, which is right for one pair and wrong for a City.
+Measured on a local stack holding 1,600 active Listings of one Card in one City, one Want queued 3,200 notifications, 1,600 of them to the Trader who had just added it, each under its own topic, so no browser would have collapsed them.
+That Trader is in the app, looking at the Matches the Want made, so their half is noise, and dropping it halves what the change writes.
+The other half is kept whole: each of those Traders is told about a pair of their own, which is the alert the notification matrix promises.
+The side is decided by whose row changed, not by who is signed in, so a Listing put back to active by a cancelled Trade alerts the Traders who want it and not its lister, whoever cancelled.
+An alert is still per pair: a Trader with three Listings of the wanted Card is told three times, and a pair still notifies once, because `match_events` keeps the first time each pair held.
