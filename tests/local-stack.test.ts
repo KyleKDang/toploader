@@ -28,7 +28,7 @@ const cityNotReadable = {
     message: 'permission denied for table cities',
   },
 };
-const accepted = { status: 200, body: [{ id: 'a-city' }] };
+const acceptedRead = { status: 200, body: [{ id: 'a-city' }] };
 
 type Reply = { status: number; body: unknown };
 
@@ -62,7 +62,7 @@ describe('waiting for PostgREST to accept a fresh session', () => {
     const { client, reads } = clientAgainstFakePostgrest([
       jwtIssuedAtFuture,
       jwtIssuedAtFuture,
-      accepted,
+      acceptedRead,
     ]);
 
     await waitForSignedInReads(client, { retry: isJwtIssuedAtFuture });
@@ -74,7 +74,7 @@ describe('waiting for PostgREST to accept a fresh session', () => {
   it('throws any other error at once, without retrying', async () => {
     const { client, reads } = clientAgainstFakePostgrest([
       cityNotReadable,
-      accepted,
+      acceptedRead,
     ]);
 
     await expect(
@@ -96,11 +96,11 @@ describe('waiting for PostgREST to accept a fresh session', () => {
     expect(reads.length).toBeGreaterThan(1);
   });
 
-  it('retries every error when told to, as the seam-1 startup wait is', async () => {
+  it('retries every error when told to, as the seam-1 startup wait asks', async () => {
     const { client, reads } = clientAgainstFakePostgrest([
       cityNotReadable,
       jwtIssuedAtFuture,
-      accepted,
+      acceptedRead,
     ]);
 
     await waitForSignedInReads(client, { retry: () => true });

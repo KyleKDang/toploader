@@ -215,6 +215,9 @@ What makes a good test here:
 - A scheduled job that runs inside the database, a `pg_cron` job such as the Meetup reminder sweep, is invoked at seam 2 the way `pg_cron` invokes it: its registered command, run as the database's owner through the superuser connection.
   Added on [#23](https://github.com/KyleKDang/toploader/issues/23): no client role may call such a job, so there is no Trader's seam to reach it through, and running the command the job is registered with proves the schedule is wired as well as what it does.
   Its effects are still asserted at the seam, on the outbound pushes and the outbox.
+- The test harness's wait for the stack to accept a fresh session (`tests/local-stack.ts`) is tested with PostgREST faked, through the `fetch` supabase-js is handed.
+  Added on [#71](https://github.com/KyleKDang/toploader/issues/71): the refusal it waits out, PGRST303 "JWT issued at future", came once in forty CI runs and never locally, so the real stack cannot serve it on demand.
+  The fake stands in for the harness's view of the stack, not for anything the app does, and no seam-1, seam-2 or seam-3 test uses it.
 - Test names use the domain vocabulary of [CONTEXT.md](../CONTEXT.md) so the suite reads as this spec.
 
 ## Build sequence

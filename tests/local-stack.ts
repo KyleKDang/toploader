@@ -32,7 +32,7 @@ export function readLocalStackStatus(): LocalStackStatus {
   }
 }
 
-/*
+/**
  * PostgREST sometimes refuses a session Auth has only just issued, with
  * PGRST303 "JWT issued at future", because its clock trails Auth's. It does
  * for about a second after the stack (re)starts, as `supabase db reset` does,
