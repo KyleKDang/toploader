@@ -323,30 +323,65 @@ describe('Meetups', () => {
     });
 
     it('is only possible for a time still to come', async () => {
-      const { actor, counterparty, tradeId, spot } = await acceptedTrade();
+      const { actor, tradeId, spot } = await acceptedTrade();
 
-      const past = await proposeMeetup(actor, tradeId, hoursFromNow(-1), spot);
-      expect(past.error?.code).toBe('22023');
-
-      const proposed = await proposeMeetup(
+      const { error } = await proposeMeetup(
         actor,
         tradeId,
-        hoursFromNow(24),
+        hoursFromNow(-1),
         spot,
       );
+
+      expect(error?.code).toBe('22023');
+      expect(await readMeetup(actor.client, tradeId)).toMatchObject({
+        meetup_at: null,
+      });
+    });
+  });
+
+  describe('a Meetup whose time passed unconfirmed', () => {
+    /** The actor put one forward, and its time came and went. */
+    async function lapsedMeetup() {
+      const trade = await acceptedTrade();
+      const proposed = await proposeMeetup(
+        trade.actor,
+        trade.tradeId,
+        hoursFromNow(24),
+        trade.spot,
+      );
       if (proposed.error) throw proposed.error;
-      // Time passes with the Meetup unconfirmed.
       await arrange(
         (sql) =>
           sql`update public.trades set meetup_at = now() - interval '1 minute'
-                where id = ${tradeId}`,
+                where id = ${trade.tradeId}`,
       );
+      return trade;
+    }
 
-      const late = await confirmMeetup(counterparty, tradeId);
+    it('can no longer be confirmed', async () => {
+      const { actor, counterparty, tradeId } = await lapsedMeetup();
 
-      expect(late.error?.code).toBe('22023');
+      const { error } = await confirmMeetup(counterparty, tradeId);
+
+      expect(error?.code).toBe('22023');
       expect(await readMeetup(actor.client, tradeId)).toMatchObject({
         status: 'accepted',
+        responder_id: counterparty.id,
+      });
+    });
+
+    it('may be replaced by the Trader who put it forward', async () => {
+      const { actor, counterparty, tradeId, otherSpot } = await lapsedMeetup();
+      const later = hoursFromNow(24);
+
+      const { error } = await proposeMeetup(actor, tradeId, later, otherSpot);
+
+      expect(error).toBeNull();
+      expect(await readMeetup(actor.client, tradeId)).toMatchObject({
+        status: 'accepted',
+        responder_id: counterparty.id,
+        meetup_at: later,
+        safe_spot_id: otherSpot,
       });
     });
   });
@@ -370,13 +405,19 @@ describe('Meetups', () => {
       if (proposed.error) throw proposed.error;
 
       const foreignConfirm = await confirmMeetup(foreign, tradeId);
-      const signedOut = await anonClient().rpc('confirm_meetup', {
+      const signedOutPut = await anonClient().rpc('propose_meetup', {
+        trade_id: tradeId,
+        meetup_at: hoursFromNow(48),
+        safe_spot_id: spot,
+      });
+      const signedOutConfirm = await anonClient().rpc('confirm_meetup', {
         trade_id: tradeId,
       });
 
       expect(foreignPut.error?.code).toBe('42501');
       expect(foreignConfirm.error?.code).toBe('42501');
-      expect(signedOut.error?.code).toBe('42501');
+      expect(signedOutPut.error?.code).toBe('42501');
+      expect(signedOutConfirm.error?.code).toBe('42501');
       expect(await readMeetup(foreign.client, tradeId)).toBeNull();
       expect(await readMeetup(actor.client, tradeId)).toMatchObject({
         status: 'accepted',
@@ -415,12 +456,28 @@ describe('Meetups', () => {
    * Trader at once, so no client role may run it or its steps.
    */
   it('keeps the reminder sweep and its steps from every client', async () => {
-    const { actor } = await acceptedTrade();
+    const { actor, tradeId } = await acceptedTrade();
+    const { data: trade, error } = await actor.client
+      .from('trades')
+      .select('*')
+      .eq('id', tradeId)
+      .single();
+    if (error) throw error;
 
     const sweep = await actor.client.rpc('queue_meetup_reminders');
     const signedOut = await anonClient().rpc('queue_meetup_reminders');
+    // Queues a notification to both Traders of whatever Trade it is handed,
+    // with whatever text: a client calling it could message anyone.
+    const queue = await actor.client.rpc('queue_meetup_notifications', {
+      trade,
+      kind: 'meetup_confirmed',
+      title: 'Meetup confirmed',
+      body_format: 'Anything at all',
+      time_format: 'HH',
+    });
 
     expect(sweep.error?.code).toBe('42501');
     expect(signedOut.error?.code).toBe('42501');
+    expect(queue.error?.code).toBe('42501');
   });
 });

@@ -136,16 +136,19 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          time_zone: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          time_zone: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          time_zone?: string
         }
         Relationships: []
       }
@@ -925,11 +928,11 @@ export type Database = {
         Args: { meetup_at: string; safe_spot_id: string; trade_id: string }
         Returns: undefined
       }
-      queue_meetup_notification: {
+      queue_meetup_notifications: {
         Args: {
           body_format: string
           kind: Database["public"]["Enums"]["notification_kind"]
-          recipient: string
+          time_format: string
           title: string
           trade: Database["public"]["Tables"]["trades"]["Row"]
         }

@@ -6,7 +6,7 @@
 -- migration in #30.
 
 -- A second City, so a test can place a Trader outside the launch City.
-insert into public.cities (name) values ('Test City');
+insert into public.cities (name, time_zone) values ('Test City', 'America/New_York');
 
 insert into public.safe_spots (city_id, name, address, kind, notes)
 select cities.id, spot.name, spot.address, spot.kind::public.safe_spot_kind, spot.notes

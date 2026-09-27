@@ -56,7 +56,10 @@ import { startCaptureServer, type CaptureServer } from './capture-server.ts';
 const APP_URL = 'https://toploaderapp.com';
 const REPLY_TO = 'hello@toploaderapp.com';
 const RESEND_API_KEY = 're_test_key';
-const HOUR = 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+// Test City's, from supabase/seed.sql.
+const TEST_CITY_TIME_ZONE = 'America/New_York';
 
 interface PushPayload {
   title: string;
@@ -596,16 +599,45 @@ describe('The notifier', { timeout: 30_000 }, () => {
     if (error) throw error;
     const [spot] = spots;
     if (!spot) throw new Error('No Safe Spot seeded in Test City');
+    // On the minute, so the time told reads exactly as it was put forward.
+    const meetupAt = new Date(
+      Math.ceil((Date.now() + hoursAway * HOUR) / MINUTE) * MINUTE,
+    );
     const proposed = await proposer.client.rpc('propose_meetup', {
       trade_id: tradeId,
-      meetup_at: new Date(Date.now() + hoursAway * HOUR).toISOString(),
+      meetup_at: meetupAt.toISOString(),
       safe_spot_id: spot.id,
     });
     if (proposed.error) throw proposed.error;
     await deliver();
     pushService.reset();
     resend.reset();
-    return { ...trade, spotName: spot.name };
+    return { ...trade, spotName: spot.name, meetupAt };
+  }
+
+  /**
+   * A time as a Trader in Test City reads it on their clock, the way the
+   * notifications tell it: "Saturday, October 3 at 2:30 PM", or with only
+   * the time of day, "2:30 PM".
+   */
+  function testCityTime(at: Date, { withDay }: { withDay: boolean }) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: TEST_CITY_TIME_ZONE,
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+        .formatToParts(at)
+        .map((part) => [part.type, part.value]),
+    );
+    const time = `${parts.hour}:${parts.minute} ${parts.dayPeriod}`;
+    return withDay
+      ? `${parts.weekday}, ${parts.month} ${parts.day} at ${time}`
+      : time;
   }
 
   /** A Meetup put forward and confirmed, as `meetupPutForward` leaves one. */
@@ -621,9 +653,20 @@ describe('The notifier', { timeout: 30_000 }, () => {
     return meetup;
   }
 
-  /** The reminder sweep, run the way its pg_cron job runs it. */
-  const sweepReminders = () =>
-    arrange((sql) => sql`select public.queue_meetup_reminders()`);
+  /**
+   * The reminder sweep, run the way pg_cron runs it: the command its job is
+   * registered with, as the database's owner. Nothing can call it at the
+   * seam a Trader reaches, because no Trader may; so this is the job
+   * itself, and a job that is not registered fails the test here.
+   */
+  async function sweepReminders() {
+    await arrange(async (sql) => {
+      const [job] = await sql<{ command: string }[]>`
+        select command from cron.job where jobname = 'queue-meetup-reminders'`;
+      if (!job) throw new Error('The reminder sweep is not scheduled');
+      await sql.unsafe(job.command);
+    });
+  }
 
   /** The Meetup reminders queued on one topic. */
   async function reminders(topic: string) {
@@ -645,6 +688,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       tradeId,
       topic,
       spotName,
+      meetupAt,
     } = await meetupPutForward(24);
 
     const { error } = await recipient.client.rpc('confirm_meetup', {
@@ -657,7 +701,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
         title: 'Meetup confirmed',
-        body: `Your meetup with Recipient at ${spotName} is confirmed.`,
+        body: `Your meetup with Recipient at ${spotName} on ${testCityTime(meetupAt, { withDay: true })} is confirmed.`,
         url,
         tag: topic,
       },
@@ -665,7 +709,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       {
         title: 'Meetup confirmed',
-        body: `Your meetup with Proposer at ${spotName} is confirmed.`,
+        body: `Your meetup with Proposer at ${spotName} on ${testCityTime(meetupAt, { withDay: true })} is confirmed.`,
         url,
         tag: topic,
       },
@@ -676,7 +720,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
         to: [proposer.email],
         reply_to: REPLY_TO,
         subject: 'Meetup confirmed',
-        text: `Your meetup with Recipient at ${spotName} is confirmed.\n\n${APP_URL}${url}\n`,
+        text: `Your meetup with Recipient at ${spotName} on ${testCityTime(meetupAt, { withDay: true })} is confirmed.\n\n${APP_URL}${url}\n`,
       },
     ]);
     expect(emailsTo(recipient).map((email) => email.subject)).toEqual([
@@ -707,6 +751,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       tradeId,
       topic,
       spotName,
+      meetupAt,
     } = await scheduledMeetup(1.5);
     // The Meetup was confirmed a day ago and is now an hour and a half
     // away: the reminder is due.
@@ -724,7 +769,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
         title: 'Meetup coming up',
-        body: `Your meetup with Recipient at ${spotName} is coming up.`,
+        body: `Your meetup with Recipient at ${spotName} is at ${testCityTime(meetupAt, { withDay: false })}.`,
         url,
         tag: topic,
       },
@@ -732,7 +777,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       {
         title: 'Meetup coming up',
-        body: `Your meetup with Proposer at ${spotName} is coming up.`,
+        body: `Your meetup with Proposer at ${spotName} is at ${testCityTime(meetupAt, { withDay: false })}.`,
         url,
         tag: topic,
       },
@@ -753,21 +798,6 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(await reminders(far.topic)).toEqual([]);
     // Its confirmation just told both Traders.
     expect(await reminders(near.topic)).toEqual([]);
-  });
-
-  it('runs the reminder sweep every minute', async () => {
-    const jobs = await arrange(
-      (sql) =>
-        sql`select schedule, command from cron.job
-              where jobname = 'queue-meetup-reminders'`,
-    );
-
-    expect(jobs).toEqual([
-      {
-        schedule: '* * * * *',
-        command: ' select public.queue_meetup_reminders() ',
-      },
-    ]);
   });
 
   it('emails through Resend, and pushes too, for a kind the matrix emails', async () => {

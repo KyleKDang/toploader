@@ -137,6 +137,7 @@ Settled on [#21](https://github.com/KyleKDang/toploader/issues/21): a declined p
 The responder is the Trader a proposal waits on, handed back and forth by each counter, while proposer and recipient never change.
 Scheduling reuses it, settled on [#23](https://github.com/KyleKDang/toploader/issues/23): `meetup_at` and `safe_spot_id` are the Meetup put forward while the Trade is accepted, the responder is the Trader it waits on, and a different Meetup put forward by that Trader replaces it and hands the answer back, as a counter does.
 `scheduled_at` is when the Meetup was confirmed, like `accepted_at`, and a reminder is pushed two hours before `meetup_at` unless it was confirmed inside those two hours.
+A City carries its time zone, so a Meetup's notifications tell its time as the clocks at its Safe Spot read it.
 Cash is two nullable columns on the Trade, at most one of them set, rather than a field on an item, because cash is a side's figure and not a Listing; an item's side is its Listing's owner, since a Listing never changes hands, and the Listing itself is the snapshot, since a traded Listing is frozen.
 Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks`.
 
@@ -205,6 +206,9 @@ What makes a good test here:
   Added on [#17](https://github.com/KyleKDang/toploader/issues/17), where City browse and the photo reaper both had to answer for a `traded` Listing months before the Trade machine can produce one.
   Assertions stay at the seam, as a signed-in Trader; the fixture walks the real transitions rather than jumping, so it cannot arrange a state the app could never produce.
   The alternative was granting a client role or a scheduled job a power it does not otherwise have, purely so a test could use it, which would have put the test's convenience into the production surface.
+- A scheduled job that runs inside the database, a `pg_cron` job such as the Meetup reminder sweep, is invoked at seam 2 the way `pg_cron` invokes it: its registered command, run as the database's owner through the superuser connection.
+  Added on [#23](https://github.com/KyleKDang/toploader/issues/23): no client role may call such a job, so there is no Trader's seam to reach it through, and running the command the job is registered with proves the schedule is wired as well as what it does.
+  Its effects are still asserted at the seam, on the outbound pushes and the outbox.
 - Test names use the domain vocabulary of [CONTEXT.md](../CONTEXT.md) so the suite reads as this spec.
 
 ## Build sequence

@@ -8,6 +8,14 @@
 -- way a counter does to a proposal. Both Traders are told when a Meetup is
 -- confirmed, and reminded before it.
 
+-- A City's time zone, so a Meetup's time is told as the clocks there read
+-- it. Cities are written only by migrations, so each names its own; the
+-- launch City's is set here.
+alter table public.cities add column time_zone text;
+update public.cities set time_zone = 'America/Los_Angeles'
+  where name = 'Orange County';
+alter table public.cities alter column time_zone set not null;
+
 -- `meetup_at` and `safe_spot_id` are the Meetup, put forward while the
 -- Trade is accepted and agreed once it is scheduled. `scheduled_at` is when
 -- that happened, as `accepted_at` is for the accept. `meetup_reminded_at`
@@ -41,7 +49,7 @@ create index trades_meetup_reminder_idx
   where status = 'scheduled' and meetup_reminded_at is null;
 
 -- The Safe Spot a Trade references is looked up from the Trade, never the
--- other way round, except when a migration retires one.
+-- other way around, except when a migration retires one.
 create index trades_safe_spot_id_idx on public.trades (safe_spot_id);
 
 -- Puts a Meetup forward on an accepted Trade: a time still to come, at a
@@ -51,7 +59,9 @@ create index trades_safe_spot_id_idx on public.trades (safe_spot_id);
 -- Either Trader may put one forward first. Once one is waiting, only the
 -- Trader it waits on may replace it, so the Meetup a Trader confirms is
 -- always the one they were shown: the Trader who put it forward cannot
--- change it under them.
+-- change it under them. Once its time has passed it can no longer be
+-- confirmed, so there is nothing left to change under anyone, and either
+-- Trader may put forward another.
 --
 -- Verification is not asked again: a Trade is only accepted between two
 -- Verified Traders, which is the gate on committing anyone to a Meetup.
@@ -75,7 +85,9 @@ begin
       using errcode = '22023';
   end if;
 
-  if trade.responder_id is not null and trade.responder_id <> caller then
+  if trade.responder_id is not null
+    and trade.responder_id <> caller
+    and trade.meetup_at > now() then
     raise exception 'this Meetup is waiting on the other Trader'
       using errcode = '22023';
   end if;
@@ -156,17 +168,19 @@ as $$
   select interval '2 hours'
 $$;
 
--- One notification of a Meetup to one of its Traders, naming the other and
--- the Safe Spot. On the Trade's topic, like everything on a Trade, so a
--- browser shows only the latest word on it. The text carries no time: a
--- City has no time zone recorded yet, and the Trade shows the time in the
--- Trader's own.
-create function public.queue_meetup_notification(
+-- A Meetup's notification to both its Traders, each naming the other, the
+-- Safe Spot, and the time as the clocks there read it. On the Trade's
+-- topic, like everything on a Trade, so a browser shows only the latest
+-- word on it.
+--
+-- `body_format` takes the other Trader, the Safe Spot, and the time, in
+-- that order; `time_format` is how the time reads (to_char).
+create function public.queue_meetup_notifications(
   trade public.trades,
-  recipient uuid,
   kind public.notification_kind,
   title text,
-  body_format text
+  body_format text,
+  time_format text
 )
   returns void
   language sql
@@ -176,27 +190,37 @@ as $$
   insert into public.notifications (trader_id, kind, topic, title, body, url)
     -- Qualified, because a Safe Spot has a `kind` of its own.
     select
-      queue_meetup_notification.recipient,
-      queue_meetup_notification.kind,
-      'trade:' || (queue_meetup_notification.trade).id,
-      queue_meetup_notification.title,
+      recipient.id,
+      queue_meetup_notifications.kind,
+      'trade:' || (queue_meetup_notifications.trade).id,
+      queue_meetup_notifications.title,
       format(
-        queue_meetup_notification.body_format,
+        queue_meetup_notifications.body_format,
         other.display_name,
-        spot.name
+        spot.name,
+        to_char(
+          (queue_meetup_notifications.trade).meetup_at at time zone city.time_zone,
+          queue_meetup_notifications.time_format
+        )
       ),
-      '/trades/' || (queue_meetup_notification.trade).id
-    from public.traders other, public.safe_spots spot
-    where other.id = public.other_trader(
-        queue_meetup_notification.trade,
-        queue_meetup_notification.recipient
-      )
-      and spot.id = (queue_meetup_notification.trade).safe_spot_id;
+      '/trades/' || (queue_meetup_notifications.trade).id
+    from unnest(array[
+        (queue_meetup_notifications.trade).proposer_id,
+        (queue_meetup_notifications.trade).recipient_id
+      ]) as recipient (id)
+      join public.traders other
+        on other.id = public.other_trader(
+          queue_meetup_notifications.trade,
+          recipient.id
+        )
+      join public.safe_spots spot
+        on spot.id = (queue_meetup_notifications.trade).safe_spot_id
+      join public.cities city on city.id = spot.city_id;
 $$;
 
 -- A confirmed Meetup is told to both Traders, pushed and emailed per the
 -- matrix: the one who put it forward learns it was confirmed, and the
--- email is where both find the place again.
+-- email is where both find the place and the time again.
 create function public.queue_meetup_confirmed_notifications()
   returns trigger
   language plpgsql
@@ -204,11 +228,11 @@ create function public.queue_meetup_confirmed_notifications()
   set search_path = ''
 as $$
 begin
-  perform public.queue_meetup_notification(
-    new, trader, 'meetup_confirmed', 'Meetup confirmed',
-    'Your meetup with %s at %s is confirmed.'
-  )
-  from unnest(array[new.proposer_id, new.recipient_id]) as trader;
+  perform public.queue_meetup_notifications(
+    new, 'meetup_confirmed', 'Meetup confirmed',
+    'Your meetup with %s at %s on %s is confirmed.',
+    'FMDay, FMMonth FMDD "at" FMHH12:MI AM'
+  );
   return null;
 end;
 $$;
@@ -243,11 +267,11 @@ begin
         and trades.scheduled_at < trades.meetup_at - public.meetup_reminder_lead()
       returning trades.*
   loop
-    perform public.queue_meetup_notification(
-      trade, trader, 'meetup_reminder', 'Meetup coming up',
-      'Your meetup with %s at %s is coming up.'
-    )
-    from unnest(array[trade.proposer_id, trade.recipient_id]) as trader;
+    perform public.queue_meetup_notifications(
+      trade, 'meetup_reminder', 'Meetup coming up',
+      'Your meetup with %s at %s is at %s.',
+      'FMHH12:MI AM'
+    );
   end loop;
 end;
 $$;
