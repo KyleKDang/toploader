@@ -646,14 +646,21 @@ export type Database = {
       }
       trades: {
         Row: {
+          absent_trader_id: string | null
           accepted_at: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          completed_at: string | null
           created_at: string
           id: string
           meetup_at: string | null
           meetup_reminded_at: string | null
+          no_show_at: string | null
           proposer_cash_cents: number | null
+          proposer_completed_at: string | null
           proposer_id: string
           recipient_cash_cents: number | null
+          recipient_completed_at: string | null
           recipient_id: string
           responder_id: string | null
           safe_spot_id: string | null
@@ -661,14 +668,21 @@ export type Database = {
           status: Database["public"]["Enums"]["trade_status"]
         }
         Insert: {
+          absent_trader_id?: string | null
           accepted_at?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
           created_at?: string
           id?: string
           meetup_at?: string | null
           meetup_reminded_at?: string | null
+          no_show_at?: string | null
           proposer_cash_cents?: number | null
+          proposer_completed_at?: string | null
           proposer_id: string
           recipient_cash_cents?: number | null
+          recipient_completed_at?: string | null
           recipient_id: string
           responder_id?: string | null
           safe_spot_id?: string | null
@@ -676,14 +690,21 @@ export type Database = {
           status?: Database["public"]["Enums"]["trade_status"]
         }
         Update: {
+          absent_trader_id?: string | null
           accepted_at?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
           created_at?: string
           id?: string
           meetup_at?: string | null
           meetup_reminded_at?: string | null
+          no_show_at?: string | null
           proposer_cash_cents?: number | null
+          proposer_completed_at?: string | null
           proposer_id?: string
           recipient_cash_cents?: number | null
+          recipient_completed_at?: string | null
           recipient_id?: string
           responder_id?: string | null
           safe_spot_id?: string | null
@@ -691,6 +712,20 @@ export type Database = {
           status?: Database["public"]["Enums"]["trade_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "trades_absent_trader_id_fkey"
+            columns: ["absent_trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "trades_proposer_id_fkey"
             columns: ["proposer_id"]
@@ -893,11 +928,13 @@ export type Database = {
         Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
         Returns: undefined
       }
+      cancel_trade: { Args: { trade_id: string }; Returns: undefined }
       claim_notifications: { Args: { batch?: number }; Returns: Json }
       compact_price_snapshots: {
         Args: { sync_day: string }
         Returns: undefined
       }
+      complete_trade: { Args: { trade_id: string }; Returns: undefined }
       confirm_meetup: { Args: { trade_id: string }; Returns: undefined }
       counter_trade: {
         Args: {
@@ -928,6 +965,14 @@ export type Database = {
         Returns: string
       }
       decline_trade: { Args: { trade_id: string }; Returns: undefined }
+      has_tapped_complete: {
+        Args: {
+          trade: Database["public"]["Tables"]["trades"]["Row"]
+          trader: string
+        }
+        Returns: boolean
+      }
+      mark_no_show: { Args: { trade_id: string }; Returns: undefined }
       mark_notification_sent: {
         Args: {
           channel: Database["public"]["Enums"]["notification_channel"]
@@ -936,6 +981,13 @@ export type Database = {
         Returns: undefined
       }
       meetup_reminder_lead: { Args: never; Returns: string }
+      move_trade_listings: {
+        Args: {
+          status: Database["public"]["Enums"]["listing_status"]
+          trade: Database["public"]["Tables"]["trades"]["Row"]
+        }
+        Returns: undefined
+      }
       notification_channels: {
         Args: { kind: Database["public"]["Enums"]["notification_kind"] }
         Returns: Database["public"]["Enums"]["notification_channel"][]
@@ -1034,14 +1086,21 @@ export type Database = {
       trade_for_participant: {
         Args: { caller: string; trade_id: string }
         Returns: {
+          absent_trader_id: string | null
           accepted_at: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          completed_at: string | null
           created_at: string
           id: string
           meetup_at: string | null
           meetup_reminded_at: string | null
+          no_show_at: string | null
           proposer_cash_cents: number | null
+          proposer_completed_at: string | null
           proposer_id: string
           recipient_cash_cents: number | null
+          recipient_completed_at: string | null
           recipient_id: string
           responder_id: string | null
           safe_spot_id: string | null
