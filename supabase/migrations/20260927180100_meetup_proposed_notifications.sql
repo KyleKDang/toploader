@@ -103,7 +103,9 @@ $$;
 -- is the first, a different one in answer to the other's, or another put
 -- forward once an unconfirmed one's time has passed. That last one can
 -- leave the responder as it was, so what fires this is the Meetup
--- changing, not only whom it waits on.
+-- changing, not only whom it waits on. `propose_meetup` is the only writer
+-- of a Meetup; anything else that moves one on an accepted Trade would be
+-- told to the other Trader the same way.
 create function public.queue_meetup_proposed_notification()
   returns trigger
   language plpgsql
@@ -113,7 +115,7 @@ as $$
 begin
   perform public.queue_meetup_notification(
     new, new.responder_id, 'meetup_proposed', 'Meetup proposed',
-    '%s proposed meeting at %s on %s.',
+    '%s proposed a meetup at %s on %s.',
     'FMDay, FMMonth FMDD "at" FMHH12:MI AM'
   );
   return null;

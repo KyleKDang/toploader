@@ -729,6 +729,11 @@ describe('The notifier', { timeout: 30_000 }, () => {
       : time;
   }
 
+  /** What a Meetup put forward is told as, naming who put it forward. */
+  function meetupProposedBody(by: string, spotName: string, meetupAt: Date) {
+    return `${by} proposed a meetup at ${spotName} on ${testCityTime(meetupAt, { withDay: true })}.`;
+  }
+
   /** A Meetup put forward and confirmed, as `meetupPutForward` leaves one. */
   async function scheduledMeetup(hoursAway: number) {
     const meetup = await meetupPutForward(hoursAway);
@@ -832,7 +837,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     await deliver();
 
     const url = `/trades/${tradeId}`;
-    const body = `Proposer proposed meeting at ${spot.name} on ${testCityTime(meetupAt, { withDay: true })}.`;
+    const body = meetupProposedBody('Proposer', spot.name, meetupAt);
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       { title: 'Meetup proposed', body, url, tag: topic },
     ]);
@@ -866,7 +871,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
         title: 'Meetup proposed',
-        body: `Recipient proposed meeting at ${otherSpot.name} on ${testCityTime(meetupAt, { withDay: true })}.`,
+        body: meetupProposedBody('Recipient', otherSpot.name, meetupAt),
         url: `/trades/${tradeId}`,
         tag: topic,
       },
@@ -895,6 +900,8 @@ describe('The notifier', { timeout: 30_000 }, () => {
         sql`update public.trades set meetup_at = now() - interval '1 hour'
               where id = ${tradeId}`,
     );
+    // Moving the Meetup told the recipient of it, as any write to one does;
+    // what is under test is the one put forward next.
     await deliver();
     pushService.reset();
     resend.reset();
@@ -905,7 +912,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       {
         title: 'Meetup proposed',
-        body: `Proposer proposed meeting at ${spot.name} on ${testCityTime(meetupAt, { withDay: true })}.`,
+        body: meetupProposedBody('Proposer', spot.name, meetupAt),
         url: `/trades/${tradeId}`,
         tag: topic,
       },
