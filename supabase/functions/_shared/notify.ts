@@ -75,15 +75,25 @@ const PUSH_TTL_SECONDS = 24 * 60 * 60;
 
 /**
  * How many claims one run will make. It is a stop, not a budget: the loop
- * ends when a claim comes back empty, and this keeps a run that is somehow
- * not making progress from spinning until the function times out.
+ * ends when a claim does no work, and this keeps a run that is somehow not
+ * making progress from spinning until the function times out.
  */
 const MAX_CLAIMS = 100;
 
 /** The notification matrix's columns: public.notification_channel. */
 type Channel = 'push' | 'email';
 
-/** What claim_notifications hands back. */
+/**
+ * What one claim_notifications call did: the silent rows it marked sent,
+ * a push-only row for a Trader with no browser subscribed, and the rows it
+ * claimed for this run to send.
+ */
+interface Claim {
+  settled: number;
+  claimed: ClaimedNotification[];
+}
+
+/** A row claim_notifications hands out. */
 interface ClaimedNotification {
   id: string;
   trader_id: string;
@@ -136,8 +146,10 @@ export async function deliverNotifications(
       batch: options.batch ?? 20,
     });
     if (claim.error) throw claim.error;
-    const claimed = claim.data as ClaimedNotification[];
-    if (claimed.length === 0) break;
+    const { settled, claimed } = claim.data as Claim;
+    // A call that only settled silent rows may have deliverable ones behind
+    // them, so it is a call that did nothing that ends the run.
+    if (settled === 0 && claimed.length === 0) break;
 
     // One row's failure is that row's: it stays unsent for a later run,
     // and every other row in the batch still goes out.
