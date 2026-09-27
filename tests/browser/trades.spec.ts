@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { signInAsNewTrader, verifyTrader } from './session.ts';
+import { arrangeCity, signInAsNewTrader, verifyTrader } from './session.ts';
 
 /*
  * Proposing a Trade, end to end at 375px: two Verified Traders with a Match,
@@ -12,7 +12,9 @@ import { signInAsNewTrader, verifyTrader } from './session.ts';
  * along the way, are proven at seam 1 (tests/db/trades.test.ts).
  *
  * The Listing and the Want are arranged through the API: each has a tracer
- * of its own, and this one starts where a Match already exists.
+ * of its own, and this one starts where a Match already exists. Both
+ * Traders are in a City of this run's own, for the reason matches.spec.ts
+ * gives.
  */
 
 const CARD_IMAGE = readFileSync(
@@ -24,11 +26,6 @@ const TINY_WEBP = Buffer.from(
   'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
   'base64',
 );
-
-/** A display name no other Trader has, for the reason matches.spec.ts gives. */
-function uniqueTrader(role: string) {
-  return `${role} ${randomUUID().slice(0, 8)}`;
-}
 
 /** Card images are hotlinked from TCGplayer; faked at the network edge. */
 async function fakeCardImages(page: Page) {
@@ -54,18 +51,11 @@ test('a Trader proposes from a Match, and the other Trader accepts', async ({
   await fakeCardImages(listerPage);
   await fakeCardImages(proposerPage);
 
-  const listerName = uniqueTrader('Lister');
-  const proposerName = uniqueTrader('Proposer');
-  const lister = await signInAsNewTrader(
-    listerPage,
-    'Orange County',
-    listerName,
-  );
-  const proposer = await signInAsNewTrader(
-    proposerPage,
-    'Orange County',
-    proposerName,
-  );
+  const city = await arrangeCity();
+  const listerName = 'Lister';
+  const proposerName = 'Proposer';
+  const lister = await signInAsNewTrader(listerPage, city, listerName);
+  const proposer = await signInAsNewTrader(proposerPage, city, proposerName);
   await verifyTrader(lister.id);
   await verifyTrader(proposer.id);
 

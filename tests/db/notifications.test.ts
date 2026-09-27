@@ -134,7 +134,22 @@ describe('The notification outbox', () => {
     ));
   });
 
-  it('queues one push-only notification for each Trader of a new Match', async () => {
+  /**
+   * The outbox rows on one Match's topic. The City is full of other Traders'
+   * Wants and Listings for this Card from earlier runs, and every pair they
+   * make is legitimately notified too; the pair a test arranged is the only
+   * one it can speak for.
+   */
+  async function matchRows(listingId: string, wanter: SeededTrader) {
+    const { data, error } = await service
+      .from('notifications')
+      .select('trader_id, kind, channels, title, body, url')
+      .eq('topic', `match:${listingId}:${wanter.id}`);
+    if (error) throw error;
+    return data;
+  }
+
+  it('queues one push-only notification of a new Listing, to the Trader who wants it', async () => {
     const [lister, wanter] = await Promise.all([
       seedTrader('Lister'),
       seedTrader('Wanter'),
@@ -143,37 +158,37 @@ describe('The notification outbox', () => {
 
     const listingId = await createListing(lister, holofoil, 'NM');
 
-    // The City is full of other Traders' Wants for this Card from earlier
-    // runs, and every one of them is legitimately notified too; the pair
-    // this test arranged is the only one it can speak for.
-    const topic = `match:${listingId}:${wanter.id}`;
-    const { data, error } = await service
-      .from('notifications')
-      .select('trader_id, kind, channels, title, body, url')
-      .eq('topic', topic)
-      .order('created_at');
-    if (error) throw error;
-    expect(data).toEqual(
-      expect.arrayContaining([
-        {
-          trader_id: wanter.id,
-          kind: 'new_match',
-          channels: ['push'],
-          title: 'New match',
-          body: 'Lister listed Examplemon (Holofoil, NM), a card you want.',
-          url: `/listings/${listingId}`,
-        },
-        {
-          trader_id: lister.id,
-          kind: 'new_match',
-          channels: ['push'],
-          title: 'New match',
-          body: 'Wanter wants the Examplemon you listed.',
-          url: '/',
-        },
-      ]),
-    );
-    expect(data).toHaveLength(2);
+    expect(await matchRows(listingId, wanter)).toEqual([
+      {
+        trader_id: wanter.id,
+        kind: 'new_match',
+        channels: ['push'],
+        title: 'New match',
+        body: 'Lister listed Examplemon (Holofoil, NM), a card you want.',
+        url: `/listings/${listingId}`,
+      },
+    ]);
+  });
+
+  it('queues one push-only notification of a new Want, to the Trader whose Listing it pairs with', async () => {
+    const [lister, wanter] = await Promise.all([
+      seedTrader('Lister'),
+      seedTrader('Wanter'),
+    ]);
+    const listingId = await createListing(lister, holofoil, 'NM');
+
+    await addWant(wanter, { card_id: examplemon });
+
+    expect(await matchRows(listingId, wanter)).toEqual([
+      {
+        trader_id: lister.id,
+        kind: 'new_match',
+        channels: ['push'],
+        title: 'New match',
+        body: 'Wanter wants the Examplemon you listed.',
+        url: '/',
+      },
+    ]);
   });
 
   /*

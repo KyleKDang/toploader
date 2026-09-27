@@ -213,6 +213,9 @@ What makes a good test here:
   Added on [#17](https://github.com/KyleKDang/toploader/issues/17), where City browse and the photo reaper both had to answer for a `traded` Listing months before the Trade machine can produce one.
   Assertions stay at the seam, as a signed-in Trader; the fixture walks the real transitions rather than jumping, so it cannot arrange a state the app could never produce.
   The alternative was granting a client role or a scheduled job a power it does not otherwise have, purely so a test could use it, which would have put the test's convenience into the production surface.
+- A tracer that makes a Match signs its Traders into a City of its own, arranged through the superuser connection (`arrangeCity` in `tests/browser/session.ts`).
+  Added on [#72](https://github.com/KyleKDang/toploader/issues/72): every tracer and every earlier run lists and wants the same seeded Card, so in a shared City its Want or Listing pairs with everything the stack has accumulated, and how long the flow takes grows with how many runs came before.
+  A City is reference data that no client path writes, which is what makes making one an arrange step.
 - A scheduled job that runs inside the database, a `pg_cron` job such as the Meetup reminder sweep, is invoked at seam 2 the way `pg_cron` invokes it: its registered command, run as the database's owner through the superuser connection.
   Added on [#23](https://github.com/KyleKDang/toploader/issues/23): no client role may call such a job, so there is no Trader's seam to reach it through, and running the command the job is registered with proves the schedule is wired as well as what it does.
   Its effects are still asserted at the seam, on the outbound pushes and the outbox.
