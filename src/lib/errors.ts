@@ -36,16 +36,16 @@ const MESSAGES: Record<string, string> = {
  */
 const REFUSALS: Record<string, string> = {
   'a Listing on this Trade is no longer on offer':
-    'A card on this trade is no longer available. It may be in another trade, or its owner took it down.',
+    'A listing on this trade is no longer available. It may be in another trade, or its owner took it down.',
   'this Trade is not waiting on your answer':
-    'This trade is not waiting on your answer any more. It may have been answered already.',
+    'This trade is not waiting on your answer anymore. It may have been answered already.',
   'a Trade can hold only active Listings of its two Traders':
-    'A card you picked is no longer available. Go back and pick again.',
+    'A listing you picked is no longer available. Go back and pick again.',
   'only a Verified Trader can send or accept a Trade proposal':
     'Only verified traders can send or accept a trade.',
   'each side of a Trade must give a Listing or cash':
-    'Each side of a trade has to give a card or cash.',
-  'a Trade needs at least one Listing': 'A trade needs at least one card.',
+    'Each side of a trade has to give a listing or cash.',
+  'a Trade needs at least one Listing': 'A trade needs at least one listing.',
   'cash can be on one side of a Trade, not both':
     'Cash can come from one side of a trade, not both.',
   'a cash amount must be more than zero':

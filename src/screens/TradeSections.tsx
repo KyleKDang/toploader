@@ -9,7 +9,7 @@ import {
 } from '../components';
 import { formatPrice } from '../lib/format';
 import type { TradeListing } from '../lib/queries';
-import { sideValue } from '../lib/trades';
+import { sideValue, traderName, type TradeTrader } from '../lib/trades';
 
 /*
  * The pieces a Trade's terms are drawn with, shared by the proposal picker
@@ -32,16 +32,12 @@ export function OtherTraderLine({
   trader,
 }: {
   prefix: string;
-  trader: {
-    display_name: string | null;
-    verified_at: string | null;
-    completed_trade_count: number;
-  };
+  trader: TradeTrader;
 }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="truncate">
-        {prefix} {trader.display_name ?? 'a trader'}
+        {prefix} {traderName(trader)}
       </span>
       <ReputationPill
         verified={trader.verified_at !== null}
@@ -175,7 +171,11 @@ export function TradeBalance({
   );
 }
 
-/** The line every screen with cash on it carries (ADR-0004). */
+/**
+ * Said under a Trade's terms when there is cash on them: the figure is what
+ * the two Traders agreed, and the app never touches the money (ADR-0004).
+ * The picker says the same in its cash field's hint instead.
+ */
 export function CashNote() {
   return (
     <p className="px-4 pt-2.5 text-xs leading-prose text-muted">

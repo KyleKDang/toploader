@@ -9,7 +9,7 @@ import {
   TopBar,
 } from '../components';
 import { tradesQuery, type TradeSummary } from '../lib/queries';
-import { cashOf, otherTraderOf, whoseMove } from '../lib/trades';
+import { cashOf, otherTraderOf, traderName, whoseMove } from '../lib/trades';
 import { useTabs } from '../lib/tabs';
 
 /*
@@ -27,9 +27,10 @@ export function TradesScreen() {
   const { traderId } = route.useLoaderData();
   const navigate = useNavigate();
   const trades = useQuery(tradesQuery(traderId));
+  const tabs = useTabs('trades');
 
   return (
-    <AppShell header={<TopBar title="Trades" />} {...useTabs('trades')}>
+    <AppShell header={<TopBar title="Trades" />} {...tabs}>
       {trades.data?.length ? (
         <ul aria-label="Your trades">
           {trades.data.map((trade) => (
@@ -75,7 +76,7 @@ function TradeRow({
   return (
     <ListRow
       leading={<CardTile src={trade.thumbnailUrl} alt="" />}
-      title={`Trade with ${other.display_name ?? 'a trader'}`}
+      title={`Trade with ${traderName(other)}`}
       detail={cards.join(', ')}
       relation={whoseMove(trade, traderId)}
       relationTrailing={

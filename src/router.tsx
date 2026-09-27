@@ -306,13 +306,20 @@ const proposeTradeRoute = createRoute({
     if (!otherId)
       return { traderId, trader, other: null, listings: [], listingId: null };
     const [other, listings] = await Promise.all([
-      queryClient.ensureQueryData(traderQuery(otherId)),
+      // An id that is not a Trader's names nobody, the same as no id at all.
+      // traderQuery reads with `.single()`, which says so as PGRST116.
+      queryClient
+        .ensureQueryData(traderQuery(otherId))
+        .catch((error: unknown) => {
+          if ((error as { code?: unknown }).code === 'PGRST116') return null;
+          throw error;
+        }),
       queryClient.ensureQueryData(tradeListingsQuery(traderId, otherId)),
     ]);
     return {
       traderId,
       trader,
-      other: { id: otherId, ...other },
+      other: other && { id: otherId, ...other },
       listings,
       listingId: deps.listing ?? null,
     };
@@ -329,10 +336,10 @@ const tradeRoute = createRoute({
   loader: async ({ context: { queryClient }, params }) => {
     const { traderId, trader } = await loadOnboardedTrader(queryClient);
     // Not an id is not a Trade, the same as one the Trader is not party to,
-    // rather than a request that errors.
-    if (isUuid(params.tradeId))
-      await queryClient.ensureQueryData(tradeQuery(params.tradeId));
-    return { traderId, trader, tradeId: params.tradeId };
+    // rather than a request that errors; the screen reads null as that.
+    const tradeId = isUuid(params.tradeId) ? params.tradeId : null;
+    if (tradeId) await queryClient.ensureQueryData(tradeQuery(tradeId));
+    return { traderId, trader, tradeId };
   },
   component: lazyRouteComponent(
     () => import('./screens/TradeScreen'),
@@ -343,17 +350,20 @@ const tradeRoute = createRoute({
 const counterTradeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/trades/$tradeId/counter',
+  // Fetched, not read from the cache: the picker is filled in from the
+  // current terms, and the other Trader may have answered, or taken a
+  // Listing down, since the Trade page cached them.
   loader: async ({ context: { queryClient }, params }) => {
     const { traderId, trader } = await loadOnboardedTrader(queryClient);
     const trade = isUuid(params.tradeId)
-      ? await queryClient.ensureQueryData(tradeQuery(params.tradeId))
+      ? await queryClient.fetchQuery(tradeQuery(params.tradeId))
       : null;
     if (!trade) return { traderId, trader, trade: null, listings: [] };
     return {
       traderId,
       trader,
       trade,
-      listings: await queryClient.ensureQueryData(
+      listings: await queryClient.fetchQuery(
         tradeListingsQuery(traderId, otherTraderOf(trade, traderId).id),
       ),
     };
