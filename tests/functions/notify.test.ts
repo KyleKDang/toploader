@@ -119,7 +119,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     resend.reset();
   });
 
-  const deliver = () =>
+  const deliver = ({ batch }: { batch?: number } = {}) =>
     deliverNotifications({
       supabaseUrl: inject('supabaseUrl'),
       supabaseSecretKey: inject('supabaseSecretKey'),
@@ -130,6 +130,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
         replyTo: REPLY_TO,
       },
       appUrl: APP_URL,
+      batch,
     });
 
   /**
@@ -286,6 +287,47 @@ describe('The notifier', { timeout: 30_000 }, () => {
     );
     return topic;
   }
+
+  /**
+   * Many "new match" rows for one Trader, written the way `queue` writes
+   * one, all created at the given instant; a Trader with no browser
+   * subscribed makes every one of them a silent row.
+   */
+  async function queueMatches(
+    trader: SeededTrader,
+    count: number,
+    createdAt: string,
+  ) {
+    const prefix = `test:${randomUUID()}`;
+    await arrange(
+      (sql) =>
+        sql`insert into public.notifications
+              (trader_id, kind, topic, title, body, url, created_at)
+            select ${trader.id}, 'new_match', ${prefix} || ':' || g,
+              'New match', 'Ash wants the Examplemon you listed.', '/',
+              ${createdAt}
+            from generate_series(1, ${count}::integer) g`,
+    );
+    return prefix;
+  }
+
+  /** The outbox rows whose topic starts with the given prefix. */
+  async function outboxLike(prefix: string) {
+    const { data, error } = await service
+      .from('notifications')
+      .select('sent_at, attempts')
+      .like('topic', `${prefix}:%`);
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * A moment just inside the day a row is worth sending for, so rows
+   * created then are the oldest the claim will reach: ahead of everything
+   * the rest of the suite queues, whatever runs beside this file.
+   */
+  const headOfTheDay = () =>
+    new Date(Date.now() - 24 * HOUR + 5 * MINUTE).toISOString();
 
   /**
    * Two Verified Traders of one City, each with a Listing and a browser
@@ -971,6 +1013,71 @@ describe('The notifier', { timeout: 30_000 }, () => {
     // claimed again.
     const [row] = await outbox(topic);
     expect(row?.sent_at).not.toBeNull();
+    expect(row?.attempts).toBe(0);
+  });
+
+  it('drains a backlog larger than one run handles over the runs after it', async () => {
+    // A run at a batch of one makes at most a hundred calls, so this is
+    // more than one run reaches.
+    const trader = await seedTrader('Unsubscribed');
+    const backlog = await queueMatches(trader, 250, headOfTheDay());
+
+    await deliver({ batch: 1 });
+
+    const afterOne = await outboxLike(backlog);
+    expect(afterOne.some((row) => row.sent_at === null)).toBe(true);
+    expect(afterOne.some((row) => row.sent_at !== null)).toBe(true);
+
+    for (let runs = 0; runs < 5; runs += 1) {
+      await deliver({ batch: 1 });
+      if ((await outboxLike(backlog)).every((row) => row.sent_at !== null)) {
+        break;
+      }
+    }
+    const drained = await outboxLike(backlog);
+    expect(drained).toHaveLength(250);
+    for (const row of drained) {
+      expect(row.sent_at).not.toBeNull();
+      expect(row.attempts).toBe(0);
+    }
+  });
+
+  it('delivers a notification queued behind several batches of silent ones, in one run', async () => {
+    const [silent, proposedTo] = await Promise.all([
+      seedTrader('Unsubscribed'),
+      seedTrader('Proposed to'),
+    ]);
+    const browser = await subscribe(proposedTo);
+    const head = headOfTheDay();
+    const silentRows = await queueMatches(silent, 10, head);
+    const topic = await queue(proposedTo, 'new_proposal', {
+      createdAt: new Date(Date.parse(head) + 1000).toISOString(),
+    });
+
+    await deliver({ batch: 2 });
+
+    for (const row of await outboxLike(silentRows)) {
+      expect(row.sent_at).not.toBeNull();
+      expect(row.attempts).toBe(0);
+    }
+    expect(pushesTo(browser, topic)).toHaveLength(1);
+    expect(emailsTo(proposedTo)).toHaveLength(1);
+    const [row] = await outbox(topic);
+    expect(row?.sent_at).not.toBeNull();
+  });
+
+  it('leaves a day-old notification unsent for a Trader with no browser subscribed', async () => {
+    // Settling walks the same day the claim does, so it never has to step
+    // over every stale row at the head of the outbox to reach a live one.
+    const trader = await seedTrader('Unsubscribed');
+    const stale = await queue(trader, 'new_match', {
+      createdAt: new Date(Date.now() - 25 * HOUR).toISOString(),
+    });
+
+    await deliver();
+
+    const [row] = await outbox(stale);
+    expect(row?.sent_at).toBeNull();
     expect(row?.attempts).toBe(0);
   });
 

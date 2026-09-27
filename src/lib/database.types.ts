@@ -893,23 +893,7 @@ export type Database = {
         Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
         Returns: undefined
       }
-      claim_notifications: {
-        Args: { batch?: number }
-        Returns: {
-          body: string
-          channels: Database["public"]["Enums"]["notification_channel"][]
-          created_at: string
-          email: string
-          email_sent_at: string
-          id: string
-          kind: Database["public"]["Enums"]["notification_kind"]
-          push_sent_at: string
-          title: string
-          topic: string
-          trader_id: string
-          url: string
-        }[]
-      }
+      claim_notifications: { Args: { batch?: number }; Returns: Json }
       compact_price_snapshots: {
         Args: { sync_day: string }
         Returns: undefined
