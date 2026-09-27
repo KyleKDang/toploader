@@ -407,14 +407,14 @@ describe('The notifier', { timeout: 30_000 }, () => {
     url: '/',
   });
 
-  /** A Match is pushed, never emailed, and its row is marked sent. */
+  /** Matches are pushed, never emailed, and every row on their topics is marked sent. */
   async function expectPushedOnly(
     traders: SeededTrader[],
     topics: string[],
   ): Promise<void> {
     expect(
       emails().filter((email) =>
-        email.to.some((to) => traders.some((t) => t.email === to)),
+        email.to.some((to) => traders.some((trader) => trader.email === to)),
       ),
     ).toEqual([]);
     for (const topic of topics) {
@@ -512,24 +512,23 @@ describe('The notifier', { timeout: 30_000 }, () => {
   it("pushes a Trader's move to the Traders they now match, and not to the Trader who moved", async () => {
     // The mover lists and wants Examplemon in Test City, then moves to
     // Orange County, where one Trader wants it and another lists it.
-    const [mover, wantsMine, listsWhatIWant] = await Promise.all([
+    const [mover, wanter, lister] = await Promise.all([
       seedTrader('Mover', TEST_CITY),
-      seedTrader('Wants mine'),
-      seedTrader('Lists theirs'),
+      seedTrader('Wanter'),
+      seedTrader('Lister'),
     ]);
     const [moverListing, theirListing] = await Promise.all([
       createListing(mover, holofoil, 'NM'),
-      createListing(listsWhatIWant, holofoil, 'NM'),
+      createListing(lister, holofoil, 'NM'),
       addWant(mover, { card_id: examplemon }),
-      addWant(wantsMine, { card_id: examplemon }),
+      addWant(wanter, { card_id: examplemon }),
     ]);
-    const [moverBrowser, wantsMineBrowser, listsWhatIWantBrowser] =
-      await Promise.all([
-        subscribe(mover),
-        subscribe(wantsMine),
-        subscribe(listsWhatIWant),
-      ]);
-    const mineTopic = `match:${moverListing}:${wantsMine.id}`;
+    const [moverBrowser, wanterBrowser, listerBrowser] = await Promise.all([
+      subscribe(mover),
+      subscribe(wanter),
+      subscribe(lister),
+    ]);
+    const mineTopic = `match:${moverListing}:${wanter.id}`;
     const theirsTopic = `match:${theirListing}:${mover.id}`;
 
     const { error } = await mover.client.rpc('set_trader_profile', {
@@ -540,18 +539,15 @@ describe('The notifier', { timeout: 30_000 }, () => {
     if (error) throw error;
     await deliver();
 
-    expect(pushesTo(wantsMineBrowser, mineTopic)).toEqual([
+    expect(pushesTo(wanterBrowser, mineTopic)).toEqual([
       { ...listedPush(mover, moverListing), tag: mineTopic },
     ]);
-    expect(pushesTo(listsWhatIWantBrowser, theirsTopic)).toEqual([
+    expect(pushesTo(listerBrowser, theirsTopic)).toEqual([
       { ...wantedPush(mover), tag: theirsTopic },
     ]);
     expect(pushesTo(moverBrowser, mineTopic)).toEqual([]);
     expect(pushesTo(moverBrowser, theirsTopic)).toEqual([]);
-    await expectPushedOnly(
-      [mover, wantsMine, listsWhatIWant],
-      [mineTopic, theirsTopic],
-    );
+    await expectPushedOnly([mover, wanter, lister], [mineTopic, theirsTopic]);
   });
 
   it('pushes to every browser a Trader has said yes in', async () => {

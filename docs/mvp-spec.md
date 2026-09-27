@@ -178,7 +178,7 @@ Every policy and RPC ships with a test proving what a foreign user cannot do.
 | Chat message | yes | no |
 | Verification result | yes | yes |
 
-A new Match alerts only the Trader on the other side of the change that made it: a new Listing alerts the Traders who want it, and a new Want alerts the Traders whose Listings satisfy it.
+A new Match alerts only the Trader on the other side of the change that made it: a new Listing alerts the Traders who want it, a new Want alerts the Traders whose Listings satisfy it, and a Trader changing City alerts the Traders they now match.
 The Trader who made the change is already looking at the result, and in a busy City one Want for a popular Card would otherwise push them an alert per Listing.
 Settled on [#72](https://github.com/KyleKDang/toploader/issues/72) and recorded as an amendment to [ADR-0008](adr/0008-notification-outbox.md).
 
