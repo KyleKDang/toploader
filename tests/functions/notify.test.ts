@@ -23,7 +23,12 @@ import {
   toBase64Url,
   type VapidKeys,
 } from '../../supabase/functions/_shared/vapid.ts';
-import { arrange, cancelTradeFor, verifyTrader } from '../db/arrange.ts';
+import {
+  arrange,
+  cancelTradeFor,
+  commitToTrade,
+  verifyTrader,
+} from '../db/arrange.ts';
 import {
   addWant,
   cityId,
@@ -242,7 +247,11 @@ describe('The notifier', { timeout: 30_000 }, () => {
     return data;
   }
 
-  /** A Match between two fresh Traders, each subscribed in one browser. */
+  /**
+   * A Match between two fresh Traders, each subscribed in one browser. The
+   * Want goes in first, so the Listing going active is the change that makes
+   * the pair hold, and the wanting Trader is the one it alerts.
+   */
   async function matchedPair() {
     const [lister, wanter] = await Promise.all([
       seedTrader('Lister'),
@@ -384,38 +393,165 @@ describe('The notifier', { timeout: 30_000 }, () => {
   const emailsTo = (trader: SeededTrader) =>
     emails().filter((email) => email.to.includes(trader.email));
 
-  it('pushes a new Match to each Trader once, and emails neither', async () => {
+  /** The push a wanting Trader gets for a Listing that satisfies their Want. */
+  const listedPush = (lister: SeededTrader, listingId: string) => ({
+    title: 'New match',
+    body: `${lister.displayName} listed Examplemon (Holofoil, NM), a card you want.`,
+    url: `/listings/${listingId}`,
+  });
+
+  /** The push a lister gets for a Trader wanting what they listed. */
+  const wantedPush = (wanter: SeededTrader) => ({
+    title: 'New match',
+    body: `${wanter.displayName} wants the Examplemon you listed.`,
+    url: '/',
+  });
+
+  /** A Match is pushed, never emailed, and its row is marked sent. */
+  async function expectPushedOnly(
+    traders: SeededTrader[],
+    topics: string[],
+  ): Promise<void> {
+    expect(
+      emails().filter((email) =>
+        email.to.some((to) => traders.some((t) => t.email === to)),
+      ),
+    ).toEqual([]);
+    for (const topic of topics) {
+      for (const row of await outbox(topic)) {
+        expect(row.push_sent_at).not.toBeNull();
+        expect(row.email_sent_at).toBeNull();
+        expect(row.sent_at).not.toBeNull();
+      }
+    }
+  }
+
+  it('pushes a Listing going active to the Trader who wants it, and not to its lister', async () => {
     const { lister, wanter, listerBrowser, wanterBrowser, listingId, topic } =
       await matchedPair();
 
     await deliver();
 
     expect(pushesTo(wanterBrowser, topic)).toEqual([
-      {
-        title: 'New match',
-        body: 'Lister listed Examplemon (Holofoil, NM), a card you want.',
-        url: `/listings/${listingId}`,
-        tag: topic,
-      },
+      { ...listedPush(lister, listingId), tag: topic },
     ]);
-    expect(pushesTo(listerBrowser, topic)).toEqual([
-      {
-        title: 'New match',
-        body: 'Wanter wants the Examplemon you listed.',
-        url: '/',
-        tag: topic,
-      },
+    expect(pushesTo(listerBrowser, topic)).toEqual([]);
+    expect(await outbox(topic)).toEqual([
+      expect.objectContaining({ trader_id: wanter.id }),
     ]);
-    expect(
-      emails().filter((email) =>
-        email.to.some((to) => [lister.email, wanter.email].includes(to)),
-      ),
-    ).toEqual([]);
-    for (const row of await outbox(topic)) {
-      expect(row.push_sent_at).not.toBeNull();
-      expect(row.email_sent_at).toBeNull();
-      expect(row.sent_at).not.toBeNull();
+    await expectPushedOnly([lister, wanter], [topic]);
+  });
+
+  it('pushes a Listing returned to active to the Trader who wants it, and not to its lister', async () => {
+    // The Want goes in while the Listing is spoken for, so no pair holds
+    // until a cancelled Trade puts the Listing back.
+    const [lister, wanter] = await Promise.all([
+      seedTrader('Lister'),
+      seedTrader('Wanter'),
+    ]);
+    const [listerBrowser, wanterBrowser] = await Promise.all([
+      subscribe(lister),
+      subscribe(wanter),
+    ]);
+    const listingId = await createListing(lister, holofoil, 'NM');
+    await commitToTrade(listingId);
+    await addWant(wanter, { card_id: examplemon });
+    const topic = `match:${listingId}:${wanter.id}`;
+    expect(await outbox(topic)).toEqual([]);
+
+    await arrange(
+      (sql) =>
+        sql`update public.listings set status = 'active' where id = ${listingId}`,
+    );
+    await deliver();
+
+    expect(pushesTo(wanterBrowser, topic)).toEqual([
+      { ...listedPush(lister, listingId), tag: topic },
+    ]);
+    expect(pushesTo(listerBrowser, topic)).toEqual([]);
+    await expectPushedOnly([lister, wanter], [topic]);
+  });
+
+  it('pushes a new Want to each Trader whose Listing it pairs with, once per pair, and not to the Trader who added it', async () => {
+    const [first, second, wanter] = await Promise.all([
+      seedTrader('First lister'),
+      seedTrader('Second lister'),
+      seedTrader('Wanter'),
+    ]);
+    const [firstBrowser, secondBrowser, wanterBrowser] = await Promise.all([
+      subscribe(first),
+      subscribe(second),
+      subscribe(wanter),
+    ]);
+    const [firstA, firstB, secondA] = await Promise.all([
+      createListing(first, holofoil, 'NM'),
+      createListing(first, holofoil, 'NM'),
+      createListing(second, holofoil, 'NM'),
+    ]);
+    const topic = (listingId: string) => `match:${listingId}:${wanter.id}`;
+
+    await addWant(wanter, { card_id: examplemon });
+    await deliver();
+
+    for (const [browser, listingId] of [
+      [firstBrowser, firstA],
+      [firstBrowser, firstB],
+      [secondBrowser, secondA],
+    ] as const) {
+      expect(pushesTo(browser, topic(listingId))).toEqual([
+        { ...wantedPush(wanter), tag: topic(listingId) },
+      ]);
+      expect(pushesTo(wanterBrowser, topic(listingId))).toEqual([]);
     }
+    await expectPushedOnly(
+      [first, second, wanter],
+      [firstA, firstB, secondA].map(topic),
+    );
+  });
+
+  it("pushes a Trader's move to the Traders they now match, and not to the Trader who moved", async () => {
+    // The mover lists and wants Examplemon in Test City, then moves to
+    // Orange County, where one Trader wants it and another lists it.
+    const [mover, wantsMine, listsWhatIWant] = await Promise.all([
+      seedTrader('Mover', TEST_CITY),
+      seedTrader('Wants mine'),
+      seedTrader('Lists theirs'),
+    ]);
+    const [moverListing, theirListing] = await Promise.all([
+      createListing(mover, holofoil, 'NM'),
+      createListing(listsWhatIWant, holofoil, 'NM'),
+      addWant(mover, { card_id: examplemon }),
+      addWant(wantsMine, { card_id: examplemon }),
+    ]);
+    const [moverBrowser, wantsMineBrowser, listsWhatIWantBrowser] =
+      await Promise.all([
+        subscribe(mover),
+        subscribe(wantsMine),
+        subscribe(listsWhatIWant),
+      ]);
+    const mineTopic = `match:${moverListing}:${wantsMine.id}`;
+    const theirsTopic = `match:${theirListing}:${mover.id}`;
+
+    const { error } = await mover.client.rpc('set_trader_profile', {
+      display_name: mover.displayName,
+      city_id: await cityId(mover.client, ORANGE_COUNTY),
+      attests_adult: true,
+    });
+    if (error) throw error;
+    await deliver();
+
+    expect(pushesTo(wantsMineBrowser, mineTopic)).toEqual([
+      { ...listedPush(mover, moverListing), tag: mineTopic },
+    ]);
+    expect(pushesTo(listsWhatIWantBrowser, theirsTopic)).toEqual([
+      { ...wantedPush(mover), tag: theirsTopic },
+    ]);
+    expect(pushesTo(moverBrowser, mineTopic)).toEqual([]);
+    expect(pushesTo(moverBrowser, theirsTopic)).toEqual([]);
+    await expectPushedOnly(
+      [mover, wantsMine, listsWhatIWant],
+      [mineTopic, theirsTopic],
+    );
   });
 
   it('pushes to every browser a Trader has said yes in', async () => {
@@ -448,16 +584,15 @@ describe('The notifier', { timeout: 30_000 }, () => {
     await deliver();
 
     expect(pushesTo(wanterBrowser, topic)).toHaveLength(1);
-    expect(pushesTo(listerBrowser, topic)).toHaveLength(1);
+    expect(pushesTo(listerBrowser, topic)).toEqual([]);
   });
 
   it('sends each notification once when two runs overlap', async () => {
-    const { listerBrowser, wanterBrowser, topic } = await matchedPair();
+    const { wanterBrowser, topic } = await matchedPair();
 
     await Promise.all([deliver(), deliver()]);
 
     expect(pushesTo(wanterBrowser, topic)).toHaveLength(1);
-    expect(pushesTo(listerBrowser, topic)).toHaveLength(1);
   });
 
   it('pushes and emails a new Trade proposal to its recipient alone', async () => {

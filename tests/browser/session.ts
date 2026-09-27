@@ -78,6 +78,28 @@ export async function signInAsNewTrader(
 }
 
 /**
+ * A City no other tracer or earlier run has Traders in, through a superuser
+ * connection in a tracer's arrange step, and its name. Cities are reference
+ * data written only by migrations, so no client path makes one.
+ *
+ * For a tracer whose screen shows what a City's other Traders did: in a
+ * shared City the flow under test competes with every Listing and Want the
+ * stack has accumulated, and how long it takes depends on how many earlier
+ * runs there were (#72).
+ */
+export async function arrangeCity() {
+  const name = `Tracer City ${randomUUID().slice(0, 8)}`;
+  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
+  try {
+    await sql`insert into public.cities (name, time_zone)
+              values (${name}, 'America/Los_Angeles')`;
+  } finally {
+    await sql.end();
+  }
+  return name;
+}
+
+/**
  * Makes a Trader a Verified Trader, through a superuser connection, in a
  * tracer's arrange step. The submit-and-review flow that sets this for real
  * is #26; until then no client path reaches it, the same reason the seam-1

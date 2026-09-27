@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { signInAsNewTrader } from './session.ts';
+import { arrangeCity, signInAsNewTrader } from './session.ts';
 
 /*
  * Matching, end to end at 375px: one Trader lists a Copy, another Trader
@@ -15,6 +15,11 @@ import { signInAsNewTrader } from './session.ts';
  * page, because this tracer is also the browser coverage #18 left to it.
  * The Listing is arranged through the API: the Listing flow has a tracer of
  * its own (listings.spec.ts), and nothing here depends on its photo.
+ *
+ * Both Traders are in a City of this run's own. Every other tracer and every
+ * earlier run lists and wants Examplemon too, and in their City this Want
+ * would pair with all of them, so both what it takes to add and what the
+ * Matches view shows would grow with the stack (#72).
  */
 
 const CARD_IMAGE = readFileSync(
@@ -26,15 +31,6 @@ const TINY_WEBP = Buffer.from(
   'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
   'base64',
 );
-
-/**
- * A display name no other Trader has. The City is full of other tracers'
- * and earlier runs' Listings and Wants for the same Card, so a Match can
- * only be pointed at by the name of the Trader on the other side of it.
- */
-function uniqueTrader(role: string) {
-  return `${role} ${randomUUID().slice(0, 8)}`;
-}
 
 /** Card images are hotlinked from TCGplayer; faked at the network edge. */
 async function fakeCardImages(page: Page) {
@@ -60,14 +56,11 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
   await fakeCardImages(listerPage);
   await fakeCardImages(wanterPage);
 
-  const listerName = uniqueTrader('Lister');
-  const wanterName = uniqueTrader('Wanter');
-  const lister = await signInAsNewTrader(
-    listerPage,
-    'Orange County',
-    listerName,
-  );
-  await signInAsNewTrader(wanterPage, 'Orange County', wanterName);
+  const city = await arrangeCity();
+  const listerName = 'Lister';
+  const wanterName = 'Wanter';
+  const lister = await signInAsNewTrader(listerPage, city, listerName);
+  await signInAsNewTrader(wanterPage, city, wanterName);
 
   // The Listing: a Near Mint Holofoil Examplemon, in the lister's City.
   const { data: card, error: cardError } = await lister.client
@@ -158,7 +151,7 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
   );
   // The Trader's own Reputation, once, in the header.
   await expect(
-    wanterPage.locator('header p', { hasText: 'Orange County · You' }),
+    wanterPage.locator('header p', { hasText: `${city} · You` }),
   ).toContainText('Not verified · 0 Trades');
   await expectNoHorizontalOverflow(wanterPage);
 
