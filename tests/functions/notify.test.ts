@@ -56,6 +56,7 @@ import { startCaptureServer, type CaptureServer } from './capture-server.ts';
 const APP_URL = 'https://toploaderapp.com';
 const REPLY_TO = 'hello@toploaderapp.com';
 const RESEND_API_KEY = 're_test_key';
+const HOUR = 60 * 60 * 1000;
 
 interface PushPayload {
   title: string;
@@ -574,6 +575,199 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(emailsTo(proposer)).toEqual([]);
     expect(emailsTo(recipient)).toEqual([]);
     expect(await outbox(topic)).toHaveLength(1);
+  });
+
+  /**
+   * A proposal the recipient has accepted and a Meetup the proposer has put
+   * forward at the first Safe Spot of their City, the given number of hours
+   * out, with everything queued so far already delivered.
+   */
+  async function meetupPutForward(hoursAway: number) {
+    const trade = await proposedTrade();
+    const { proposer, recipient, tradeId } = trade;
+    const accepted = await recipient.client.rpc('accept_trade', {
+      trade_id: tradeId,
+    });
+    if (accepted.error) throw accepted.error;
+    const { data: spots, error } = await proposer.client
+      .from('safe_spots')
+      .select('id, name')
+      .order('name');
+    if (error) throw error;
+    const [spot] = spots;
+    if (!spot) throw new Error('No Safe Spot seeded in Test City');
+    const proposed = await proposer.client.rpc('propose_meetup', {
+      trade_id: tradeId,
+      meetup_at: new Date(Date.now() + hoursAway * HOUR).toISOString(),
+      safe_spot_id: spot.id,
+    });
+    if (proposed.error) throw proposed.error;
+    await deliver();
+    pushService.reset();
+    resend.reset();
+    return { ...trade, spotName: spot.name };
+  }
+
+  /** A Meetup put forward and confirmed, as `meetupPutForward` leaves one. */
+  async function scheduledMeetup(hoursAway: number) {
+    const meetup = await meetupPutForward(hoursAway);
+    const { error } = await meetup.recipient.client.rpc('confirm_meetup', {
+      trade_id: meetup.tradeId,
+    });
+    if (error) throw error;
+    await deliver();
+    pushService.reset();
+    resend.reset();
+    return meetup;
+  }
+
+  /** The reminder sweep, run the way its pg_cron job runs it. */
+  const sweepReminders = () =>
+    arrange((sql) => sql`select public.queue_meetup_reminders()`);
+
+  /** The Meetup reminders queued on one topic. */
+  async function reminders(topic: string) {
+    const { data, error } = await service
+      .from('notifications')
+      .select('trader_id')
+      .eq('topic', topic)
+      .eq('kind', 'meetup_reminder');
+    if (error) throw error;
+    return data;
+  }
+
+  it('pushes and emails a confirmed Meetup to both Traders', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+      spotName,
+    } = await meetupPutForward(24);
+
+    const { error } = await recipient.client.rpc('confirm_meetup', {
+      trade_id: tradeId,
+    });
+    if (error) throw error;
+    await deliver();
+
+    const url = `/trades/${tradeId}`;
+    expect(pushesTo(proposerBrowser, topic)).toEqual([
+      {
+        title: 'Meetup confirmed',
+        body: `Your meetup with Recipient at ${spotName} is confirmed.`,
+        url,
+        tag: topic,
+      },
+    ]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([
+      {
+        title: 'Meetup confirmed',
+        body: `Your meetup with Proposer at ${spotName} is confirmed.`,
+        url,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(proposer)).toEqual([
+      {
+        from: 'Toploader <noreply@mail.toploaderapp.com>',
+        to: [proposer.email],
+        reply_to: REPLY_TO,
+        subject: 'Meetup confirmed',
+        text: `Your meetup with Recipient at ${spotName} is confirmed.\n\n${APP_URL}${url}\n`,
+      },
+    ]);
+    expect(emailsTo(recipient).map((email) => email.subject)).toEqual([
+      'Meetup confirmed',
+    ]);
+  });
+
+  it('tells nobody about a Meetup only put forward', async () => {
+    // The matrix has a row for a confirmed Meetup and none for one put
+    // forward; the other Trader finds it on the Trade.
+    const { proposer, recipient, proposerBrowser, recipientBrowser, topic } =
+      await meetupPutForward(24);
+
+    await deliver();
+
+    expect(pushesTo(proposerBrowser, topic)).toEqual([]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
+    expect(emailsTo(proposer)).toEqual([]);
+    expect(emailsTo(recipient)).toEqual([]);
+  });
+
+  it('reminds both Traders by push alone before the Meetup, once', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+      spotName,
+    } = await scheduledMeetup(1.5);
+    // The Meetup was confirmed a day ago and is now an hour and a half
+    // away: the reminder is due.
+    await arrange(
+      (sql) =>
+        sql`update public.trades set scheduled_at = scheduled_at - interval '1 day'
+              where id = ${tradeId}`,
+    );
+
+    await sweepReminders();
+    await sweepReminders();
+    await deliver();
+
+    const url = `/trades/${tradeId}`;
+    expect(pushesTo(proposerBrowser, topic)).toEqual([
+      {
+        title: 'Meetup coming up',
+        body: `Your meetup with Recipient at ${spotName} is coming up.`,
+        url,
+        tag: topic,
+      },
+    ]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([
+      {
+        title: 'Meetup coming up',
+        body: `Your meetup with Proposer at ${spotName} is coming up.`,
+        url,
+        tag: topic,
+      },
+    ]);
+    expect(emailsTo(proposer)).toEqual([]);
+    expect(emailsTo(recipient)).toEqual([]);
+    expect(await reminders(topic)).toHaveLength(2);
+  });
+
+  it('does not remind of a Meetup not yet near, nor one confirmed already near', async () => {
+    const [far, near] = await Promise.all([
+      scheduledMeetup(24),
+      scheduledMeetup(1.5),
+    ]);
+
+    await sweepReminders();
+
+    expect(await reminders(far.topic)).toEqual([]);
+    // Its confirmation just told both Traders.
+    expect(await reminders(near.topic)).toEqual([]);
+  });
+
+  it('runs the reminder sweep every minute', async () => {
+    const jobs = await arrange(
+      (sql) =>
+        sql`select schedule, command from cron.job
+              where jobname = 'queue-meetup-reminders'`,
+    );
+
+    expect(jobs).toEqual([
+      {
+        schedule: '* * * * *',
+        command: ' select public.queue_meetup_reminders() ',
+      },
+    ]);
   });
 
   it('emails through Resend, and pushes too, for a kind the matrix emails', async () => {
