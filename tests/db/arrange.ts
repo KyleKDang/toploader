@@ -8,12 +8,12 @@ import { inject } from 'vitest';
  * Seam 1 is supabase-js signed in as a Trader, and that stays the seam every
  * assertion is made through: this is for the arrange step only. A Listing
  * reaches `traded`, and returns from `in_trade` to `active`, through the
- * completion and cancel steps of the Trade machine (#25), which do not exist
- * yet, so without this there is no way to ask what City browse does with a
- * traded Listing, or what the reaper does with the photos of a completed
- * Trade - both of which #17 had to answer. A test about a Listing simply
- * being committed to a Trade may still arrange that here, rather than
- * seeding two Verified Traders and a proposal to get there.
+ * completion and cancel steps of the Trade machine (#25), which take two
+ * Verified Traders, a proposal, an accept, and a confirmed Meetup to reach.
+ * A test whose subject is the Listing rather than the Trade - what City
+ * browse does with a traded Listing, what the reaper does with its photos -
+ * arranges the Listing's states here instead; tests/db/completion.test.ts
+ * proves the Trade machine moves them the same way.
  *
  * It is deliberately not a door in the app: no client role and no
  * server-side job may move a Listing's status, so the only alternative was
