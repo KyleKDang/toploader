@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import postgres from 'postgres';
 import type { Database } from '../../src/lib/database.types.ts';
+import { isJwtIssuedAtFuture, waitForSignedInReads } from '../local-stack.ts';
 
 /*
  * Signing a Trader into the app under test without walking the sign-up
@@ -49,6 +50,7 @@ export async function signInAsNewTrader(
   });
   if (error) throw error;
   if (!data.session) throw new Error('Signup returned no session');
+  await waitForSignedInReads(client, { retry: isJwtIssuedAtFuture });
 
   const { data: found, error: cityError } = await client
     .from('cities')
