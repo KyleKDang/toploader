@@ -607,33 +607,45 @@ export type Database = {
           accepted_at: string | null
           created_at: string
           id: string
+          meetup_at: string | null
+          meetup_reminded_at: string | null
           proposer_cash_cents: number | null
           proposer_id: string
           recipient_cash_cents: number | null
           recipient_id: string
           responder_id: string | null
+          safe_spot_id: string | null
+          scheduled_at: string | null
           status: Database["public"]["Enums"]["trade_status"]
         }
         Insert: {
           accepted_at?: string | null
           created_at?: string
           id?: string
+          meetup_at?: string | null
+          meetup_reminded_at?: string | null
           proposer_cash_cents?: number | null
           proposer_id: string
           recipient_cash_cents?: number | null
           recipient_id: string
           responder_id?: string | null
+          safe_spot_id?: string | null
+          scheduled_at?: string | null
           status?: Database["public"]["Enums"]["trade_status"]
         }
         Update: {
           accepted_at?: string | null
           created_at?: string
           id?: string
+          meetup_at?: string | null
+          meetup_reminded_at?: string | null
           proposer_cash_cents?: number | null
           proposer_id?: string
           recipient_cash_cents?: number | null
           recipient_id?: string
           responder_id?: string | null
+          safe_spot_id?: string | null
+          scheduled_at?: string | null
           status?: Database["public"]["Enums"]["trade_status"]
         }
         Relationships: [
@@ -656,6 +668,13 @@ export type Database = {
             columns: ["responder_id"]
             isOneToOne: false
             referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_safe_spot_id_fkey"
+            columns: ["safe_spot_id"]
+            isOneToOne: false
+            referencedRelation: "safe_spots"
             referencedColumns: ["id"]
           },
         ]
@@ -853,6 +872,7 @@ export type Database = {
         Args: { sync_day: string }
         Returns: undefined
       }
+      confirm_meetup: { Args: { trade_id: string }; Returns: undefined }
       counter_trade: {
         Args: {
           listing_ids: string[]
@@ -889,6 +909,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      meetup_reminder_lead: { Args: never; Returns: string }
       notification_channels: {
         Args: { kind: Database["public"]["Enums"]["notification_kind"] }
         Returns: Database["public"]["Enums"]["notification_channel"][]
@@ -900,6 +921,21 @@ export type Database = {
         }
         Returns: string
       }
+      propose_meetup: {
+        Args: { meetup_at: string; safe_spot_id: string; trade_id: string }
+        Returns: undefined
+      }
+      queue_meetup_notification: {
+        Args: {
+          body_format: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          recipient: string
+          title: string
+          trade: Database["public"]["Tables"]["trades"]["Row"]
+        }
+        Returns: undefined
+      }
+      queue_meetup_reminders: { Args: never; Returns: undefined }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
       remove_push_subscription: {
         Args: { endpoint: string }
@@ -960,11 +996,15 @@ export type Database = {
           accepted_at: string | null
           created_at: string
           id: string
+          meetup_at: string | null
+          meetup_reminded_at: string | null
           proposer_cash_cents: number | null
           proposer_id: string
           recipient_cash_cents: number | null
           recipient_id: string
           responder_id: string | null
+          safe_spot_id: string | null
+          scheduled_at: string | null
           status: Database["public"]["Enums"]["trade_status"]
         }
         SetofOptions: {

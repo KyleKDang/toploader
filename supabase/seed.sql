@@ -32,6 +32,13 @@ from (
       '1 Test Street, Test City',
       'police_station',
       null
+    ),
+    (
+      'Test City',
+      'Test City Library',
+      '2 Test Street, Test City',
+      'monitored_site',
+      null
     )
 ) as spot (city, name, address, kind, notes)
 join public.cities on cities.name = spot.city;

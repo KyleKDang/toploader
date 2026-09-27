@@ -96,6 +96,8 @@ The domain's DNS records, including SPF, DKIM and DMARC for `mail.`, are in Clou
 - **Merge to `main`:** CI's `migrate` job applies new migrations to the hosted database and deploys the edge functions; Render deploys the app once every check on the commit has passed (`render.yaml`).
 - **On every notification, and once a minute:** the database wakes the `notify` edge function, which sends whatever the outbox holds ([The notifier](#the-notifier)).
   A run that fails reports to Sentry as an error.
+- **Once a minute:** the `pg_cron` job `queue-meetup-reminders` queues a reminder for each scheduled Meetup now within two hours, once per Meetup, which the notifier then pushes.
+  It runs inside the database and needs no secret, so it works on every stack, local included.
 - **Nightly, 10:17 UTC:** `.github/workflows/nightly-backup.yml` dumps and encrypts the database, keeps it as an artifact for 30 days, restores it into a throwaway stack to prove it restores, and checks in with the Sentry cron monitor `nightly-backup`.
   A failed run, or no run at all, raises a Sentry issue.
 - **Daily, 21:23 UTC:** `.github/workflows/catalog-sync.yml` syncs the Catalog from TCGCSV, which publishes around 20:00 UTC, and checks in with the Sentry cron monitor `catalog-sync`.
