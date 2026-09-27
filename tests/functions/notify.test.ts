@@ -820,19 +820,22 @@ describe('The notifier', { timeout: 30_000 }, () => {
     if (error) throw error;
     await deliver();
 
-    expect(pushesTo(proposerBrowser, topic)).toEqual([
+    // The Trade's chat is a topic of its own: on the Trade's, a message
+    // would replace the proposal the proposer may not have read yet.
+    const chat = `chat:${tradeId}`;
+    expect(pushesTo(proposerBrowser, chat)).toEqual([
       {
         title: 'New message',
         body: 'Recipient: Can we meet at the station Saturday?',
         url: `/trades/${tradeId}`,
-        tag: topic,
+        tag: chat,
       },
     ]);
-    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
+    expect(pushesTo(proposerBrowser, topic)).toEqual([]);
+    expect(pushesTo(recipientBrowser, chat)).toEqual([]);
     expect(emailsTo(proposer)).toEqual([]);
     expect(emailsTo(recipient)).toEqual([]);
-    // The proposal's, then the message's, which asked for push alone.
-    const [, message] = await outbox(topic);
+    const [message] = await outbox(chat);
     expect(message).toMatchObject({
       trader_id: proposer.id,
       email_sent_at: null,
@@ -841,7 +844,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
   });
 
   it('cuts a long chat message short in its push', async () => {
-    const { proposer, proposerBrowser, recipient, tradeId, topic } =
+    const { proposer, proposerBrowser, recipient, tradeId } =
       await proposedTrade();
     await deliver();
     pushService.reset();
@@ -855,7 +858,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     if (error) throw error;
     await deliver();
 
-    const [push] = pushesTo(proposerBrowser, topic);
+    const [push] = pushesTo(proposerBrowser, `chat:${tradeId}`);
     expect(push.body).toBe(`Recipient: ${'é'.repeat(139)}…`);
     expect(emailsTo(proposer)).toEqual([]);
   });

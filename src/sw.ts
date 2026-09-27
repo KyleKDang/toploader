@@ -53,9 +53,17 @@ type PushMessage = { title: string; body: string; url: string; tag: string };
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   const { title, body, url, tag } = event.data.json() as PushMessage;
-  event.waitUntil(
-    self.registration.showNotification(title, { body, tag, data: { url } }),
-  );
+  // A notification that replaces one with the same tag is shown silently
+  // unless told otherwise, so a Trade's second chat message onward would
+  // make no sound. `renotify` asks for the alert each time; TypeScript's
+  // lib no longer lists it, and browsers without it ignore it.
+  const options: NotificationOptions & { renotify: boolean } = {
+    body,
+    tag,
+    renotify: true,
+    data: { url },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // A tap opens the app at the notification's path, in the app's tab if one
