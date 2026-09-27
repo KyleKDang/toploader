@@ -555,22 +555,22 @@ describe('Ending a Trade', () => {
       ).toBe('accepted');
     });
 
-    it('cannot be reported by a Trader who has tapped Complete', async () => {
+    it('cannot be reported by either Trader once one has tapped Complete', async () => {
       const trade = await pastMeetup();
       const tapped = await complete(trade.counterparty, trade.tradeId);
       if (tapped.error) throw tapped.error;
 
-      const reported = await markNoShow(trade.counterparty, trade.tradeId);
+      // A tap says the two met. Were the untapped Trader able to report the
+      // tapper absent, they could take the cards, skip their own tap, and
+      // mark the partner a no-show.
+      const byTapper = await markNoShow(trade.counterparty, trade.tradeId);
+      const byOther = await markNoShow(trade.actor, trade.tradeId);
 
-      // Their own tap says the Meetup happened. The Trader who has not
-      // tapped may still report them absent: a tap can be made from
-      // anywhere.
-      expect(reported.error?.code).toBe('22023');
-      const other = await markNoShow(trade.actor, trade.tradeId);
-      expect(other.error).toBeNull();
-      expect(await readEnding(trade.actor.client, trade.tradeId)).toMatchObject(
-        { status: 'no_show', absent_trader_id: trade.counterparty.id },
-      );
+      expect(byTapper.error?.code).toBe('22023');
+      expect(byOther.error?.code).toBe('22023');
+      expect(
+        (await readEnding(trade.actor.client, trade.tradeId))?.status,
+      ).toBe('scheduled');
     });
 
     it('is terminal', async () => {

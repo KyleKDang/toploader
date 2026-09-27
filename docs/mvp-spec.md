@@ -144,7 +144,7 @@ A message is pushed under the Trade's chat as its own topic rather than the Trad
 Settled on [#25](https://github.com/KyleKDang/toploader/issues/25): each Trader's Complete tap is its own timestamp and the second completes the Trade, which trades its Listings; a cancel records who cancelled and a no-show who was absent, since those are what Reputation counts against a Trader.
 A cancel or a no-show releases the Trade's Listings back to active.
 A proposal is withdrawn by cancelling it only by the Trader whose terms are standing, its proposer or whoever last countered; the Trader it waits on declines it instead, so turning down an offer never counts.
-A no-show is reported only once the Meetup's time has passed, and never by a Trader who has tapped Complete, since their tap says the Meetup happened.
+A no-show is reported only once the Meetup's time has passed, and never once either Trader has tapped Complete, since a tap says the two met; otherwise a Trader could take the cards, skip their own tap, and mark the partner absent.
 Both Traders read a completed Trade's Listings and photos, though City browse no longer shows a traded Listing, because the Trade Record is read whole.
 Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks`.
 

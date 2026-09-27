@@ -207,9 +207,11 @@ end;
 $$;
 
 -- Reports the other Trader absent from a scheduled Meetup, once its time
--- has passed: nobody is late to a Meetup that has not started. A Trader
--- who has tapped Complete has said the Meetup happened, so cannot; the
--- other still may, since a tap can be made from anywhere.
+-- has passed: nobody is late to a Meetup that has not started. Once either
+-- Trader has tapped Complete, neither may: a tap says the two met, and
+-- letting the other report the tapper absent would let a Trader take the
+-- cards, skip their own tap, and mark the partner a no-show. A tap made
+-- from anywhere else is a dispute for moderation, not for this RPC.
 create function public.mark_no_show(trade_id uuid)
   returns void
   language plpgsql
@@ -231,8 +233,9 @@ begin
       using errcode = '22023';
   end if;
 
-  if public.has_tapped_complete(trade, caller) then
-    raise exception 'you have completed this Trade, so cannot report a no-show'
+  if public.has_tapped_complete(trade, trade.proposer_id)
+    or public.has_tapped_complete(trade, trade.recipient_id) then
+    raise exception 'a Trade tapped Complete cannot become a no-show'
       using errcode = '22023';
   end if;
 
