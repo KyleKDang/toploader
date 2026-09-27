@@ -29,7 +29,9 @@ describe('Cities', () => {
   });
 
   it('cannot be created by a Trader', async () => {
-    const { error } = await trader.from('cities').insert({ name: 'Gotham' });
+    const { error } = await trader
+      .from('cities')
+      .insert({ name: 'Gotham', time_zone: 'America/New_York' });
 
     expect(error?.code).toBe('42501');
   });
