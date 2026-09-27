@@ -13,7 +13,7 @@
 -- it, and none is.
 --
 -- So the check is asked once per event, about that event alone. Every table
--- in it is reached by one of the event's keys: its Listing and both its
+-- in it is reached by one of the event's keys: its Listing and both
 -- Traders by primary key, the wanting Trader's Wants through the index that
 -- leads with trader_id, and the Listing's Card through its Variant's key.
 -- Whatever order the planner picks, each step is a lookup, so the work is
@@ -38,16 +38,13 @@ create or replace view public.matches as
     -- the wanting Trader's Wants for this Card is satisfied by it.
     and exists (
       select 1
-      from public.listings listing,
-        public.traders lister,
-        public.traders wanter,
-        public.wants want
+      from public.listings listing
+        join public.traders lister on lister.id = listing.trader_id
+        join public.wants want on want.trader_id = event.wanter_id
+        join public.traders wanter on wanter.id = want.trader_id
       where listing.id = event.listing_id
-        and lister.id = event.lister_id
-        and wanter.id = event.wanter_id
-        and want.trader_id = event.wanter_id
         and listing.status = 'active'
-        and event.wanter_id <> event.lister_id
+        and want.trader_id <> listing.trader_id
         and lister.city_id = wanter.city_id
         -- A scalar lookup rather than a join, so the planner never
         -- estimates Wants against the whole catalog through it.
@@ -65,3 +62,10 @@ create or replace view public.matches as
       -- join it could run for every pair at once, so it runs per event.
       offset 0
     );
+
+-- The warning above, where the next change to `match_pairs` will meet it:
+-- its migration is already applied, so its own comment cannot carry it.
+comment on view public.match_pairs is
+  'Every pair that holds right now. The same rules are restated for one '
+  'pair in the matches view (#66); a change to what makes a pair hold '
+  'changes both.';
