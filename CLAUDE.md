@@ -6,7 +6,7 @@ The MVP spec is complete at `docs/mvp-spec.md`; implementation is one ticket per
 
 ## Implementing a ticket
 
-`/ship #N` is the whole prompt: it drives one ticket from claim to close, and the ticket (a sub-issue of the map at #31) carries everything needed.
+`/ship #N` is the whole prompt: it drives one ticket from claim to close, and the ticket carries everything needed.
 `/ship` owns the sequence; this file owns what is specific to this project.
 
 **Pacing.**
@@ -44,6 +44,9 @@ The bare `code-review` is Claude Code's built-in, which fans out sub-agents at t
 
 **The frontier** is the map's lowest-numbered child that is open, unassigned, and has no open blocker.
 Build-sequence order is spec order; do not jump ahead.
+
+**The map** at #31 holds only the tickets planned from the spec.
+A follow-up filed while shipping another ticket is standalone: no parent, off the frontier, and started by number when Kyle says to.
 
 ## Agent skills
 
