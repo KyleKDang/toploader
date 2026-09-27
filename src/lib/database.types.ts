@@ -337,6 +337,45 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          sender_id: string
+          trade_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          trade_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          trade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           attempts: number
@@ -974,6 +1013,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      send_message: {
+        Args: { body: string; trade_id: string }
+        Returns: string
       }
       set_collection_quantity: {
         Args: { entry_id: string; quantity: number }

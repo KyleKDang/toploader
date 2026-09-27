@@ -800,6 +800,66 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(await reminders(near.topic)).toEqual([]);
   });
 
+  it('pushes a chat message to the other Trader alone, and emails nobody', async () => {
+    const {
+      proposer,
+      recipient,
+      proposerBrowser,
+      recipientBrowser,
+      tradeId,
+      topic,
+    } = await proposedTrade();
+    await deliver();
+    pushService.reset();
+    resend.reset();
+
+    const { error } = await recipient.client.rpc('send_message', {
+      trade_id: tradeId,
+      body: 'Can we meet at the station Saturday?',
+    });
+    if (error) throw error;
+    await deliver();
+
+    expect(pushesTo(proposerBrowser, topic)).toEqual([
+      {
+        title: 'New message',
+        body: 'Recipient: Can we meet at the station Saturday?',
+        url: `/trades/${tradeId}`,
+        tag: topic,
+      },
+    ]);
+    expect(pushesTo(recipientBrowser, topic)).toEqual([]);
+    expect(emailsTo(proposer)).toEqual([]);
+    expect(emailsTo(recipient)).toEqual([]);
+    // The proposal's, then the message's, which asked for push alone.
+    const [, message] = await outbox(topic);
+    expect(message).toMatchObject({
+      trader_id: proposer.id,
+      email_sent_at: null,
+    });
+    expect(message.sent_at).not.toBeNull();
+  });
+
+  it('cuts a long chat message short in its push', async () => {
+    const { proposer, proposerBrowser, recipient, tradeId, topic } =
+      await proposedTrade();
+    await deliver();
+    pushService.reset();
+
+    // A push service caps what it carries at about 4 KB once encrypted,
+    // and a message may be 2,000 characters of anything.
+    const { error } = await recipient.client.rpc('send_message', {
+      trade_id: tradeId,
+      body: 'é'.repeat(2_000),
+    });
+    if (error) throw error;
+    await deliver();
+
+    const [push] = pushesTo(proposerBrowser, topic);
+    expect(push.body).toBe(`Recipient: ${'é'.repeat(139)}…`);
+    expect(emailsTo(proposer)).toEqual([]);
+  });
+
   it('emails through Resend, and pushes too, for a kind the matrix emails', async () => {
     const trader = await seedTrader('Proposed to');
     const browser = await subscribe(trader);
