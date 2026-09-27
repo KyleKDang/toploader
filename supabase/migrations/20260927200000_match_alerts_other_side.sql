@@ -85,17 +85,12 @@ begin
   -- Matches, where the pairing is.
   insert into public.notifications (trader_id, kind, topic, title, body, url)
     select
-      case when side.to_wanter then wanter.id else lister.id end,
+      alerted.trader_id,
       'new_match',
       format('match:%s:%s', pair.listing_id, pair.wanter_id),
       'New match',
-      case when side.to_wanter
-        then format('%s listed %s (%s, %s), a card you want.',
-          lister.display_name, card.name, variant.name, listing.condition)
-        else format('%s wants the %s you listed.',
-          wanter.display_name, card.name)
-      end,
-      case when side.to_wanter then '/listings/' || pair.listing_id else '/' end
+      alerted.body,
+      alerted.url
     from unnest(listing_ids, wanter_ids) as pair (listing_id, wanter_id)
       join public.listings listing on listing.id = pair.listing_id
       join public.card_variants variant on variant.id = listing.card_variant_id
@@ -104,7 +99,20 @@ begin
       join public.traders wanter on wanter.id = pair.wanter_id
       -- The lister's change alerts the wanting Trader, and the wanting
       -- Trader's change alerts the lister.
-      cross join lateral (select lister.id = changed_by as to_wanter) side;
+      cross join lateral (
+        select
+          wanter.id,
+          format('%s listed %s (%s, %s), a card you want.',
+            lister.display_name, card.name, variant.name, listing.condition),
+          '/listings/' || pair.listing_id
+        where lister.id = changed_by
+        union all
+        select
+          lister.id,
+          format('%s wants the %s you listed.', wanter.display_name, card.name),
+          '/'
+        where wanter.id = changed_by
+      ) as alerted (trader_id, body, url);
 
   return null;
 end;
