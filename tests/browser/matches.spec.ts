@@ -171,8 +171,11 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
   await expect(yours).toContainText('Not verified · 0 Trades');
   await expectNoHorizontalOverflow(listerPage);
 
-  // And the row opens the Listing it is about.
+  // And the row opens the Listing it is about, naming the Trader on the
+  // other side of the Match so its page can propose a Trade to them.
   await yours.click();
-  await expect(listerPage).toHaveURL(new RegExp(`/listings/${listingId}$`));
+  await expect(listerPage).toHaveURL(
+    new RegExp(`/listings/${listingId}\\?with=[0-9a-f-]{36}$`),
+  );
   await expect(listerPage.getByText('Your listing.')).toBeVisible();
 });

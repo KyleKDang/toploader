@@ -12,7 +12,7 @@ export { BottomTabBar } from './BottomTabBar';
 export type { TabKey } from './BottomTabBar';
 export { Button } from './Button';
 export { CardTile } from './CardTile';
-export { Checkbox } from './Checkbox';
+export { Checkbox, CheckboxBox } from './Checkbox';
 export { ChipGroup } from './ChipGroup';
 export { Disclaimer } from './Disclaimer';
 export { EmptyState } from './EmptyState';

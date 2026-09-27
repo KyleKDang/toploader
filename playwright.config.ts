@@ -16,6 +16,9 @@ process.env.MAILPIT_URL = status.MAILPIT_URL;
 // and plant their session under supabase-js's key.
 process.env.SUPABASE_API_URL = status.API_URL;
 process.env.SUPABASE_PUBLISHABLE_KEY = status.PUBLISHABLE_KEY;
+// Read by tests/browser/session.ts to make a Trader a Verified Trader in a
+// tracer's arrange step, which no client path can do until #26.
+process.env.SUPABASE_DB_URL = status.DB_URL;
 
 // A port of its own, so the tracer never reuses a dev server that is
 // pointed somewhere else.

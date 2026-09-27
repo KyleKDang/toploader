@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import postgres from 'postgres';
 import type { Database } from '../../src/lib/database.types.ts';
 
 /*
@@ -72,6 +73,21 @@ export async function signInAsNewTrader(
   );
 
   return { id: data.user?.id ?? '', displayName, client };
+}
+
+/**
+ * Makes a Trader a Verified Trader, through a superuser connection, in a
+ * tracer's arrange step. The submit-and-review flow that sets this for real
+ * is #26; until then no client path reaches it, the same reason the seam-1
+ * suites arrange it (tests/db/arrange.ts).
+ */
+export async function verifyTrader(traderId: string) {
+  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
+  try {
+    await sql`update public.traders set verified_at = now() where id = ${traderId}`;
+  } finally {
+    await sql.end();
+  }
 }
 
 function requireEnv(name: string) {

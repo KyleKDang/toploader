@@ -528,3 +528,182 @@ async function fetchMatches() {
 
 /** A Match as the Matches view shows it in a row. */
 export type Match = Awaited<ReturnType<typeof fetchMatches>>[number];
+
+/*
+ * Trades: the proposal phase of the one agreement between two Traders
+ * (ADR-0005). Only its two Traders can read a Trade, and every step is an
+ * RPC (ADR-0001), so nothing here filters or writes a table.
+ */
+
+/** A Trader as a Trade names them: who, and their Reputation basics. */
+const TRADE_TRADER = 'id, display_name, verified_at, completed_trade_count';
+
+/** A Listing as a Trade's terms show it: its Card, and its first thumbnail. */
+const TRADE_LISTING =
+  'id, trader_id, condition, card_variants(name, market_price_cents, cards(name, number, card_sets(name))), listing_photos(position, thumbnail_path)';
+
+/** A Trade with both its Traders and every Listing on the table. */
+const TRADE = `id, status, proposer_id, responder_id, proposer_cash_cents, recipient_cash_cents, proposer:traders!proposer_id(${TRADE_TRADER}), recipient:traders!recipient_id(${TRADE_TRADER}), trade_items(listing:listings(${TRADE_LISTING}))`;
+
+/**
+ * The active Listings of the two Traders a proposal is between, newest
+ * first: everything that could go on the table. RLS already limits the other
+ * Trader's to those of the caller's City.
+ */
+export function tradeListingsQuery(traderId: string, otherTraderId: string) {
+  return queryOptions({
+    queryKey: ['listings', 'trade', traderId, otherTraderId],
+    queryFn: () => fetchTradeListings([traderId, otherTraderId]),
+  });
+}
+
+async function fetchTradeListings(traderIds: string[]) {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(TRADE_LISTING)
+    .in('trader_id', traderIds)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .order('position', { referencedTable: 'listing_photos' });
+  if (error) throw error;
+
+  return withThumbnailUrls(data, (listing) => listing);
+}
+
+/** A Listing as a Trade's terms show it. */
+export type TradeListing = Awaited<
+  ReturnType<typeof fetchTradeListings>
+>[number];
+
+/** Everything cached about Trades, for dropping once one changes. */
+export const TRADES_KEY = ['trades'] as const;
+
+/**
+ * One Trade, with every Listing on the table. Null when the Trader is not
+ * party to it, which reads the same as one that does not exist.
+ */
+export function tradeQuery(tradeId: string) {
+  return queryOptions({
+    queryKey: [...TRADES_KEY, 'one', tradeId],
+    queryFn: () => fetchTrade(tradeId),
+  });
+}
+
+async function fetchTrade(tradeId: string) {
+  const { data, error } = await supabase
+    .from('trades')
+    .select(TRADE)
+    .eq('id', tradeId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const { trade_items, ...trade } = data;
+  return {
+    ...trade,
+    listings: await withThumbnailUrls(
+      visibleListings(trade_items),
+      (listing) => listing,
+    ),
+  };
+}
+
+/**
+ * The Listings on a Trade's table that the Trader can still read. The types
+ * say every item has its Listing, because the foreign key is not null, but
+ * RLS has the last word: another Trader's Listing goes out of sight once it
+ * is withdrawn or traded, and then reads as null.
+ */
+function visibleListings<Listing>(items: { listing: Listing | null }[]) {
+  return items.flatMap(({ listing }) => (listing ? [listing] : []));
+}
+
+/** A Trade as its own page shows it. */
+export type TradeDetail = NonNullable<Awaited<ReturnType<typeof fetchTrade>>>;
+
+/**
+ * Every Trade the Trader is party to, newest first, each with the thumbnail
+ * of the first Listing on its table. The Trader is named in the key for the
+ * reason wantsQuery names them.
+ */
+export function tradesQuery(traderId: string) {
+  return queryOptions({
+    queryKey: [...TRADES_KEY, 'list', traderId],
+    queryFn: () => fetchTrades(),
+  });
+}
+
+async function fetchTrades() {
+  const { data, error } = await supabase
+    .from('trades')
+    .select(TRADE)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  return withThumbnailUrls(
+    data.map(({ trade_items, ...trade }) => ({
+      ...trade,
+      listings: visibleListings(trade_items),
+    })),
+    (trade) => ({ listing_photos: trade.listings[0]?.listing_photos ?? [] }),
+  );
+}
+
+/** A Trade as the Trades list shows it in a row. */
+export type TradeSummary = Awaited<ReturnType<typeof fetchTrades>>[number];
+
+/**
+ * What a Trader puts on the table, from their own side, the way the RPCs
+ * take it: the Listings from both sides, and cash they bring or ask for,
+ * never both.
+ */
+export type TradeTerms = {
+  listingIds: string[];
+  offeredCashCents: number | null;
+  requestedCashCents: number | null;
+};
+
+function termsArgs(terms: TradeTerms) {
+  return {
+    listing_ids: terms.listingIds,
+    offered_cash_cents: terms.offeredCashCents ?? undefined,
+    requested_cash_cents: terms.requestedCashCents ?? undefined,
+  };
+}
+
+/** Opens a Trade with another Trader of the City, and returns its id. */
+export async function proposeTrade(
+  recipientId: string,
+  terms: TradeTerms,
+): Promise<string> {
+  const { data, error } = await supabase.rpc('create_trade', {
+    recipient_id: recipientId,
+    ...termsArgs(terms),
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** Answers a proposal with terms that replace it whole. */
+export async function counterTrade(
+  tradeId: string,
+  terms: TradeTerms,
+): Promise<void> {
+  const { error } = await supabase.rpc('counter_trade', {
+    trade_id: tradeId,
+    ...termsArgs(terms),
+  });
+  if (error) throw error;
+}
+
+/** Says yes to a proposal, committing every Listing on the table. */
+export async function acceptTrade(tradeId: string): Promise<void> {
+  const { error } = await supabase.rpc('accept_trade', { trade_id: tradeId });
+  if (error) throw error;
+}
+
+/** Says no to a proposal, which ends the Trade. */
+export async function declineTrade(tradeId: string): Promise<void> {
+  const { error } = await supabase.rpc('decline_trade', { trade_id: tradeId });
+  if (error) throw error;
+}

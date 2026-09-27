@@ -35,19 +35,36 @@ export function Checkbox({ label, className, ...props }: CheckboxProps) {
         className,
       )}
     >
-      <span className="relative flex shrink-0">
-        <input
-          id={id}
-          type="checkbox"
-          className={cx(
-            'peer size-6 cursor-pointer appearance-none rounded-sm border-2 border-line bg-surface',
-            'checked:border-accent checked:bg-accent',
-          )}
-          {...props}
-        />
-        <CheckIcon className="pointer-events-none absolute inset-0 m-auto hidden text-base text-accent-ink peer-checked:block" />
-      </span>
+      <CheckboxBox id={id} {...props} />
       <span className="text-base text-ink">{label}</span>
     </label>
+  );
+}
+
+type CheckboxBoxProps = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'className' | 'children'
+>;
+
+/**
+ * The box alone, for a control whose label is something larger than a line
+ * of words - a list row picking a Listing for a Trade, where the whole row
+ * is the label and the touch target. Whatever wraps it must be a <label>
+ * at least --size-tap tall, which is what gives the box its name and its
+ * 56px.
+ */
+export function CheckboxBox(props: CheckboxBoxProps) {
+  return (
+    <span className="relative flex shrink-0">
+      <input
+        type="checkbox"
+        className={cx(
+          'peer size-6 cursor-pointer appearance-none rounded-sm border-2 border-line bg-surface',
+          'checked:border-accent checked:bg-accent',
+        )}
+        {...props}
+      />
+      <CheckIcon className="pointer-events-none absolute inset-0 m-auto hidden text-base text-accent-ink peer-checked:block" />
+    </span>
   );
 }

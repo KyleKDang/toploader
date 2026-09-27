@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { getRouteApi, useRouter } from '@tanstack/react-router';
+import { getRouteApi, useNavigate, useRouter } from '@tanstack/react-router';
 import {
   AppShell,
   Badge,
@@ -28,6 +28,12 @@ import { useTabs } from '../lib/tabs';
  * Its own Trader gets the way out: withdrawing is the one transition a
  * Trader owns, and it is where a Listing stops - so it is confirmed in a
  * sheet, with the destructive action second.
+ *
+ * It is also where a Trade is proposed from a Match, with the Listing the
+ * Match is about already on the table. Another Trader's active Listing is
+ * proposed for to its Trader. The Trader's own is proposed for only when it
+ * was opened from a Match, which names who wants it; opened any other way,
+ * there is nobody to propose to.
  */
 
 const route = getRouteApi('/listings/$listingId');
@@ -42,6 +48,7 @@ const STATUS_LABELS = {
 
 export function ListingScreen() {
   const { listing, traderId } = route.useLoaderData();
+  const { with: matchedTraderId } = route.useSearch();
   const router = useRouter();
   const tabs = useTabs('search');
 
@@ -62,7 +69,11 @@ export function ListingScreen() {
 
   return (
     <AppShell header={header} {...tabs}>
-      <Listing listing={listing} isOwn={listing.trader_id === traderId} />
+      <Listing
+        listing={listing}
+        isOwn={listing.trader_id === traderId}
+        matchedTraderId={matchedTraderId}
+      />
     </AppShell>
   );
 }
@@ -70,11 +81,15 @@ export function ListingScreen() {
 function Listing({
   listing,
   isOwn,
+  matchedTraderId,
 }: {
   listing: ListingDetail;
   isOwn: boolean;
+  /** The other Trader of the Match this Listing was opened from, if any. */
+  matchedTraderId: string | undefined;
 }) {
   const router = useRouter();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
@@ -98,6 +113,7 @@ function Listing({
   });
 
   const status = STATUS_LABELS[listing.status];
+  const proposeTo = isOwn ? matchedTraderId : listing.trader_id;
 
   return (
     <>
@@ -154,11 +170,30 @@ function Listing({
         ) : null}
       </section>
 
-      {isOwn && listing.status === 'active' ? (
-        <div className="flex px-4 pt-4 pb-6">
-          <Button onClick={() => setConfirming(true)}>
-            Withdraw this listing
-          </Button>
+      {listing.status === 'active' && (proposeTo || isOwn) ? (
+        <div className="flex flex-col gap-2 px-4 pt-4 pb-6">
+          {proposeTo ? (
+            <div className="flex">
+              <Button
+                variant="primary"
+                onClick={() =>
+                  void navigate({
+                    to: '/trades/new',
+                    search: { with: proposeTo, listing: listing.id },
+                  })
+                }
+              >
+                Propose a trade
+              </Button>
+            </div>
+          ) : null}
+          {isOwn ? (
+            <div className="flex">
+              <Button onClick={() => setConfirming(true)}>
+                Withdraw this listing
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

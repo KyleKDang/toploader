@@ -128,10 +128,13 @@ function MatchRow({ match, traderId }: { match: Match; traderId: string }) {
           trades={other.completed_trade_count}
         />
       }
+      // The other Trader rides along, so the Listing's page can propose a
+      // Trade to them even when the Listing is the Trader's own.
       onClick={() =>
         void navigate({
           to: '/listings/$listingId',
           params: { listingId: listing.id },
+          search: { with: other.id },
         })
       }
     />

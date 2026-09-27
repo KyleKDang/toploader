@@ -8,10 +8,10 @@ import type { TabKey } from '../components';
  * here, so a new tab on the bar does not compile until it is given a place.
  */
 
-const TAB_PATHS: Record<TabKey, '/' | '/search' | null> = {
+const TAB_PATHS: Record<TabKey, '/' | '/search' | '/trades' | null> = {
   matches: '/',
   search: '/search',
-  trades: null,
+  trades: '/trades',
   profile: null,
 };
 
