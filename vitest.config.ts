@@ -8,6 +8,9 @@ export default defineConfig({
       // Seam 2: edge/scheduled functions against the same stack, external HTTP
       // faked at the network edge.
       'tests/functions/**/*.test.ts',
+      // The test harness's own wait for the stack, PostgREST faked at the
+      // network edge.
+      'tests/local-stack.test.ts',
     ],
     globalSetup: ['tests/db/global-setup.ts'],
     environment: 'node',

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { TestProject } from 'vitest/node';
-import { readLocalStackStatus } from '../local-stack.ts';
+import type { Database } from '../../src/lib/database.types.ts';
+import { readLocalStackStatus, waitForSignedInReads } from '../local-stack.ts';
 
 /*
  * Reads the API URL and publishable key from the running local stack rather
@@ -10,7 +11,7 @@ import { readLocalStackStatus } from '../local-stack.ts';
  */
 export default async function setup(project: TestProject) {
   const status = readLocalStackStatus();
-  await waitForSignedInReads(status.API_URL, status.PUBLISHABLE_KEY);
+  await waitForStackToAcceptSessions(status.API_URL, status.PUBLISHABLE_KEY);
   project.provide('supabaseUrl', status.API_URL);
   project.provide('supabasePublishableKey', status.PUBLISHABLE_KEY);
   // The server-side key, for seam 2: the Catalog sync runs as service_role.
@@ -21,12 +22,12 @@ export default async function setup(project: TestProject) {
 }
 
 /*
- * For about a second after the stack (re)starts, as `supabase db reset` does,
- * PostgREST rejects fresh sessions with "JWT issued at future" because its
- * clock trails Auth's. Wait until a new session can read before any test runs.
+ * Wait until a throwaway Trader's new session can read before any test runs.
+ * Any error is retried, not only "JWT issued at future": right after
+ * `supabase db reset` the stack can refuse in other ways too.
  */
-async function waitForSignedInReads(url: string, key: string) {
-  const client = createClient(url, key, {
+async function waitForStackToAcceptSessions(url: string, key: string) {
+  const client = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { error: signUpError } = await client.auth.signUp({
@@ -34,18 +35,7 @@ async function waitForSignedInReads(url: string, key: string) {
     password: randomUUID(),
   });
   if (signUpError) throw signUpError;
-
-  const deadline = Date.now() + 10_000;
-  for (;;) {
-    const { error } = await client.from('cities').select('id').limit(1);
-    if (!error) return;
-    if (Date.now() > deadline) {
-      throw new Error(
-        `The local stack never accepted a session: ${error.message}`,
-      );
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
+  await waitForSignedInReads(client, { retry: () => true });
 }
 
 declare module 'vitest' {
