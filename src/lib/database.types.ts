@@ -1060,6 +1060,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      trade_has_ended: {
+        Args: { status: Database["public"]["Enums"]["trade_status"] }
+        Returns: boolean
+      }
       unreferenced_listing_photos: {
         Args: { uploaded_before: string }
         Returns: {
