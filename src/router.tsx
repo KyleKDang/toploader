@@ -18,9 +18,13 @@ import {
   listingQuery,
   matchesQuery,
   safeSpotsQuery,
+  tradeListingsQuery,
+  tradeQuery,
   traderQuery,
+  tradesQuery,
   wantsQuery,
 } from './lib/queries';
+import { otherTraderOf } from './lib/trades';
 import { installOffer, installStepDue } from './lib/install';
 import { RouteErrorScreen } from './screens/RouteErrorScreen';
 
@@ -248,6 +252,11 @@ const newListingRoute = createRoute({
 const listingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/listings/$listingId',
+  // `?with=` is the other Trader of the Match the Listing was opened from.
+  // A Trader's own Listing says nothing about who to trade it with, so this
+  // is what lets its page propose a Trade to the Trader who wants it.
+  validateSearch: (search: Record<string, unknown>): { with?: string } =>
+    isUuid(search.with) ? { with: search.with } : {},
   loader: async ({ context: { queryClient }, params }) => {
     const { traderId } = await loadOnboardedTrader(queryClient);
     return {
@@ -262,6 +271,108 @@ const listingRoute = createRoute({
     'ListingScreen',
   ),
 });
+
+const tradesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trades',
+  // Loaded before the screen renders for the reason the Matches are.
+  loader: async ({ context: { queryClient } }) => {
+    const { traderId } = await loadOnboardedTrader(queryClient);
+    await queryClient.ensureQueryData(tradesQuery(traderId));
+    return { traderId };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/TradesScreen'),
+    'TradesScreen',
+  ),
+});
+
+const proposeTradeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trades/new',
+  // `?with=` is the Trader to propose to and `?listing=` the Listing the
+  // Match was about, which starts on the table. Anything that is not an id
+  // names nobody, and the screen says there is no one to propose to.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { with?: string; listing?: string } => ({
+    ...(isUuid(search.with) ? { with: search.with } : {}),
+    ...(isUuid(search.listing) ? { listing: search.listing } : {}),
+  }),
+  loaderDeps: ({ search }) => ({ with: search.with, listing: search.listing }),
+  loader: async ({ context: { queryClient }, deps }) => {
+    const { traderId, trader } = await loadOnboardedTrader(queryClient);
+    const otherId = deps.with === traderId ? undefined : deps.with;
+    if (!otherId)
+      return { traderId, trader, other: null, listings: [], listingId: null };
+    const [other, listings] = await Promise.all([
+      queryClient.ensureQueryData(traderQuery(otherId)),
+      queryClient.ensureQueryData(tradeListingsQuery(traderId, otherId)),
+    ]);
+    return {
+      traderId,
+      trader,
+      other: { id: otherId, ...other },
+      listings,
+      listingId: deps.listing ?? null,
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/ProposeTradeScreen'),
+    'ProposeTradeScreen',
+  ),
+});
+
+const tradeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trades/$tradeId',
+  loader: async ({ context: { queryClient }, params }) => {
+    const { traderId, trader } = await loadOnboardedTrader(queryClient);
+    // Not an id is not a Trade, the same as one the Trader is not party to,
+    // rather than a request that errors.
+    if (isUuid(params.tradeId))
+      await queryClient.ensureQueryData(tradeQuery(params.tradeId));
+    return { traderId, trader, tradeId: params.tradeId };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/TradeScreen'),
+    'TradeScreen',
+  ),
+});
+
+const counterTradeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trades/$tradeId/counter',
+  loader: async ({ context: { queryClient }, params }) => {
+    const { traderId, trader } = await loadOnboardedTrader(queryClient);
+    const trade = isUuid(params.tradeId)
+      ? await queryClient.ensureQueryData(tradeQuery(params.tradeId))
+      : null;
+    if (!trade) return { traderId, trader, trade: null, listings: [] };
+    return {
+      traderId,
+      trader,
+      trade,
+      listings: await queryClient.ensureQueryData(
+        tradeListingsQuery(traderId, otherTraderOf(trade, traderId).id),
+      ),
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/ProposeTradeScreen'),
+    'CounterTradeScreen',
+  ),
+});
+
+/** Whether a value from the URL is a uuid, the form every row id takes. */
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  );
+}
 
 /**
  * A Catalog id from the URL, or null where it is not one. An id that is not
@@ -285,6 +396,10 @@ const routeTree = rootRoute.addChildren([
   collectionRoute,
   newListingRoute,
   listingRoute,
+  tradesRoute,
+  proposeTradeRoute,
+  tradeRoute,
+  counterTradeRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {
