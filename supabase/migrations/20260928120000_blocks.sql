@@ -23,22 +23,30 @@ create table public.blocks (
 -- other.
 create index blocks_blocked_id_idx on public.blocks (blocked_id);
 
--- A Trader reads the blocks they made and no others. The blocked Trader is
--- not told who blocked them, and nobody learns who blocks whom. Writes go
--- through the RPC below (ADR-0001).
+-- A block is read by its two Traders and nobody else. The blocked Trader is
+-- not notified, but hiding the row from them would hide nothing: the other
+-- Trader's Listings vanish and every step toward them is refused, so the
+-- block is plain to them the first time they look. What stays private is
+-- who blocks whom among everyone else. Writes go through the RPC below
+-- (ADR-0001).
+--
+-- Readable from both sides is also what lets City browse's policy ask about
+-- a block as the reader, rather than through a function running as its
+-- owner that any client could call.
 alter table public.blocks enable row level security;
 
 grant select on public.blocks to authenticated;
 
-create policy "A Trader can read the blocks they made"
+create policy "A Trader can read the blocks they are party to"
   on public.blocks for select
   to authenticated
-  using (blocker_id = (select auth.uid()));
+  using ((select auth.uid()) in (blocker_id, blocked_id));
 
--- Whether either of two Traders has blocked the other. It reads blocks the
--- caller's own policy would hide, which is the point, so it runs as its
--- owner and no client role may call it (deny_by_default): asked about any
--- two Traders, it would say who blocks whom.
+-- Whether either of two Traders has blocked the other, for the triggers
+-- below, which ask about Traders other than the caller. It runs as
+-- its owner so that it holds whoever is signed in, and no client role may
+-- call it (deny_by_default): asked about any two Traders, it would say who
+-- blocks whom.
 create function public.blocked_between(a uuid, b uuid)
   returns boolean
   language sql
@@ -52,21 +60,6 @@ as $$
       or (blocker_id = b and blocked_id = a)
   )
 $$;
-
--- The same question with the caller as one of the two, which is all a
--- policy needs and all a Trader may ask: it tells them nothing about a
--- block they are not party to.
-create function public.is_blocked_with(trader_id uuid)
-  returns boolean
-  language sql
-  stable
-  security definer
-  set search_path = ''
-as $$
-  select public.blocked_between((select auth.uid()), is_blocked_with.trader_id)
-$$;
-
-grant execute on function public.is_blocked_with(uuid) to authenticated;
 
 -- Blocks another Trader as the caller. It takes no blocker id, so a Trader
 -- can only ever block for themselves, and blocking someone already blocked
@@ -101,7 +94,8 @@ $$;
 grant execute on function public.block_trader(uuid) to authenticated;
 
 -- City browse, as before, less the Listings of anyone the reader is in a
--- block with, from either side.
+-- block with, from either side. The subquery reads `blocks` under its own
+-- policy, which shows the reader exactly the blocks they are party to.
 drop policy "A Trader can read the live Listings of their City"
   on public.listings;
 
@@ -117,14 +111,21 @@ create policy "A Trader can read the live Listings of their City"
       select traders.city_id from public.traders
       where traders.id = (select auth.uid())
     )
-    and not public.is_blocked_with(listings.trader_id)
+    and not exists (
+      select 1 from public.blocks
+      where (blocks.blocker_id = (select auth.uid())
+          and blocks.blocked_id = listings.trader_id)
+        or (blocks.blocker_id = listings.trader_id
+          and blocks.blocked_id = (select auth.uid()))
+    )
   );
 
 -- The two Traders of an open Trade read what is on the table, whatever else
 -- keeps them apart. A block ends browse between them, but a Trade already
 -- open between them can still end, and ending it means seeing what it holds.
 -- Until now this came with browse, since both Traders of a Trade share a
--- City; stated here, it holds on its own.
+-- City; stated here, it holds on its own, so a Trader who moves City
+-- mid-Trade also keeps seeing the Trade they are still in.
 --
 -- Only while the Listing is still on offer: one its Trader has withdrawn
 -- from under a proposal is theirs alone, as City browse already has it.
@@ -147,7 +148,10 @@ create policy "A Trader can read the Listings of their open Trades"
 -- A block ends every pair between its two Traders, in both of the places
 -- the rules of a pair live (#66): `match_pairs`, which records new pairs and
 -- so decides who is alerted, and `matches`, which is what a Trader reads.
--- Both run as their owner, so they read `blocks` directly.
+-- Both run as their owner, so they read `blocks` directly. They cannot call
+-- `blocked_between` instead: a view lends its owner's rights to the tables
+-- it reads, but a function it calls is still checked against the reader,
+-- and no client role may call that one.
 create or replace view public.match_pairs as
   select distinct
     listing.id as listing_id,

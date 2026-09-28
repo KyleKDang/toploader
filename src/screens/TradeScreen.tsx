@@ -12,6 +12,7 @@ import {
 } from '../components';
 import {
   acceptTrade,
+  blockedWithQuery,
   declineTrade,
   TRADES_KEY,
   tradeQuery,
@@ -117,6 +118,9 @@ function Trade({
   const sides = sidesOf(trade.listings, traderId);
   const cash = cashOf(trade, traderId);
   const answering = isTradersTurn(trade, traderId);
+  // A block between the two leaves this Trade only its endings, so the
+  // steps that move it forward are not offered at all.
+  const blocked = useQuery(blockedWithQuery(other.id)).data ?? false;
 
   async function refresh() {
     // An answer moves the Trade and, on accept, every Listing on it. What
@@ -200,7 +204,13 @@ function Trade({
       {answering ? (
         <div className="flex flex-col gap-2 px-4 pt-4">
           <FormError error={accept.error} />
-          {verified ? (
+          {blocked ? (
+            <div className="flex">
+              <Button onClick={() => setConfirmingDecline(true)}>
+                Decline
+              </Button>
+            </div>
+          ) : verified ? (
             <>
               <div className="flex">
                 <Button
@@ -240,17 +250,28 @@ function Trade({
         </div>
       ) : null}
 
-      <div className="px-4 pt-6">
-        <BlockTrader
-          trader={{ id: other.id, name }}
-          onBlocked={async () => {
-            // Their Listings and the Matches with them leave every other
-            // screen; this Trade stays, since it can still be ended.
-            queryClient.removeQueries({ queryKey: ['matches'] });
-            await refresh();
-          }}
-        />
-      </div>
+      {blocked ? (
+        <p className="px-4 pt-4 text-sm leading-prose text-muted">
+          One of you has blocked the other, so this trade can only be ended.
+        </p>
+      ) : (
+        <div className="px-4 pt-6">
+          <BlockTrader
+            trader={{ id: other.id, name }}
+            onBlocked={async () => {
+              // Their Listings and the Matches with them leave every other
+              // screen; this Trade stays, since it can still be ended.
+              queryClient.removeQueries({ queryKey: ['matches'] });
+              await Promise.all([
+                queryClient.invalidateQueries({
+                  queryKey: blockedWithQuery(other.id).queryKey,
+                }),
+                refresh(),
+              ]);
+            }}
+          />
+        </div>
+      )}
 
       <Sheet
         open={confirmingDecline}

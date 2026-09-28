@@ -147,7 +147,8 @@ A proposal is withdrawn by cancelling it only by the Trader whose terms are stan
 A no-show is reported only once the Meetup's time has passed, and never once either Trader has tapped Complete, since a tap says the two met; otherwise a Trader could take the cards, skip their own tap, and mark the partner absent.
 Both Traders read a completed Trade's Listings and photos, though City browse no longer shows a traded Listing, because the Trade Record is read whole.
 Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks` (blocker, blocked).
-Settled on [#28](https://github.com/KyleKDang/toploader/issues/28): a block works in both directions, whichever Trader made it, and only its maker can read it, so the blocked Trader is not told.
+Settled on [#28](https://github.com/KyleKDang/toploader/issues/28): a block works in both directions, whichever Trader made it.
+Its two Traders can read it and nobody else can; the blocked Trader is not notified, but hiding the row from them would hide nothing, since what vanishes and what is refused makes the block plain.
 Neither Trader sees the other's Listings or Matches, and nothing on a Trade between them moves forward: no proposal, counter, or accept, no Meetup put forward or confirmed, and no message.
 Every way a Trade ends stays open, so a Trade already under way can still be declined, cancelled, completed, or reported a no-show, and its two Traders keep reading its Listings until it ends.
 Ending those Trades automatically instead would put a cancel on someone's Reputation for keeping themselves safe, or let a block dodge a no-show.

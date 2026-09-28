@@ -8,7 +8,7 @@ import { blockTrader } from '../lib/queries';
  * or a Trade with them.
  *
  * A block is confirmed in a sheet, with the destructive action second, since
- * it cannot be taken back. The sheet says what it does in the Trader's
+ * it cannot be taken back until unblocking exists (#87). The sheet says what it does in the Trader's
  * terms, including what it leaves alone: a Trade already open between the
  * two can still be ended, so nobody is left holding cards on a Trade that
  * can never finish.
@@ -62,7 +62,7 @@ export function BlockTrader({
           completed.
         </p>
         <p className="mt-2 text-base leading-prose text-ink">
-          {trader.name} is not told. This cannot be undone.
+          {trader.name} is not notified. There is no way to unblock yet.
         </p>
         <FormError error={block.error} />
       </Sheet>

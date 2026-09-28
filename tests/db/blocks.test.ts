@@ -5,7 +5,9 @@ import {
   anonClient,
   createListing,
   seededExamplemon,
+  ORANGE_COUNTY,
   seedTrader,
+  serviceClient,
   TEST_CITY,
   type Client,
   type SeededTrader,
@@ -34,7 +36,7 @@ async function block(by: SeededTrader, trader: SeededTrader) {
 }
 
 /** Blocks a Trader a test needs blocked, failing loudly where it is refused. */
-async function blocked(by: SeededTrader, trader: SeededTrader) {
+async function arrangeBlock(by: SeededTrader, trader: SeededTrader) {
   const { error } = await block(by, trader);
   if (error) throw error;
 }
@@ -149,17 +151,18 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
   }
 
   describe('the block itself', () => {
-    it('is readable by the Trader who made it and by no one else', async () => {
+    it('is readable by its two Traders and by no one else', async () => {
       const { actor, counterparty, foreign } = await seedTrio();
 
-      await blocked(actor, counterparty);
+      await arrangeBlock(actor, counterparty);
 
-      expect(await readBlocks(actor.client)).toEqual([
-        { blocker_id: actor.id, blocked_id: counterparty.id },
-      ]);
-      // The blocked Trader is not told who blocked them, and nobody else
-      // learns who blocks whom.
-      expect(await readBlocks(counterparty.client)).toEqual([]);
+      // The blocked Trader could tell anyway, from what vanishes and what is
+      // refused; what stays private is who blocks whom among everyone else.
+      for (const trader of [actor, counterparty]) {
+        expect(await readBlocks(trader.client)).toEqual([
+          { blocker_id: actor.id, blocked_id: counterparty.id },
+        ]);
+      }
       expect(await readBlocks(foreign.client)).toEqual([]);
       const signedOut = await anonClient().from('blocks').select('blocker_id');
       expect(signedOut.error).not.toBeNull();
@@ -168,7 +171,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
     it('is harmless to repeat', async () => {
       const { actor, counterparty } = await seedTrio();
 
-      await blocked(actor, counterparty);
+      await arrangeBlock(actor, counterparty);
       expect((await block(actor, counterparty)).error).toBeNull();
 
       expect(await readBlocks(actor.client)).toHaveLength(1);
@@ -208,11 +211,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
           .insert({ blocker_id: blocker.id, blocked_id: counterparty.id });
         expect(error).not.toBeNull();
       }
-      const rows = await arrange(
-        (sql) =>
-          sql`select 1 from public.blocks where blocked_id = ${counterparty.id}`,
-      );
-      expect(rows).toHaveLength(0);
+      expect(await readBlocks(counterparty.client)).toEqual([]);
     });
   });
 
@@ -229,8 +228,8 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
           true,
         );
 
-        if (who === 'blocker') await blocked(actor, counterparty);
-        else await blocked(counterparty, actor);
+        if (who === 'blocker') await arrangeBlock(actor, counterparty);
+        else await arrangeBlock(counterparty, actor);
 
         expect(await canReadListing(actor.client, counterpartyListing)).toBe(
           false,
@@ -254,7 +253,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
       const listing = await createListing(actor, holofoil, 'NM');
       expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(true);
 
-      await blocked(counterparty, actor);
+      await arrangeBlock(counterparty, actor);
 
       expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(
         false,
@@ -269,15 +268,18 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
       const later = await createListing(actor, holofoil, 'LP');
       expect(await hasMatch(actor.client, later, foreign.id)).toBe(true);
       expect(await hasMatch(actor.client, later, counterparty.id)).toBe(false);
-      const alerted = await arrange(
-        (sql) =>
-          sql<{ trader_id: string }[]>`
-            select trader_id from public.notifications
-            where kind = 'new_match' and url = ${`/listings/${later}`}`,
-      );
-      const alertedIds = alerted.map((row) => row.trader_id);
-      expect(alertedIds).toContain(foreign.id);
-      expect(alertedIds).not.toContain(counterparty.id);
+      // Read as the notifier reads the outbox, per Match topic, as
+      // tests/db/notifications.test.ts does.
+      const alertsOn = async (wanter: SeededTrader) => {
+        const { data, error } = await serviceClient()
+          .from('notifications')
+          .select('trader_id')
+          .eq('topic', `match:${later}:${wanter.id}`);
+        if (error) throw error;
+        return data;
+      };
+      expect(await alertsOn(foreign)).toEqual([{ trader_id: foreign.id }]);
+      expect(await alertsOn(counterparty)).toEqual([]);
     });
   });
 
@@ -290,7 +292,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
           createListing(actor, holofoil, 'NM'),
           createListing(counterparty, holofoil, 'NM'),
         ]);
-        await blocked(actor, counterparty);
+        await arrangeBlock(actor, counterparty);
         const [from, to] =
           who === 'blocker' ? [actor, counterparty] : [counterparty, actor];
 
@@ -307,7 +309,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
       const { actor, counterparty, tradeId, mine, theirs } =
         await proposedTrade();
 
-      await blocked(actor, counterparty);
+      await arrangeBlock(actor, counterparty);
 
       const countered = await counterparty.client.rpc('counter_trade', {
         trade_id: tradeId,
@@ -330,7 +332,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
       const { actor, counterparty, tradeId } = await acceptedTrade();
       const spot = await safeSpot(actor);
 
-      await blocked(counterparty, actor);
+      await arrangeBlock(counterparty, actor);
 
       const proposed = await actor.client.rpc('propose_meetup', {
         trade_id: tradeId,
@@ -354,7 +356,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
       });
       if (proposed.error) throw proposed.error;
 
-      await blocked(actor, counterparty);
+      await arrangeBlock(actor, counterparty);
 
       const confirmed = await counterparty.client.rpc('confirm_meetup', {
         trade_id: tradeId,
@@ -366,7 +368,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
       const { actor, counterparty, tradeId, mine, theirs } =
         await scheduledTrade();
 
-      await blocked(actor, counterparty);
+      await arrangeBlock(actor, counterparty);
 
       // The Trade's Listings stay on its page while it is open.
       expect(await canReadListing(actor.client, theirs)).toBe(true);
@@ -389,6 +391,60 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
       expect(await canReadListing(actor.client, theirs)).toBe(true);
       expect(await canReadListing(counterparty.client, mine)).toBe(true);
     });
+
+    it('lets a scheduled Trade whose Meetup has passed still be reported a no-show', async () => {
+      const { actor, counterparty, tradeId } = await scheduledTrade();
+      await arrangeBlock(counterparty, actor);
+      await arrange(
+        (sql) =>
+          sql`update public.trades set meetup_at = now() - interval '1 minute'
+                where id = ${tradeId}`,
+      );
+
+      const { error } = await actor.client.rpc('mark_no_show', {
+        trade_id: tradeId,
+      });
+
+      expect(error).toBeNull();
+    });
+
+    it('lets the proposer still withdraw their proposal', async () => {
+      const { actor, counterparty, tradeId } = await proposedTrade();
+      await arrangeBlock(counterparty, actor);
+
+      const { error } = await actor.client.rpc('cancel_trade', {
+        trade_id: tradeId,
+      });
+
+      expect(error).toBeNull();
+    });
+  });
+
+  describe("keeps an open Trade's Listings readable to its two Traders", () => {
+    it('and to no Trader outside it', async () => {
+      const { actor, counterparty, mine, theirs } = await proposedTrade();
+      // Another City, so City browse cannot be what shows them.
+      const outsider = await seedTrader('Outsider', ORANGE_COUNTY);
+      await arrangeBlock(actor, counterparty);
+
+      expect(await canReadListing(counterparty.client, mine)).toBe(true);
+      expect(await canReadListing(actor.client, theirs)).toBe(true);
+      expect(await canReadListing(outsider.client, mine)).toBe(false);
+      expect(await canReadListing(outsider.client, theirs)).toBe(false);
+    });
+
+    it('but not once its Trader withdraws it from under the proposal', async () => {
+      const { actor, counterparty, theirs } = await proposedTrade();
+      await arrangeBlock(actor, counterparty);
+
+      const { error } = await counterparty.client.rpc('withdraw_listing', {
+        listing_id: theirs,
+      });
+      if (error) throw error;
+
+      expect(await canReadListing(actor.client, theirs)).toBe(false);
+      expect(await canReadListing(counterparty.client, theirs)).toBe(true);
+    });
   });
 
   describe('prevents chat', () => {
@@ -402,7 +458,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
         });
         if (said.error) throw said.error;
 
-        await blocked(actor, counterparty);
+        await arrangeBlock(actor, counterparty);
         const from = who === 'blocker' ? actor : counterparty;
 
         const { error } = await from.client.rpc('send_message', {
@@ -425,7 +481,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
 
   it('leaves Trades with anyone else untouched', async () => {
     const { actor, counterparty, foreign } = await seedTrio();
-    await blocked(actor, counterparty);
+    await arrangeBlock(actor, counterparty);
     const [mine, theirs] = await Promise.all([
       createListing(actor, holofoil, 'NM'),
       createListing(foreign, holofoil, 'NM'),
