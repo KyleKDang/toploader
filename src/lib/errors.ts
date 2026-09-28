@@ -59,7 +59,7 @@ const REFUSALS: Record<string, string> = {
   // moving forward and its chat, and leaves every way of ending it open.
   "one of this Trade's Traders has blocked the other":
     'One of you has blocked the other, so this trade can only be ended now.',
-  // Verification (supabase/migrations/20260928110000_verification.sql).
+  // Verification (supabase/migrations/20260928140000_verification.sql).
   'a verification request is already waiting on review':
     'Your ID and selfie are already in review.',
   'a Verified Trader has nothing left to verify': 'You are already verified.',
