@@ -812,6 +812,54 @@ export type Database = {
           },
         ]
       }
+      verification_requests: {
+        Row: {
+          created_at: string
+          id: string
+          id_document_path: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_path: string
+          status: Database["public"]["Enums"]["verification_status"]
+          trader_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          id_document_path: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path: string
+          status?: Database["public"]["Enums"]["verification_status"]
+          trader_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          id_document_path?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path?: string
+          status?: Database["public"]["Enums"]["verification_status"]
+          trader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_requests_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wants: {
         Row: {
           card_id: number
@@ -984,6 +1032,7 @@ export type Database = {
         Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
         Returns: undefined
       }
+      approve_verification: { Args: { request_id: string }; Returns: undefined }
       block_trader: { Args: { trader_id: string }; Returns: undefined }
       blocked_between: { Args: { a: string; b: string }; Returns: boolean }
       cancel_trade: { Args: { trade_id: string }; Returns: undefined }
@@ -1085,6 +1134,7 @@ export type Database = {
         Returns: undefined
       }
       queue_meetup_reminders: { Args: never; Returns: undefined }
+      reject_verification: { Args: { request_id: string }; Returns: undefined }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
       remove_push_subscription: {
         Args: { endpoint: string }
@@ -1143,6 +1193,10 @@ export type Database = {
         Args: { attests_adult: boolean; city_id: string; display_name: string }
         Returns: undefined
       }
+      submit_verification: {
+        Args: { id_document_path: string; selfie_path: string }
+        Returns: string
+      }
       trade_for_participant: {
         Args: { caller: string; trade_id: string }
         Returns: {
@@ -1184,6 +1238,26 @@ export type Database = {
           path: string
         }[]
       }
+      verification_document_exists: { Args: { path: string }; Returns: boolean }
+      verification_request_for_review: {
+        Args: { caller: string; request_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          id_document_path: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_path: string
+          status: Database["public"]["Enums"]["verification_status"]
+          trader_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "verification_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       wake_notifier: { Args: never; Returns: undefined }
       withdraw_listing: { Args: { listing_id: string }; Returns: undefined }
     }
@@ -1210,6 +1284,7 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "no_show"
+      verification_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1364,6 +1439,7 @@ export const Constants = {
         "cancelled",
         "no_show",
       ],
+      verification_status: ["pending", "approved", "rejected"],
     },
   },
 } as const
