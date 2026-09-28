@@ -107,6 +107,18 @@ The domain's DNS records, including SPF, DKIM and DMARC for `mail.`, are in Clou
   It never touches the photos of a Listing that went through a Trade: those are the Trade Record's evidence.
   Running it twice in a day is harmless, and a run that reclaims nothing is the normal case.
 
+## Reviewing verification requests
+
+A Founder reviews at `/admin/verification` on the deployed app, signed in as their own Trader account.
+Nothing in the app links there yet, so it is opened by its address; any other Trader who opens it is sent to their Matches.
+
+The queue is oldest first.
+Approving or rejecting deletes both photos before the answer is saved, and neither can be undone.
+A request whose photos are already gone was interrupted halfway through an earlier review: reject it, and the Trader is asked to send new ones.
+
+Who the Founders are is a migration (`supabase/migrations/20260928120000_seed_founders.sql`), per [ADR-0007](adr/0007-admin-authorization.md).
+Adding or removing one is a new migration, never a change made in the dashboard.
+
 ## Recovering the database
 
 The backups are artifacts on the nightly backup's runs in GitHub Actions.

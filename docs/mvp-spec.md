@@ -111,6 +111,7 @@ Settled on [#36](https://github.com/KyleKDang/toploader/issues/36).
 2. A founder reviews in the admin view and approves or rejects; Stripe Identity replaces this step at v1.5.
 3. On approval: `verified` status set, ID and selfie images deleted; we store only the boolean and timestamp, never documents.
 4. On rejection the images are deleted too, and the Trader re-submits fresh ones. Holding rejected strangers' government IDs is the largest avoidable data liability in the app, so no path stores a document past its review.
+5. The deletion comes first: the reviewing founder deletes both images, and the review is recorded only once they are gone, so a review that fails halfway leaves no document behind ([ADR-0007](adr/0007-admin-authorization.md), settled on [#26](https://github.com/KyleKDang/toploader/issues/26)).
 
 ### Safety and moderation
 
@@ -155,7 +156,7 @@ Ending those Trades automatically instead would put a cancel on someone's Reputa
 
 RLS posture: every table deny-by-default.
 Reads are policy-scoped (own rows for private tables; city-scoped for listings/matches; participants-only for trades/messages; all rows for a Founder, via additive policies calling `is_founder()`).
-All state changes go through named RPCs - `set_trader_profile`, `create_trade`, `counter_trade`, `accept_trade`, `decline_trade`, `propose_meetup`, `confirm_meetup`, `complete_trade`, `cancel_trade`, `mark_no_show`, `leave_feedback`, `submit_verification`, `approve_verification` - or edge functions when side effects leave the database.
+All state changes go through named RPCs - `set_trader_profile`, `create_trade`, `counter_trade`, `accept_trade`, `decline_trade`, `propose_meetup`, `confirm_meetup`, `complete_trade`, `cancel_trade`, `mark_no_show`, `leave_feedback`, `submit_verification`, `approve_verification`, `reject_verification` - or edge functions when side effects leave the database.
 Ban and account deletion are edge functions rather than RPCs, because both must write `auth.users` through the Auth admin API, which a function running as the calling Trader cannot reach ([ADR-0007](adr/0007-admin-authorization.md)).
 Every policy and RPC ships with a test proving what a foreign user cannot do.
 
@@ -223,6 +224,8 @@ What makes a good test here:
   Added on [#17](https://github.com/KyleKDang/toploader/issues/17), where City browse and the photo reaper both had to answer for a `traded` Listing months before the Trade machine can produce one.
   Assertions stay at the seam, as a signed-in Trader; the fixture walks the real transitions rather than jumping, so it cannot arrange a state the app could never produce.
   The alternative was granting a client role or a scheduled job a power it does not otherwise have, purely so a test could use it, which would have put the test's convenience into the production surface.
+  Extended on [#26](https://github.com/KyleKDang/toploader/issues/26) to a Verified Trader, whom a client path can now make: that path takes a Founder's review, and a Founder is exactly such a state, since only a migration makes one.
+  A test about what a Verified Trader may do sets `verified_at` directly, and the path that sets it for real is walked where it is the subject.
 - A tracer that makes a Match signs its Traders into a City of its own, arranged through the superuser connection (`arrangeCity` in `tests/browser/session.ts`).
   Added on [#72](https://github.com/KyleKDang/toploader/issues/72): every tracer and every earlier run lists and wants the same seeded Card, so in a shared City its Want or Listing pairs with everything the stack has accumulated, and how long the flow takes grows with how many runs came before.
   A City is reference data that no client path writes, which is what makes making one an arrange step.
