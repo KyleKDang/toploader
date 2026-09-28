@@ -78,9 +78,22 @@ export async function signInAsNewTrader(
 }
 
 /**
- * A City no other tracer or earlier run has Traders in, through a superuser
- * connection in a tracer's arrange step, and its name. Cities are reference
- * data written only by migrations, so no client path makes one.
+ * A superuser connection to the local stack, for a tracer's arrange step:
+ * a state no client path can reach, as tests/db/arrange.ts is for seam 1.
+ */
+async function arrange<T>(run: (sql: postgres.Sql) => Promise<T>): Promise<T> {
+  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
+  try {
+    return await run(sql);
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * A City no other tracer or earlier run has Traders in, and its name.
+ * Cities are reference data written only by migrations, so no client path
+ * makes one.
  *
  * For a tracer whose screen shows what a City's other Traders did: in a
  * shared City the flow under test competes with every Listing and Want the
@@ -89,61 +102,52 @@ export async function signInAsNewTrader(
  */
 export async function arrangeCity() {
   const name = `Tracer City ${randomUUID().slice(0, 8)}`;
-  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
-  try {
-    await sql`insert into public.cities (name, time_zone)
-              values (${name}, 'America/Los_Angeles')`;
-  } finally {
-    await sql.end();
-  }
+  await arrange(
+    (sql) => sql`insert into public.cities (name, time_zone)
+                 values (${name}, 'America/Los_Angeles')`,
+  );
   return name;
 }
 
 /**
- * Makes a Trader a Verified Trader, through a superuser connection, in a
- * tracer's arrange step, for a tracer whose flow starts after verification.
- * The flow that sets this for real takes a Founder's review, and has a
- * tracer of its own (verification.spec.ts); the seam-1 suites arrange it
- * for the same reason (tests/db/arrange.ts).
+ * Makes a Trader a Verified Trader, for a tracer whose flow starts after
+ * verification. The flow that sets this for real takes a Founder's review,
+ * and has a tracer of its own (verification.spec.ts); the seam-1 suites
+ * arrange it for the same reason (tests/db/arrange.ts).
  */
 export async function verifyTrader(traderId: string) {
-  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
-  try {
-    await sql`update public.traders set verified_at = now() where id = ${traderId}`;
-  } finally {
-    await sql.end();
-  }
+  await arrange(
+    (sql) =>
+      sql`update public.traders set verified_at = now() where id = ${traderId}`,
+  );
 }
 
 /**
- * Makes a Trader a Founder, through a superuser connection, in a tracer's
- * arrange step. Membership is granted only by migration (ADR-0007), so no
- * client path makes one.
+ * Makes a Trader a Founder. Membership is granted only by migration
+ * (ADR-0007), so no client path makes one.
  */
 export async function makeFounder(traderId: string) {
-  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
-  try {
-    await sql`insert into public.founders (trader_id) values (${traderId})`;
-  } finally {
-    await sql.end();
-  }
+  await arrange(
+    (sql) => sql`insert into public.founders (trader_id) values (${traderId})`,
+  );
 }
 
 /**
- * Empties the review queue of what earlier runs left waiting, through a
- * superuser connection, in a tracer's arrange step. The seam-1 suites leave
- * a dozen requests pending per run on a stack that outlives them, and the
- * queue a Founder reads is oldest first: without this, how far down the
- * tracer's own request sits, and whether it is on the page at all, would
- * depend on how many runs came before (#72, #82).
+ * Clears the review queue of what earlier runs left waiting. The seam-1
+ * suites leave a dozen requests pending per run on a stack that outlives
+ * them, and the queue a Founder reads is oldest first: without this, how
+ * far down the tracer's own request sits, and whether it is on the page at
+ * all, would depend on how many runs came before (#72, #82).
+ *
+ * Only what is older than any run still going, so a suite running against
+ * the same stack keeps the requests it is in the middle of.
  */
-export async function emptyReviewQueue() {
-  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
-  try {
-    await sql`delete from public.verification_requests where status = 'pending'`;
-  } finally {
-    await sql.end();
-  }
+export async function clearStaleReviewQueue() {
+  await arrange(
+    (sql) => sql`delete from public.verification_requests
+                 where status = 'pending'
+                   and created_at < now() - interval '10 minutes'`,
+  );
 }
 
 /**
@@ -151,16 +155,13 @@ export async function emptyReviewQueue() {
  * past every policy, for a tracer that has to say none is left.
  */
 export async function verificationDocumentCount(traderId: string) {
-  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
-  try {
+  return arrange(async (sql) => {
     const [{ count }] = await sql<[{ count: number }]>`
       select count(*)::int as count from storage.objects
       where bucket_id = 'verification-documents'
         and name like ${traderId + '/%'}`;
     return count;
-  } finally {
-    await sql.end();
-  }
+  });
 }
 
 function requireEnv(name: string) {

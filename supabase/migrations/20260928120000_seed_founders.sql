@@ -8,9 +8,18 @@
 -- those accounts do not exist - every local stack, and CI's - this seeds
 -- nobody instead of failing on the foreign key. The suites seed a Founder
 -- of their own (tests/db/arrange.ts) and never depend on these.
+--
+-- On the hosted database it is both or nothing. A migration runs once, so
+-- one that seeded a single Founder and called itself applied would leave
+-- the deadlock above in place with nothing to say so. The hosted database
+-- is known by the notifier's address, a Vault secret set only there
+-- (docs/operations.md); a stack without it is a local one.
 do $$
 declare
   seeded integer;
+  hosted boolean := exists (
+    select 1 from vault.secrets where name = 'notifier_url'
+  );
 begin
   insert into public.founders (trader_id)
     select traders.id
@@ -22,8 +31,9 @@ begin
     on conflict (trader_id) do nothing;
   get diagnostics seeded = row_count;
 
-  -- Read in the log of the job that applies this to the hosted database:
-  -- anything but 2 there means an id above is not an account.
+  if hosted and seeded <> 2 then
+    raise exception 'seeded % of 2 Founders: an id above is not a Trader account', seeded;
+  end if;
   raise notice 'seeded % of 2 Founders', seeded;
 end;
 $$;

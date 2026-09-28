@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { cameraPhoto } from './photo-fixture.ts';
 import {
   arrangeCity,
-  emptyReviewQueue,
+  clearStaleReviewQueue,
   makeFounder,
   signInAsNewTrader,
   verificationDocumentCount,
@@ -63,7 +63,7 @@ test('a Trader who is not verified is sent to verification, and proposes once a 
   const founderPage = await (await browser.newContext()).newPage();
   await fakeCardImages(traderPage);
 
-  await emptyReviewQueue();
+  await clearStaleReviewQueue();
   const city = await arrangeCity();
   const listerName = 'Lister';
   const traderName = `Asker ${randomUUID().slice(0, 8)}`;
@@ -193,7 +193,12 @@ test('a Trader who is not verified is sent to verification, and proposes once a 
   // Back at the queue, which no longer holds the request, and Storage no
   // longer holds the photos.
   await expect(founderPage).toHaveURL(/\/admin\/verification$/);
-  await expect(founderPage.getByText('No requests waiting')).toBeVisible();
+  await expect(
+    founderPage.getByRole('heading', { name: 'Verification requests' }),
+  ).toBeVisible();
+  await expect(
+    founderPage.getByRole('button', { name: new RegExp(traderName) }),
+  ).toHaveCount(0);
   expect(await verificationDocumentCount(trader.id)).toBe(0);
 
   // The Trader, told the result, opens it, and goes back to what they came

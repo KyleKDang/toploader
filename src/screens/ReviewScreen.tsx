@@ -14,6 +14,7 @@ import {
   PENDING_VERIFICATION_KEY,
   reviewVerification,
   verificationDocumentQuery,
+  type VerificationAnswer,
 } from '../lib/queries';
 import { traderName } from '../lib/trades';
 import { useTabs } from '../lib/tabs';
@@ -32,20 +33,18 @@ import { useTabs } from '../lib/tabs';
 
 const route = getRouteApi('/admin/verification/$requestId');
 
-type Answer = 'approve' | 'reject';
-
 export function ReviewScreen() {
   const { request } = route.useLoaderData();
   const navigate = useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
   const tabs = useTabs('profile');
-  const [confirming, setConfirming] = useState<Answer | null>(null);
+  const [confirming, setConfirming] = useState<VerificationAnswer | null>(null);
 
   const backToQueue = () => void navigate({ to: '/admin/verification' });
 
   const review = useMutation({
-    mutationFn: async (answer: Answer) => {
+    mutationFn: async (answer: VerificationAnswer) => {
       if (!request) throw new Error('There is no request to review.');
       await reviewVerification(request, answer);
     },
@@ -171,7 +170,9 @@ function Document({
         <p className="rounded-sm border border-line bg-surface-2 p-4 text-sm leading-prose text-muted">
           {document.isPending
             ? 'Loading…'
-            : 'This photo is no longer in storage. If you did not see it, reject the request so they send a new one.'}
+            : document.isError
+              ? 'This photo could not be loaded. Check your connection, then open the request again.'
+              : 'This photo is no longer in storage. If you did not see it, reject the request so they send a new one.'}
         </p>
       )}
     </section>

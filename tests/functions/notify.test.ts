@@ -36,10 +36,11 @@ import {
   createListing,
   ORANGE_COUNTY,
   seededExamplemon,
+  reviewVerification,
   seedTrader,
   serviceClient,
+  submitVerification,
   TEST_CITY,
-  TINY_WEBP,
   type SeededTrader,
 } from '../db/seed.ts';
 import { startCaptureServer, type CaptureServer } from './capture-server.ts';
@@ -1180,7 +1181,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
 
   /**
    * A Trader's verification request, reviewed by a Founder the way the
-   * admin view reviews one: both documents deleted, then the answer.
+   * review screen reviews one: both documents deleted, then the answer.
    */
   async function reviewedVerification(answer: 'approve' | 'reject') {
     const [founder, trader] = await Promise.all([
@@ -1192,30 +1193,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       subscribe(founder),
       subscribe(trader),
     ]);
-    const documents = {
-      id_document_path: `${trader.id}/${randomUUID()}-id.webp`,
-      selfie_path: `${trader.id}/${randomUUID()}-selfie.webp`,
-    };
-    const paths = Object.values(documents);
-    for (const path of paths) {
-      const { error } = await trader.client.storage
-        .from('verification-documents')
-        .upload(path, TINY_WEBP, { contentType: 'image/webp' });
-      if (error) throw error;
-    }
-    const { data: requestId, error: submitError } = await trader.client.rpc(
-      'submit_verification',
-      documents,
-    );
-    if (submitError) throw submitError;
-    const { error: deleteError } = await founder.client.storage
-      .from('verification-documents')
-      .remove(paths);
-    if (deleteError) throw deleteError;
-    const { error } = await founder.client.rpc(`${answer}_verification`, {
-      request_id: requestId,
-    });
-    if (error) throw error;
+    await reviewVerification(founder, await submitVerification(trader), answer);
     return {
       founder,
       trader,
@@ -1225,72 +1203,49 @@ describe('The notifier', { timeout: 30_000 }, () => {
     };
   }
 
-  it('pushes and emails an approval to the Trader it verifies, and not to the Founder', async () => {
-    const { founder, trader, founderBrowser, traderBrowser, topic } =
-      await reviewedVerification('approve');
+  it.each([
+    {
+      answer: 'approve' as const,
+      result: 'an approval',
+      title: 'You are verified',
+      body: 'A founder checked your ID and selfie, and both photos have been deleted. You can now send and accept trades.',
+    },
+    {
+      answer: 'reject' as const,
+      result: 'a rejection',
+      title: 'Verification not approved',
+      body: 'A founder could not verify you from the photos you sent, and both have been deleted. Send a new ID photo and selfie to try again.',
+    },
+  ])(
+    'pushes and emails $result to the Trader who asked, and not to the Founder',
+    async ({ answer, title, body }) => {
+      const { founder, trader, founderBrowser, traderBrowser, topic } =
+        await reviewedVerification(answer);
 
-    await deliver();
+      await deliver();
 
-    const title = 'You are verified';
-    const body =
-      'A founder checked your ID and selfie, and both photos have been deleted. You can now send and accept trades.';
-    expect(pushesTo(traderBrowser, topic)).toEqual([
-      { title, body, url: '/verification', tag: topic },
-    ]);
-    expect(emailsTo(trader)).toEqual([
-      {
-        from: 'Toploader <noreply@mail.toploaderapp.com>',
-        to: [trader.email],
-        reply_to: REPLY_TO,
-        subject: title,
-        text: `${body}\n\n${APP_URL}/verification\n`,
-      },
-    ]);
-    expect(pushesTo(founderBrowser)).toEqual([]);
-    expect(emailsTo(founder)).toEqual([]);
-  });
-
-  it('pushes and emails a rejection to the Trader, saying to send fresh photos', async () => {
-    const { founder, trader, founderBrowser, traderBrowser, topic } =
-      await reviewedVerification('reject');
-
-    await deliver();
-
-    const title = 'Verification not approved';
-    const body =
-      'A founder could not verify you from the photos you sent, and both have been deleted. Send a new ID photo and selfie to try again.';
-    expect(pushesTo(traderBrowser, topic)).toEqual([
-      { title, body, url: '/verification', tag: topic },
-    ]);
-    expect(emailsTo(trader)).toEqual([
-      {
-        from: 'Toploader <noreply@mail.toploaderapp.com>',
-        to: [trader.email],
-        reply_to: REPLY_TO,
-        subject: title,
-        text: `${body}\n\n${APP_URL}/verification\n`,
-      },
-    ]);
-    expect(pushesTo(founderBrowser)).toEqual([]);
-    expect(emailsTo(founder)).toEqual([]);
-  });
+      expect(pushesTo(traderBrowser, topic)).toEqual([
+        { title, body, url: '/verification', tag: topic },
+      ]);
+      expect(emailsTo(trader)).toEqual([
+        {
+          from: 'Toploader <noreply@mail.toploaderapp.com>',
+          to: [trader.email],
+          reply_to: REPLY_TO,
+          subject: title,
+          text: `${body}\n\n${APP_URL}/verification\n`,
+        },
+      ]);
+      expect(pushesTo(founderBrowser)).toEqual([]);
+      expect(emailsTo(founder)).toEqual([]);
+    },
+  );
 
   it('tells nobody that a verification request was submitted', async () => {
     const trader = await seedTrader('Asked');
     const browser = await subscribe(trader);
-    const documents = {
-      id_document_path: `${trader.id}/${randomUUID()}-id.webp`,
-      selfie_path: `${trader.id}/${randomUUID()}-selfie.webp`,
-    };
-    for (const path of Object.values(documents)) {
-      const { error } = await trader.client.storage
-        .from('verification-documents')
-        .upload(path, TINY_WEBP, { contentType: 'image/webp' });
-      if (error) throw error;
-    }
-    const { error } = await trader.client.rpc('submit_verification', documents);
-    if (error) throw error;
 
+    await submitVerification(trader);
     await deliver();
 
     expect(pushesTo(browser)).toEqual([]);

@@ -78,6 +78,14 @@ The reviewing Founder deletes both files through the Storage API, under a delete
 The order is what makes the rule hold under failure: whatever breaks between the two steps leaves a request still waiting with no documents, never a reviewed request with documents behind it.
 A request left that way is rejected by a Founder, and the Trader sends fresh documents.
 
+**A path a request has named is closed for good.**
+The Trader's upload policy refuses any path a verification request names, so a file cannot be replaced while its request waits, nor put back once the review has deleted it.
+Without that, the check above would hold only at the instant it ran.
+
+**The seed fails on the hosted database unless it seeds both Founders.**
+It has to seed nobody on a local stack, where the founders' accounts do not exist, and a migration runs once, so a seed that quietly made one Founder would leave the self-approval deadlock in place for good.
+The hosted database is told apart by the notifier's Vault secret, which is set only there ([ADR-0008](0008-notification-outbox.md)).
+
 Considered and rejected:
 
 - **An edge function that deletes and then records.**
