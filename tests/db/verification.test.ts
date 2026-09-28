@@ -5,9 +5,13 @@ import {
   anonClient,
   seedTrader,
   serviceClient,
+  submitVerification,
   TINY_WEBP,
+  uploadVerificationDocuments,
+  VERIFICATION_DOCUMENTS_BUCKET,
   type Client,
   type SeededTrader,
+  type VerificationDocuments,
 } from './seed.ts';
 
 /*
@@ -22,38 +26,9 @@ import {
  * reviewed request with a document behind it.
  */
 
-const BUCKET = 'verification-documents';
-
-interface Documents {
-  id_document_path: string;
-  selfie_path: string;
-}
-
-/** An ID photo and a selfie, uploaded under the Trader's own prefix. */
-async function uploadDocuments(trader: SeededTrader): Promise<Documents> {
-  const documents = {
-    id_document_path: `${trader.id}/${randomUUID()}-id.webp`,
-    selfie_path: `${trader.id}/${randomUUID()}-selfie.webp`,
-  };
-  for (const path of Object.values(documents)) {
-    const { error } = await trader.client.storage
-      .from(BUCKET)
-      .upload(path, TINY_WEBP, { contentType: 'image/webp' });
-    if (error) throw error;
-  }
-  return documents;
-}
-
-/** A Trader's submitted request: its id and the documents it names. */
-async function submitVerification(trader: SeededTrader) {
-  const documents = await uploadDocuments(trader);
-  const { data, error } = await trader.client.rpc(
-    'submit_verification',
-    documents,
-  );
-  if (error) throw error;
-  return { requestId: data, ...documents };
-}
+const BUCKET = VERIFICATION_DOCUMENTS_BUCKET;
+type Documents = VerificationDocuments;
+const uploadDocuments = uploadVerificationDocuments;
 
 /** The requests a client can see, oldest first. */
 async function requestsSeenBy(client: Client) {
@@ -487,6 +462,31 @@ describe('Verification', () => {
       expect(await requestsSeenBy(trader.client)).toMatchObject([
         { status: 'pending' },
       ]);
+    });
+
+    it('leaves no way to put a document back behind a reviewed request', async () => {
+      const { founder, trader } = await seedReview();
+      const rejected = await submitVerification(trader);
+      await deleteDocuments(founder.client, rejected);
+      await reject(founder, rejected.requestId);
+      const approved = await submitVerification(trader);
+      await deleteDocuments(founder.client, approved);
+      await approve(founder, approved.requestId);
+
+      for (const path of [
+        rejected.id_document_path,
+        rejected.selfie_path,
+        approved.id_document_path,
+        approved.selfie_path,
+      ]) {
+        const { error } = await trader.client.storage
+          .from(BUCKET)
+          .upload(path, TINY_WEBP, { contentType: 'image/webp' });
+
+        expect(error).not.toBeNull();
+      }
+      expect(await documentsStoredFor(trader)).toEqual([]);
+      expect(await objectRowsFor(trader)).toBe(0);
     });
 
     it('lets the Trader submit fresh documents, which can be approved', async () => {

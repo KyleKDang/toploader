@@ -846,15 +846,23 @@ export type PendingVerificationRequest = Awaited<
  * would serve a government ID to whoever held it, and this way the photo
  * exists only in the tab of the Founder looking at it. Dropped from the
  * cache with the screen.
+ *
+ * Gone and unreachable are told apart, because a Founder acts on the
+ * difference: a photo that is gone means rejecting the request, and one
+ * that only failed to load means trying again.
  */
 export function verificationDocumentQuery(path: string) {
   return queryOptions({
     queryKey: ['verification-document', path],
     queryFn: async (): Promise<string | null> => {
-      const { data } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from(VERIFICATION_DOCUMENTS_BUCKET)
         .download(path);
-      if (!data) return null;
+      if (error) {
+        if ((error as { statusCode?: unknown }).statusCode === '404')
+          return null;
+        throw error;
+      }
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -868,6 +876,9 @@ export function verificationDocumentQuery(path: string) {
   });
 }
 
+/** What a Founder answers a request with. */
+export type VerificationAnswer = 'approve' | 'reject';
+
 /**
  * Reviews a request: both documents are deleted, then the answer is
  * recorded. The order is the rule rather than a choice made here - the RPCs
@@ -880,7 +891,7 @@ export async function reviewVerification(
     PendingVerificationRequest,
     'id' | 'id_document_path' | 'selfie_path'
   >,
-  answer: 'approve' | 'reject',
+  answer: VerificationAnswer,
 ): Promise<void> {
   const { error: deleteError } = await supabase.storage
     .from(VERIFICATION_DOCUMENTS_BUCKET)

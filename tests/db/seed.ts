@@ -197,3 +197,62 @@ export async function seededExamplemon(
   if (!variant) throw new Error('No Holofoil Variant in the seeded Catalog');
   return { card: card.id, holofoil: variant.id };
 }
+
+/** The bucket a verification request's documents live in. */
+export const VERIFICATION_DOCUMENTS_BUCKET = 'verification-documents';
+
+export interface VerificationDocuments {
+  id_document_path: string;
+  selfie_path: string;
+}
+
+/**
+ * An ID photo and a selfie, uploaded under the Trader's own prefix the way
+ * the browser path uploads them, ready for `submit_verification`.
+ */
+export async function uploadVerificationDocuments(
+  trader: SeededTrader,
+): Promise<VerificationDocuments> {
+  const documents = {
+    id_document_path: `${trader.id}/${randomUUID()}-id.webp`,
+    selfie_path: `${trader.id}/${randomUUID()}-selfie.webp`,
+  };
+  for (const path of Object.values(documents)) {
+    const { error } = await trader.client.storage
+      .from(VERIFICATION_DOCUMENTS_BUCKET)
+      .upload(path, TINY_WEBP, { contentType: 'image/webp' });
+    if (error) throw error;
+  }
+  return documents;
+}
+
+/** A Trader's submitted request: its id and the documents it names. */
+export async function submitVerification(trader: SeededTrader) {
+  const documents = await uploadVerificationDocuments(trader);
+  const { data, error } = await trader.client.rpc(
+    'submit_verification',
+    documents,
+  );
+  if (error) throw error;
+  return { requestId: data, ...documents };
+}
+
+/**
+ * Reviews a request the way the review screen does: both documents deleted
+ * through Storage, then the answer.
+ */
+export async function reviewVerification(
+  founder: SeededTrader,
+  request: VerificationDocuments & { requestId: string },
+  answer: 'approve' | 'reject',
+) {
+  const { error: deleteError } = await founder.client.storage
+    .from(VERIFICATION_DOCUMENTS_BUCKET)
+    .remove([request.id_document_path, request.selfie_path]);
+  if (deleteError) throw deleteError;
+  const { error } = await founder.client.rpc(
+    answer === 'approve' ? 'approve_verification' : 'reject_verification',
+    { request_id: request.requestId },
+  );
+  if (error) throw error;
+}

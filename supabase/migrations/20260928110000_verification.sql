@@ -27,17 +27,6 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
     array['image/webp']
   );
 
--- A Trader writes only under their own prefix, and only writes: there is no
--- policy by which a Trader reads a document back, their own included, or
--- replaces or deletes one. What a Founder reviews is what was sent.
-create policy "A Trader can upload verification documents under their own prefix"
-  on storage.objects for insert
-  to authenticated
-  with check (
-    bucket_id = 'verification-documents'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
-
 -- A Founder reads every document, and deletes them: the additive policies
 -- of ADR-0007, asked of the bucket as they are of the table below.
 create policy "A Founder can read verification documents"
@@ -103,6 +92,28 @@ create policy "A Founder can read every verification request"
   on public.verification_requests for select
   to authenticated
   using ((select public.is_founder()));
+
+-- A Trader writes only under their own prefix, and only writes: there is no
+-- policy by which a Trader reads a document back, their own included, or
+-- replaces or deletes one. What a Founder reviews is what was sent.
+--
+-- A path a request has named is closed for good. While the request waits
+-- the file is there and cannot be replaced, and once it is reviewed the
+-- file is gone and cannot be put back, so a reviewed request never has a
+-- document behind it again. The request asked about is the Trader's own,
+-- which they can read, since a path under their prefix is named by no other.
+create policy "A Trader can upload verification documents under their own prefix"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'verification-documents'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and not exists (
+      select 1 from public.verification_requests
+      where verification_requests.id_document_path = storage.objects.name
+        or verification_requests.selfie_path = storage.objects.name
+    )
+  );
 
 -- Whether a file is in the documents bucket.
 create function public.verification_document_exists(path text)
@@ -217,16 +228,14 @@ grant execute on function public.submit_verification(text, text)
 --
 -- And the documents are gone before the review is recorded, which is what
 -- makes it true of every reviewed request that nothing is left behind it.
-create function public.verification_request_for_review(
-  request_id uuid,
-  caller uuid
-)
+create function public.verification_request_for_review(request_id uuid)
   returns public.verification_requests
   language plpgsql
   security definer
   set search_path = ''
 as $$
 declare
+  caller uuid := auth.uid();
   request public.verification_requests;
 begin
   if caller is null or not public.is_founder() then
@@ -272,13 +281,12 @@ create function public.approve_verification(request_id uuid)
   set search_path = ''
 as $$
 declare
-  caller uuid := auth.uid();
   request public.verification_requests :=
-    public.verification_request_for_review(request_id, caller);
+    public.verification_request_for_review(request_id);
 begin
   update public.verification_requests
     set status = 'approved',
-        reviewed_by = caller,
+        reviewed_by = auth.uid(),
         reviewed_at = now()
     where verification_requests.id = request.id;
 
@@ -297,13 +305,12 @@ create function public.reject_verification(request_id uuid)
   set search_path = ''
 as $$
 declare
-  caller uuid := auth.uid();
   request public.verification_requests :=
-    public.verification_request_for_review(request_id, caller);
+    public.verification_request_for_review(request_id);
 begin
   update public.verification_requests
     set status = 'rejected',
-        reviewed_by = caller,
+        reviewed_by = auth.uid(),
         reviewed_at = now()
     where verification_requests.id = request.id;
 end;
