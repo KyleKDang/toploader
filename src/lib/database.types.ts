@@ -34,6 +34,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_sets: {
         Row: {
           abbreviation: string | null
@@ -928,6 +961,8 @@ export type Database = {
         Args: { card_set: Json; cards: Json; prices: Json; sync_day: string }
         Returns: undefined
       }
+      block_trader: { Args: { trader_id: string }; Returns: undefined }
+      blocked_between: { Args: { a: string; b: string }; Returns: boolean }
       cancel_trade: { Args: { trade_id: string }; Returns: undefined }
       claim_notifications: { Args: { batch?: number }; Returns: Json }
       compact_price_snapshots: {
@@ -972,6 +1007,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_blocked_with: { Args: { trader_id: string }; Returns: boolean }
       mark_no_show: { Args: { trade_id: string }; Returns: undefined }
       mark_notification_sent: {
         Args: {

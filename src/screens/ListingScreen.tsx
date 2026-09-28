@@ -15,6 +15,7 @@ import { formatPrice } from '../lib/format';
 import type { ListingDetail } from '../lib/queries';
 import { withdrawListing } from '../lib/queries';
 import { useTabs } from '../lib/tabs';
+import { BlockTrader } from './BlockTrader';
 
 /*
  * One Listing: the photographs of the actual Copy, what it is, and what the
@@ -28,6 +29,10 @@ import { useTabs } from '../lib/tabs';
  * Its own Trader gets the way out: withdrawing is the one transition a
  * Trader owns, and it is where a Listing stops - so it is confirmed in a
  * sheet, with the destructive action second.
+ *
+ * Another Trader's Listing is where that Trader can be blocked. Once the
+ * block holds, the Listing is no longer the reader's to see, so they are
+ * taken home rather than left on a page that would now read as missing.
  *
  * It is also where a Trade is proposed from a Match, with the Listing the
  * Match is about already on the table. Another Trader's active Listing is
@@ -194,6 +199,25 @@ function Listing({
               </Button>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {!isOwn ? (
+        <div className="px-4 pb-6">
+          <BlockTrader
+            trader={{
+              id: listing.trader_id,
+              name: listing.trader?.display_name ?? 'this trader',
+            }}
+            onBlocked={async () => {
+              // Everything that could still show their Listings or the
+              // Matches with them, dropped for the reason withdraw gives.
+              queryClient.removeQueries({ queryKey: ['listing'] });
+              queryClient.removeQueries({ queryKey: ['listings'] });
+              queryClient.removeQueries({ queryKey: ['matches'] });
+              await navigate({ to: '/', replace: true });
+            }}
+          />
         </div>
       ) : null}
 

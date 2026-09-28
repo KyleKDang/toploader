@@ -493,6 +493,15 @@ export async function withdrawListing(listingId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Blocks another Trader. From then on neither sees the other's Listings or
+ * Matches, and nothing between them moves forward but an ending.
+ */
+export async function blockTrader(traderId: string): Promise<void> {
+  const { error } = await supabase.rpc('block_trader', { trader_id: traderId });
+  if (error) throw error;
+}
+
 /*
  * Matches: the signed-in Trader's pairs that hold right now, from either
  * side - their Listings that satisfy someone's Want, and other Traders'
