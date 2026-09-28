@@ -502,6 +502,26 @@ export async function blockTrader(traderId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Whether the signed-in Trader and another are in a block, from either
+ * side. A Trader reads only the blocks they are party to, so any block
+ * naming the other Trader is one between the two of them.
+ */
+export function blockedWithQuery(otherTraderId: string) {
+  return queryOptions({
+    queryKey: ['blocks', otherTraderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blocks')
+        .select('blocker_id')
+        .or(`blocker_id.eq.${otherTraderId},blocked_id.eq.${otherTraderId}`)
+        .limit(1);
+      if (error) throw error;
+      return data.length > 0;
+    },
+  });
+}
+
 /*
  * Matches: the signed-in Trader's pairs that hold right now, from either
  * side - their Listings that satisfy someone's Want, and other Traders'
