@@ -62,3 +62,33 @@ That ordering belongs to [#26](https://github.com/KyleKDang/toploader/issues/26)
 - Admin rights are visible in git history and cannot be granted from inside the running app, including by a Founder.
 - The founders are named above and land as a seed migration owned by #26; seam-1 fixtures still seed their own Founder, so the tests never depend on who the real founders are.
 - Sentry's free plan allows one dashboard user ([ADR-0006](0006-operational-vendors.md)), and that seat is Kyle's rather than the reviewing founder's, for the reason given above.
+
+## Amendment, 2026-09-28 (ticket #26)
+
+How a review deletes its documents, which this ADR and the spec both required and neither said how.
+
+**An RPC cannot delete a file.**
+The rows of `storage.objects` are the index of the files, not the files.
+Storage refuses a SQL `delete` on them with a trigger of its own (`protect_objects_delete`), and a row deleted past that trigger would leave the file itself in the bucket with nothing pointing at it.
+A file is deleted only through the Storage API.
+
+**So the Founder deletes, and the RPC refuses until they have.**
+The reviewing Founder deletes both files through the Storage API, under a delete policy on the bucket that asks `is_founder()`, the additive policy this ADR already uses for reads.
+`approve_verification` and `reject_verification` then refuse to record a review while either file is still in Storage.
+The order is what makes the rule hold under failure: whatever breaks between the two steps leaves a request still waiting with no documents, never a reviewed request with documents behind it.
+A request left that way is rejected by a Founder, and the Trader sends fresh documents.
+
+Considered and rejected:
+
+- **An edge function that deletes and then records.**
+  The same two steps in the same order, with a deploy, a secret, and a second enforcement point added.
+  The guarantee would still have to live in the RPC, since the RPC stays callable.
+- **Recording the review and sweeping the files on a schedule.**
+  Every review would leave government IDs in Storage until the next sweep, and a sweep that fails leaves them there silently, which is the one failure this feature exists to rule out.
+
+**Rejection is an RPC of its own**, `reject_verification`, and a Founder can review neither way on their own request.
+Only self-approval is dangerous, but one guard shared by both answers is one place for the rule to be right.
+
+**What this leaves open** is a document that never gets a review: uploaded, and never submitted.
+The upload has to come before the row that names it, as a Listing photo does ([ADR-0001](0001-supabase-write-discipline.md), amendment for #17), so an abandoned upload is possible.
+Reclaiming those is [#88](https://github.com/KyleKDang/toploader/issues/88).
