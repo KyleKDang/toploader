@@ -227,6 +227,29 @@ export type Database = {
           },
         ]
       }
+      founders: {
+        Row: {
+          created_at: string
+          trader_id: string
+        }
+        Insert: {
+          created_at?: string
+          trader_id: string
+        }
+        Update: {
+          created_at?: string
+          trader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "founders_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: true
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_photos: {
         Row: {
           id: string
@@ -1008,6 +1031,7 @@ export type Database = {
         Returns: boolean
       }
       is_blocked_with: { Args: { trader_id: string }; Returns: boolean }
+      is_founder: { Args: never; Returns: boolean }
       mark_no_show: { Args: { trade_id: string }; Returns: undefined }
       mark_notification_sent: {
         Args: {

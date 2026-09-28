@@ -90,3 +90,15 @@ export async function verifyTrader(traderId: string): Promise<void> {
       sql`update public.traders set verified_at = now() where id = ${traderId}`,
   );
 }
+
+/**
+ * Makes a Trader a Founder. Membership is granted only by migration
+ * (ADR-0007), so no client path reaches it, and that is the point of it;
+ * the suites seed a Founder of their own here rather than depend on who the
+ * real ones are.
+ */
+export async function makeFounder(traderId: string): Promise<void> {
+  await arrange(
+    (sql) => sql`insert into public.founders (trader_id) values (${traderId})`,
+  );
+}
