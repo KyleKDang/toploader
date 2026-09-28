@@ -26,6 +26,7 @@ import {
   traderName,
 } from '../lib/trades';
 import { useTabs } from '../lib/tabs';
+import { BlockTrader } from './BlockTrader';
 import {
   CashNote,
   CashRow,
@@ -238,6 +239,18 @@ function Trade({
           )}
         </div>
       ) : null}
+
+      <div className="px-4 pt-6">
+        <BlockTrader
+          trader={{ id: other.id, name }}
+          onBlocked={async () => {
+            // Their Listings and the Matches with them leave every other
+            // screen; this Trade stays, since it can still be ended.
+            queryClient.removeQueries({ queryKey: ['matches'] });
+            await refresh();
+          }}
+        />
+      </div>
 
       <Sheet
         open={confirmingDecline}

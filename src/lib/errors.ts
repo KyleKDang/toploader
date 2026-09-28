@@ -54,6 +54,10 @@ const REFUSALS: Record<string, string> = {
     'You can only trade with another trader in your area.',
   'a Trader can only act on a Trade they are party to':
     'That trade is not available.',
+  // A block (supabase/migrations/20260928120000_blocks.sql) stops a Trade
+  // moving forward and its chat, and leaves every way of ending it open.
+  "one of this Trade's Traders has blocked the other":
+    'One of you has blocked the other, so this trade can only be ended now.',
 };
 
 const FALLBACK = 'Something went wrong. Check your connection and try again.';

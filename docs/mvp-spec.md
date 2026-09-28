@@ -146,7 +146,11 @@ A cancel or a no-show releases the Trade's Listings back to active.
 A proposal is withdrawn by cancelling it only by the Trader whose terms are standing, its proposer or whoever last countered; the Trader it waits on declines it instead, so turning down an offer never counts.
 A no-show is reported only once the Meetup's time has passed, and never once either Trader has tapped Complete, since a tap says the two met; otherwise a Trader could take the cards, skip their own tap, and mark the partner absent.
 Both Traders read a completed Trade's Listings and photos, though City browse no longer shows a traded Listing, because the Trade Record is read whole.
-Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks`.
+Safety: `safe_spots` (city, name, address, kind, notes), `verification_requests` (trader, document paths, status, reviewed_by/at), `reports`, `blocks` (blocker, blocked).
+Settled on [#28](https://github.com/KyleKDang/toploader/issues/28): a block works in both directions, whichever Trader made it, and only its maker can read it, so the blocked Trader is not told.
+Neither Trader sees the other's Listings or Matches, and nothing on a Trade between them moves forward: no proposal, counter, or accept, no Meetup put forward or confirmed, and no message.
+Every way a Trade ends stays open, so a Trade already under way can still be declined, cancelled, completed, or reported a no-show, and its two Traders keep reading its Listings until it ends.
+Ending those Trades automatically instead would put a cancel on someone's Reputation for keeping themselves safe, or let a block dodge a no-show.
 
 RLS posture: every table deny-by-default.
 Reads are policy-scoped (own rows for private tables; city-scoped for listings/matches; participants-only for trades/messages; all rows for a Founder, via additive policies calling `is_founder()`).
