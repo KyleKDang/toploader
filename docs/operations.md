@@ -116,7 +116,7 @@ The queue is oldest first.
 Approving or rejecting deletes both photos before the answer is saved, and neither can be undone.
 A request whose photos are already gone was interrupted halfway through an earlier review: reject it, and the Trader is asked to send new ones.
 
-Who the Founders are is a migration (`supabase/migrations/20260928120000_seed_founders.sql`), per [ADR-0007](adr/0007-admin-authorization.md).
+Who the Founders are is a migration (`supabase/migrations/20260928150000_seed_founders.sql`), per [ADR-0007](adr/0007-admin-authorization.md).
 Adding or removing one is a new migration, never a change made in the dashboard.
 
 ## Recovering the database

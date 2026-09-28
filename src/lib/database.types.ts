@@ -1079,7 +1079,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_blocked_with: { Args: { trader_id: string }; Returns: boolean }
       is_founder: { Args: never; Returns: boolean }
       mark_no_show: { Args: { trade_id: string }; Returns: undefined }
       mark_notification_sent: {
