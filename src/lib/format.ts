@@ -26,3 +26,18 @@ const DAY = new Intl.DateTimeFormat('en-US', {
 export function formatDay(day: string): string {
   return DAY.format(new Date(`${day}T00:00:00Z`));
 }
+
+const MOMENT = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+/**
+ * A moment the database holds as a timestamp, as "Sep 19, 4:05 PM", on the
+ * reader's own clock: when something was sent is read against their day.
+ */
+export function formatMoment(timestamp: string): string {
+  return MOMENT.format(new Date(timestamp));
+}

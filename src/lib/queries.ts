@@ -736,3 +736,160 @@ export async function declineTrade(tradeId: string): Promise<void> {
   const { error } = await supabase.rpc('decline_trade', { trade_id: tradeId });
   if (error) throw error;
 }
+
+/*
+ * Verification: the Trader's own requests, and the ones a Founder reviews.
+ *
+ * A Founder can read every request, their own among them, so both reads say
+ * whose they want rather than leaving it to RLS: the Trader's screen shows
+ * only their own, and the review screen never shows a Founder theirs, since
+ * a Founder cannot review their own request.
+ */
+
+const VERIFICATION_DOCUMENTS_BUCKET = 'verification-documents';
+
+/** The Trader's own verification requests, latest first. */
+export function verificationRequestsQuery(traderId: string) {
+  return queryOptions({
+    queryKey: ['verification-requests', traderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('verification_requests')
+        .select('id, status, created_at')
+        .eq('trader_id', traderId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/**
+ * Asks for the Trader to be verified: the ID photo and the selfie go into
+ * the bucket under the Trader's own prefix first, then the RPC records the
+ * request that names them, the order a Listing's photos take and for the
+ * same reason.
+ */
+export async function submitVerification({
+  traderId,
+  idDocument,
+  selfie,
+}: {
+  traderId: string;
+  idDocument: Blob;
+  selfie: Blob;
+}): Promise<void> {
+  const name = `${traderId}/${crypto.randomUUID()}`;
+  const paths = {
+    id_document_path: `${name}-id.webp`,
+    selfie_path: `${name}-selfie.webp`,
+  };
+  for (const [path, body] of [
+    [paths.id_document_path, idDocument],
+    [paths.selfie_path, selfie],
+  ] as const) {
+    const { error } = await supabase.storage
+      .from(VERIFICATION_DOCUMENTS_BUCKET)
+      .upload(path, body, { contentType: PHOTO_MIME });
+    if (error) throw error;
+  }
+
+  const { error } = await supabase.rpc('submit_verification', paths);
+  if (error) throw error;
+}
+
+/** Whether the signed-in Trader is a Founder. */
+export async function isFounder(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('is_founder');
+  if (error) throw error;
+  return data;
+}
+
+export const PENDING_VERIFICATION_KEY = [
+  'verification-requests',
+  'pending',
+] as const;
+
+/**
+ * The requests waiting on review, oldest first, as a Founder reads them.
+ * Never cached past the screen: the list is what other Founders are
+ * reviewing at the same time.
+ */
+export function pendingVerificationRequestsQuery(founderId: string) {
+  return queryOptions({
+    queryKey: [...PENDING_VERIFICATION_KEY, founderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('verification_requests')
+        .select(
+          'id, created_at, id_document_path, selfie_path, trader:traders!verification_requests_trader_id_fkey (display_name)',
+        )
+        .eq('status', 'pending')
+        .neq('trader_id', founderId)
+        .order('created_at');
+      if (error) throw error;
+      return data;
+    },
+    gcTime: 0,
+  });
+}
+
+export type PendingVerificationRequest = Awaited<
+  ReturnType<
+    NonNullable<ReturnType<typeof pendingVerificationRequestsQuery>['queryFn']>
+  >
+>[number];
+
+/**
+ * One document, as a `data:` URL an image can show, or null where it is no
+ * longer in Storage. It is downloaded rather than linked to: a signed URL
+ * would serve a government ID to whoever held it, and this way the photo
+ * exists only in the tab of the Founder looking at it. Dropped from the
+ * cache with the screen.
+ */
+export function verificationDocumentQuery(path: string) {
+  return queryOptions({
+    queryKey: ['verification-document', path],
+    queryFn: async (): Promise<string | null> => {
+      const { data } = await supabase.storage
+        .from(VERIFICATION_DOCUMENTS_BUCKET)
+        .download(path);
+      if (!data) return null;
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error ?? new Error('unreadable'));
+        reader.readAsDataURL(data);
+      });
+    },
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+  });
+}
+
+/**
+ * Reviews a request: both documents are deleted, then the answer is
+ * recorded. The order is the rule rather than a choice made here - the RPCs
+ * refuse to record a review while either document is still in Storage - so
+ * a review that fails halfway leaves a request with no documents, never a
+ * document with no request.
+ */
+export async function reviewVerification(
+  request: Pick<
+    PendingVerificationRequest,
+    'id' | 'id_document_path' | 'selfie_path'
+  >,
+  answer: 'approve' | 'reject',
+): Promise<void> {
+  const { error: deleteError } = await supabase.storage
+    .from(VERIFICATION_DOCUMENTS_BUCKET)
+    .remove([request.id_document_path, request.selfie_path]);
+  if (deleteError) throw deleteError;
+
+  const { error } = await supabase.rpc(
+    answer === 'approve' ? 'approve_verification' : 'reject_verification',
+    { request_id: request.id },
+  );
+  if (error) throw error;
+}
