@@ -15,13 +15,16 @@ import {
   collectionValueQuery,
   currentTraderId,
   hasProfile,
+  isFounder,
   listingQuery,
   matchesQuery,
+  pendingVerificationRequestsQuery,
   safeSpotsQuery,
   tradeListingsQuery,
   tradeQuery,
   traderQuery,
   tradesQuery,
+  verificationRequestsQuery,
   wantsQuery,
 } from './lib/queries';
 import { otherTraderOf } from './lib/trades';
@@ -374,6 +377,76 @@ const counterTradeRoute = createRoute({
   ),
 });
 
+// Verification sits in the Profile section: being verified is a fact about
+// the Trader, and the profile screen that will link here (#27) has none yet.
+const verificationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/verification',
+  // Fetched, not read from the cache. A Trader arrives here from the
+  // notification that says a Founder has answered, in an app that may have
+  // been open since before they asked, and the profile the rest of the app
+  // holds is refreshed with it: the propose screen reads `verified_at` from
+  // the same cache entry.
+  loader: async ({ context: { queryClient } }) => {
+    const { traderId } = await loadOnboardedTrader(queryClient);
+    const [trader, requests] = await Promise.all([
+      queryClient.fetchQuery(traderQuery(traderId)),
+      queryClient.fetchQuery(verificationRequestsQuery(traderId)),
+    ]);
+    return { traderId, trader, requests };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/VerificationScreen'),
+    'VerificationScreen',
+  ),
+});
+
+/**
+ * The signed-in Founder, or a redirect to the app's landing view for a
+ * Trader who is not one. It is a courtesy: what keeps a Trader from the
+ * requests and the documents is RLS, which would hand this screen nothing.
+ */
+async function loadFounder(queryClient: QueryClient) {
+  const { traderId } = await loadOnboardedTrader(queryClient);
+  if (!(await isFounder())) throw redirect({ to: '/' });
+  return { founderId: traderId };
+}
+
+const reviewQueueRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/verification',
+  loader: async ({ context: { queryClient } }) => {
+    const { founderId } = await loadFounder(queryClient);
+    await queryClient.fetchQuery(pendingVerificationRequestsQuery(founderId));
+    return { founderId };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/ReviewQueueScreen'),
+    'ReviewQueueScreen',
+  ),
+});
+
+const reviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/verification/$requestId',
+  loader: async ({ context: { queryClient }, params }) => {
+    const { founderId } = await loadFounder(queryClient);
+    const requests = await queryClient.fetchQuery(
+      pendingVerificationRequestsQuery(founderId),
+    );
+    // Not in the queue is not there to review: reviewed already, the
+    // Founder's own, or never a request at all.
+    return {
+      request:
+        requests.find((request) => request.id === params.requestId) ?? null,
+    };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/ReviewScreen'),
+    'ReviewScreen',
+  ),
+});
+
 /** Whether a value from the URL is a uuid, the form every row id takes. */
 function isUuid(value: unknown): value is string {
   return (
@@ -410,6 +483,9 @@ const routeTree = rootRoute.addChildren([
   proposeTradeRoute,
   tradeRoute,
   counterTradeRoute,
+  verificationRoute,
+  reviewQueueRoute,
+  reviewRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

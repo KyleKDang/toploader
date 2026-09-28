@@ -20,8 +20,8 @@ import {
  *
  * Every step is a named RPC (ADR-0001), sending or accepting needs a
  * Verified Trader, and only the two participants may read or act on it.
- * Verification is arranged directly (tests/db/arrange.ts) until its own
- * flow arrives in #26.
+ * Verification is arranged directly (tests/db/arrange.ts); its own flow is
+ * proven in tests/db/verification.test.ts.
  */
 
 interface Terms {

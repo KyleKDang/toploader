@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { ReactNode } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   Button,
   CardTile,
@@ -187,11 +188,11 @@ export function CashNote() {
 /**
  * What an unverified Trader sees where sending or accepting a proposal would
  * be: that it needs verification, before they tap, rather than a refusal
- * after. The way into verification is #26's to build; until it exists its
- * button is shown disabled, the way an empty state names a destination that
- * is not built yet.
+ * after, and the way to it.
  */
 export function VerificationNeeded({ toDo }: { toDo: string }) {
+  const navigate = useNavigate();
+
   return (
     <div className="flex flex-col gap-2 rounded-md border-2 border-line bg-surface p-4">
       <p className="flex items-center gap-2 text-base font-bold text-ink">
@@ -203,7 +204,10 @@ export function VerificationNeeded({ toDo }: { toDo: string }) {
         once, then deletes both.
       </p>
       <div className="flex">
-        <Button variant="primary" disabled>
+        <Button
+          variant="primary"
+          onClick={() => void navigate({ to: '/verification' })}
+        >
           Get verified
         </Button>
       </div>

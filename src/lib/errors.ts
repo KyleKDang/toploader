@@ -28,7 +28,8 @@ const MESSAGES: Record<string, string> = {
 };
 
 /*
- * The Trade RPCs' refusals (supabase/migrations/20260926120000_trades.sql).
+ * The Trade RPCs' refusals (supabase/migrations/20260926120000_trades.sql),
+ * and the verification RPCs' after them.
  * They share two Postgres codes between a dozen different reasons, so each
  * is known by the sentence the database raises it with rather than by its
  * code. A refusal the UI already prevents - cash on both sides, a Trade with
@@ -58,6 +59,16 @@ const REFUSALS: Record<string, string> = {
   // moving forward and its chat, and leaves every way of ending it open.
   "one of this Trade's Traders has blocked the other":
     'One of you has blocked the other, so this trade can only be ended now.',
+  // Verification (supabase/migrations/20260928110000_verification.sql).
+  'a verification request is already waiting on review':
+    'Your ID and selfie are already in review.',
+  'a Verified Trader has nothing left to verify': 'You are already verified.',
+  'this verification request has already been reviewed':
+    'Another founder has already reviewed this request.',
+  'a verification request is reviewed once its documents are deleted':
+    'The photos could not be deleted, so the review was not saved. Try again.',
+  'a Founder cannot review their own verification request':
+    'You cannot review your own request. The other founder has to.',
 };
 
 const FALLBACK = 'Something went wrong. Check your connection and try again.';

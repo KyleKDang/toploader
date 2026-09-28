@@ -79,10 +79,10 @@ export async function cancelTradeFor(listingId: string): Promise<void> {
 }
 
 /**
- * Makes a Trader a Verified Trader. The submit-and-review flow that sets
- * this for real is #26; until it exists nothing a client can call reaches
- * it, and the gate on sending and accepting a Trade proposal (#21) has to be
- * proven before then.
+ * Makes a Trader a Verified Trader, for a test whose subject is what a
+ * Verified Trader may do rather than how one is made. The flow that sets
+ * this for real takes a Founder's review, which verification.test.ts walks;
+ * this sets the one column that review sets.
  */
 export async function verifyTrader(traderId: string): Promise<void> {
   await arrange(

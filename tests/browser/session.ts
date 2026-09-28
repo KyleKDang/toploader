@@ -101,14 +101,63 @@ export async function arrangeCity() {
 
 /**
  * Makes a Trader a Verified Trader, through a superuser connection, in a
- * tracer's arrange step. The submit-and-review flow that sets this for real
- * is #26; until then no client path reaches it, the same reason the seam-1
- * suites arrange it (tests/db/arrange.ts).
+ * tracer's arrange step, for a tracer whose flow starts after verification.
+ * The flow that sets this for real takes a Founder's review, and has a
+ * tracer of its own (verification.spec.ts); the seam-1 suites arrange it
+ * for the same reason (tests/db/arrange.ts).
  */
 export async function verifyTrader(traderId: string) {
   const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
   try {
     await sql`update public.traders set verified_at = now() where id = ${traderId}`;
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * Makes a Trader a Founder, through a superuser connection, in a tracer's
+ * arrange step. Membership is granted only by migration (ADR-0007), so no
+ * client path makes one.
+ */
+export async function makeFounder(traderId: string) {
+  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
+  try {
+    await sql`insert into public.founders (trader_id) values (${traderId})`;
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * Empties the review queue of what earlier runs left waiting, through a
+ * superuser connection, in a tracer's arrange step. The seam-1 suites leave
+ * a dozen requests pending per run on a stack that outlives them, and the
+ * queue a Founder reads is oldest first: without this, how far down the
+ * tracer's own request sits, and whether it is on the page at all, would
+ * depend on how many runs came before (#72, #82).
+ */
+export async function emptyReviewQueue() {
+  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
+  try {
+    await sql`delete from public.verification_requests where status = 'pending'`;
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * How many verification documents Storage's index holds for a Trader, read
+ * past every policy, for a tracer that has to say none is left.
+ */
+export async function verificationDocumentCount(traderId: string) {
+  const sql = postgres(requireEnv('SUPABASE_DB_URL'), { max: 1 });
+  try {
+    const [{ count }] = await sql<[{ count: number }]>`
+      select count(*)::int as count from storage.objects
+      where bucket_id = 'verification-documents'
+        and name like ${traderId + '/%'}`;
+    return count;
   } finally {
     await sql.end();
   }
