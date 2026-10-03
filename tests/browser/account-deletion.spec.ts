@@ -16,9 +16,12 @@ import { arrangeCity, signInAsNewTrader } from './session.ts';
 test('a Trader deletes their account from Settings and is signed out', async ({
   page,
 }) => {
-  // Room for the 60 s cold-start wait below plus the steps around it, which
-  // the 30 s default would cut off before that wait ever ran out.
-  test.setTimeout(90_000);
+  // The first call to a function on a fresh stack waits for the edge runtime
+  // to fetch what it imports, which outlasts the default five seconds. The
+  // test gets that wait plus room for the steps around it, so the default
+  // test timeout cannot cut the wait off before it runs out.
+  const coldStartWait = 60_000;
+  test.setTimeout(coldStartWait + 60_000);
   const trader = await signInAsNewTrader(page, await arrangeCity());
 
   await page.goto('/');
@@ -38,9 +41,7 @@ test('a Trader deletes their account from Settings and is signed out', async ({
   await expect(sheet).toContainText('This cannot be undone.');
   await sheet.getByRole('button', { name: 'Delete account' }).click();
 
-  // The first call to a function on a fresh stack waits for the edge runtime
-  // to fetch what it imports, which outlasts the default five seconds.
-  await expect(page).toHaveURL(/\/sign-up$/, { timeout: 60_000 });
+  await expect(page).toHaveURL(/\/sign-up$/, { timeout: coldStartWait });
   // The session the browser held is gone with the account: opening the app
   // again lands on sign up rather than inside it.
   await page.goto('/');
