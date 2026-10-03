@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import {
   AppShell,
+  Button,
   CardTile,
   EmptyState,
+  FormError,
   ListRow,
   ReputationPill,
   TopBar,
@@ -28,6 +30,11 @@ import { useTabs } from '../lib/tabs';
  * the one reference both sides of a pairing share, whereas an asking price
  * exists on only some Listings and means nothing on a Want. The Listing's
  * own page, one tap away, carries the asking price.
+ *
+ * The list is read a page at a time, newest first (#76). "Load more" sits
+ * under it only while older Matches exist, and adds the next page below the
+ * rows already there. A page that fails to load leaves those rows where
+ * they are, says so, and leaves the button to try again with.
  */
 
 const route = getRouteApi('/');
@@ -35,7 +42,8 @@ const route = getRouteApi('/');
 export function MatchesScreen() {
   const { trader, traderId } = route.useLoaderData();
   const navigate = useNavigate();
-  const matches = useQuery(matchesQuery(traderId));
+  const query = useInfiniteQuery(matchesQuery(traderId));
+  const matches = query.data?.pages.flatMap((page) => page.matches) ?? [];
   const cityName = trader.city.name;
 
   // A browser that already said yes stays subscribed under whoever is
@@ -63,15 +71,32 @@ export function MatchesScreen() {
       }
       {...useTabs('matches')}
     >
-      {matches.data?.length ? (
+      {matches.length ? (
         <>
           <ul aria-label="Your matches">
-            {matches.data.map((match) => (
+            {matches.map((match) => (
               <li key={`${match.listing.id}:${match.wanter.id}`}>
                 <MatchRow match={match} traderId={traderId} />
               </li>
             ))}
           </ul>
+          {query.hasNextPage ? (
+            <div className="flex flex-col gap-2 px-4 pt-3.5">
+              <Button
+                disabled={query.isFetchingNextPage}
+                onClick={() => void query.fetchNextPage()}
+              >
+                {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              </Button>
+              <FormError
+                error={
+                  query.isFetchNextPageError && !query.isFetchingNextPage
+                    ? query.error
+                    : null
+                }
+              />
+            </div>
+          ) : null}
           <p className="px-4 py-3 text-xs leading-prose text-muted">
             Prices are market prices, updated daily.
           </p>

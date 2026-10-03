@@ -123,7 +123,7 @@ const matchesRoute = createRoute({
     // browser. Only here, not on every screen: a notification's tap opens the
     // screen it names, never a detour.
     if (installStepDue()) throw redirect({ to: '/install' });
-    await queryClient.ensureQueryData(matchesQuery(traderId));
+    await queryClient.ensureInfiniteQueryData(matchesQuery(traderId));
     return { traderId, trader };
   },
   component: lazyRouteComponent(

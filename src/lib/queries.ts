@@ -1,5 +1,6 @@
-import { queryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import type { Condition } from './conditions';
+import { readMatchesPage, type MatchesCursor } from './matches-page';
 import { PHOTO_MIME, type PreparedPhoto } from './photos';
 import { supabase } from './supabase';
 
@@ -530,33 +531,38 @@ export function blockedWithQuery(otherTraderId: string) {
  */
 
 /**
- * The Trader's Matches, newest first, each with the Listing's Card, the
- * thumbnail of its first photo - not the full-size photo, for the reason
- * City browse gives - and both Traders' Reputation basics. The Trader is
- * named in the key for the reason wantsQuery names them.
+ * The Trader's Matches, newest first and a page at a time, each with the
+ * Listing's Card, the thumbnail of its first photo - not the full-size
+ * photo, for the reason City browse gives - and both Traders' Reputation
+ * basics. The Trader is named in the key for the reason wantsQuery names
+ * them.
+ *
+ * An infinite query: each page's param is the cursor the page before it
+ * ended on, and there is a next page only while that cursor exists
+ * (src/lib/matches-page.ts).
  */
 export function matchesQuery(traderId: string) {
-  return queryOptions({
+  return infiniteQueryOptions({
     queryKey: ['matches', traderId],
-    queryFn: () => fetchMatches(),
+    queryFn: ({ pageParam }) => fetchMatchesPage(pageParam),
+    initialPageParam: null as MatchesCursor | null,
+    getNextPageParam: (page) => page.next,
   });
 }
 
-async function fetchMatches() {
-  const { data, error } = await supabase
-    .from('matches')
-    .select(
-      'matched_at, listing:listings!inner(id, condition, card_variants(name, market_price_cents, cards(name, number, card_sets(name))), listing_photos(position, thumbnail_path)), lister:traders!lister_id!inner(id, display_name, verified_at, completed_trade_count), wanter:traders!wanter_id!inner(id, display_name, verified_at, completed_trade_count)',
-    )
-    .order('matched_at', { ascending: false })
-    .order('position', { referencedTable: 'listings.listing_photos' });
-  if (error) throw error;
-
-  return withThumbnailUrls(data, (match) => match.listing);
+/** One page of Matches, its thumbnails signed for that page alone. */
+async function fetchMatchesPage(after: MatchesCursor | null) {
+  const { matches, next } = await readMatchesPage(supabase, after);
+  return {
+    matches: await withThumbnailUrls(matches, (match) => match.listing),
+    next,
+  };
 }
 
 /** A Match as the Matches view shows it in a row. */
-export type Match = Awaited<ReturnType<typeof fetchMatches>>[number];
+export type Match = Awaited<
+  ReturnType<typeof fetchMatchesPage>
+>['matches'][number];
 
 /*
  * Trades: the proposal phase of the one agreement between two Traders

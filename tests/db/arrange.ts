@@ -80,6 +80,22 @@ export async function cancelTradeFor(listingId: string): Promise<void> {
 }
 
 /**
+ * A City of the test's own, and its name. For a test that counts a Trader's
+ * whole Matches view: in a shared City a Want or a Listing pairs with
+ * everything the stack has accumulated (#72), so only a City nobody else is
+ * in gives a Trader exactly the Matches the test arranged. A City is
+ * reference data that no client path writes.
+ */
+export async function arrangeCity(): Promise<string> {
+  const name = `Test City ${randomUUID().slice(0, 8)}`;
+  await arrange(
+    (sql) => sql`insert into public.cities (name, time_zone)
+                 values (${name}, 'America/Los_Angeles')`,
+  );
+  return name;
+}
+
+/**
  * Makes a Trader a Verified Trader, for a test whose subject is what a
  * Verified Trader may do rather than how one is made. The flow that sets
  * this for real takes a Founder's review, which verification.test.ts walks;
