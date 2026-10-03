@@ -8,7 +8,6 @@ import {
   ORANGE_COUNTY,
   seededExamplemon,
   seedTrader,
-  TEST_CITY,
   type Client,
   type SeededTrader,
 } from './seed.ts';
@@ -80,16 +79,15 @@ describe('Meetups', () => {
   });
 
   /**
-   * The adversarial trio in Test City, for the reason
-   * tests/db/trades.test.ts gives, with a proposal between the first two
+   * The adversarial trio, with a proposal between the first two
    * that the counterparty has accepted. The foreign Trader is verified too,
    * so what refuses them is not being party to the Trade.
    */
   async function acceptedTrade() {
     const [actor, counterparty, foreign] = await Promise.all([
-      seedTrader('Actor', TEST_CITY),
-      seedTrader('Counterparty', TEST_CITY),
-      seedTrader('Foreign', TEST_CITY),
+      seedTrader('Actor'),
+      seedTrader('Counterparty'),
+      seedTrader('Foreign'),
     ]);
     await Promise.all(
       [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),

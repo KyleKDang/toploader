@@ -7,7 +7,6 @@ import {
   LISTING_PHOTOS_BUCKET,
   seededExamplemon,
   seedTrader,
-  TEST_CITY,
   TINY_WEBP,
   type Client,
   type SeededTrader,
@@ -74,16 +73,15 @@ describe('Ending a Trade', () => {
   });
 
   /**
-   * The adversarial trio in Test City, for the reason
-   * tests/db/trades.test.ts gives, with a proposal from the actor to the
+   * The adversarial trio, with a proposal from the actor to the
    * counterparty, one Listing from each side. The foreign Trader is verified
    * too, so what refuses them is not being party to the Trade.
    */
   async function proposedTrade() {
     const [actor, counterparty, foreign] = await Promise.all([
-      seedTrader('Actor', TEST_CITY),
-      seedTrader('Counterparty', TEST_CITY),
-      seedTrader('Foreign', TEST_CITY),
+      seedTrader('Actor'),
+      seedTrader('Counterparty'),
+      seedTrader('Foreign'),
     ]);
     await Promise.all(
       [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),

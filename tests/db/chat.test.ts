@@ -7,7 +7,6 @@ import {
   createListing,
   seededExamplemon,
   seedTrader,
-  TEST_CITY,
   type Client,
   type SeededTrader,
 } from './seed.ts';
@@ -115,15 +114,13 @@ describe('Trade chat', { timeout: 30_000 }, () => {
   });
 
   /**
-   * The adversarial trio in Test City, for the reason
-   * tests/db/trades.test.ts gives, with a Trade proposed between the first
-   * two.
+   * The adversarial trio, with a Trade proposed between the first two.
    */
   async function seedTrade() {
     const [actor, counterparty, foreign] = await Promise.all([
-      seedTrader('Actor', TEST_CITY),
-      seedTrader('Counterparty', TEST_CITY),
-      seedTrader('Foreign', TEST_CITY),
+      seedTrader('Actor'),
+      seedTrader('Counterparty'),
+      seedTrader('Foreign'),
     ]);
     await Promise.all([verifyTrader(actor.id), verifyTrader(counterparty.id)]);
     const [mine, theirs] = await Promise.all([
