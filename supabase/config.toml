@@ -433,3 +433,10 @@ enabled = true
 # itself instead. Deployed by CI on every merge to main (ci.yml).
 [functions.notify]
 verify_jwt = false
+
+# Account deletion (supabase/functions/delete_account), called by a signed-in
+# Trader from the app. The function asks Auth about the caller's session
+# itself, which also answers whether the account still exists, so the
+# gateway's check is off rather than a second answer to the same question.
+[functions.delete_account]
+verify_jwt = false

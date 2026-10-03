@@ -50,10 +50,9 @@ test('a new Trader signs up, sets up their profile in Orange County, installs wi
   await expect(page.getByText('No matches in Orange County yet')).toBeVisible();
 
   const tabs = page.getByRole('navigation', { name: 'Sections' });
-  for (const name of ['Matches', 'Search', 'Trades']) {
+  for (const name of ['Matches', 'Search', 'Trades', 'Profile']) {
     await expect(tabs.getByRole('button', { name })).toBeEnabled();
   }
-  await expect(tabs.getByRole('button', { name: 'Profile' })).toBeDisabled();
 });
 
 test.describe('on an iPhone', () => {

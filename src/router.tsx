@@ -401,6 +401,20 @@ const verificationRoute = createRoute({
   ),
 });
 
+// Settings is the Profile tab's screen until the profile has one of its own
+// (#27).
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings',
+  loader: async ({ context: { queryClient } }) => {
+    await loadOnboardedTrader(queryClient);
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/SettingsScreen'),
+    'SettingsScreen',
+  ),
+});
+
 /**
  * The signed-in Founder, or a redirect to the app's landing view for a
  * Trader who is not one. It is a courtesy: what keeps a Trader from the
@@ -484,6 +498,7 @@ const routeTree = rootRoute.addChildren([
   tradeRoute,
   counterTradeRoute,
   verificationRoute,
+  settingsRoute,
   reviewQueueRoute,
   reviewRoute,
 ]);

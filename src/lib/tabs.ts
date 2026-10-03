@@ -8,11 +8,15 @@ import type { TabKey } from '../components';
  * here, so a new tab on the bar does not compile until it is given a place.
  */
 
-const TAB_PATHS: Record<TabKey, '/' | '/search' | '/trades' | null> = {
+const TAB_PATHS: Record<
+  TabKey,
+  '/' | '/search' | '/trades' | '/settings' | null
+> = {
   matches: '/',
   search: '/search',
   trades: '/trades',
-  profile: null,
+  // Settings, until the profile has a screen of its own to lead to it (#27).
+  profile: '/settings',
 };
 
 const TABS = Object.keys(TAB_PATHS) as TabKey[];
