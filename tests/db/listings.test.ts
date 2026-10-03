@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Condition } from '../../src/lib/conditions.ts';
-import { arrange, commitToTrade, completeTradeFor } from './arrange.ts';
+import {
+  arrange,
+  arrangeCity,
+  commitToTrade,
+  completeTradeFor,
+} from './arrange.ts';
 import {
   anonClient,
   LISTING_PHOTOS_BUCKET,
@@ -202,21 +207,25 @@ describe('Listings', () => {
     });
 
     it('is left out of the browse a Trader reads for a Card once it is not live', async () => {
-      const kept = await createListing(actor, {
+      // In a City of their own, so the browse holds only these two and
+      // the withdrawn one is absent because it is withdrawn, not because
+      // the stack's other Listings crowded it past the row cap (#82).
+      const lister = await seedTrader('Lister', await arrangeCity());
+      const kept = await createListing(lister, {
         card_variant_id: holofoil,
         condition: 'NM',
-        photos: [await uploadListingPhoto(actor)],
+        photos: [await uploadListingPhoto(lister)],
       });
-      const withdrawn = await createListing(actor, {
+      const withdrawn = await createListing(lister, {
         card_variant_id: holofoil,
         condition: 'LP',
-        photos: [await uploadListingPhoto(actor)],
+        photos: [await uploadListingPhoto(lister)],
       });
-      await actor.client.rpc('withdraw_listing', { listing_id: withdrawn });
+      await lister.client.rpc('withdraw_listing', { listing_id: withdrawn });
 
       // Read as the Trader who owns both: RLS lets them read their own
       // whatever state it is in, so browse is what has to leave one out.
-      const browsed = (await browseCard(actor.client, kept)).map(
+      const browsed = (await browseCard(lister.client, kept)).map(
         ({ id }) => id,
       );
 
