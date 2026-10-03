@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { MATCHES_PAGE_SIZE } from '../../src/lib/matches-page.ts';
 import { arrangeCity, signInAsNewTrader } from './session.ts';
 
 /*
@@ -171,4 +172,67 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
     new RegExp(`/listings/${listingId}\\?with=[0-9a-f-]{36}$`),
   );
   await expect(listerPage.getByText('Your listing.')).toBeVisible();
+});
+
+/*
+ * The Matches view a page at a time (#76): the first page, "Load more" under
+ * it while older Matches exist, and the next page added below. How a page
+ * is cut - its size, its order, what a Match arriving mid-read does - is
+ * proven at seam 1 (tests/db/matches-page.test.ts).
+ */
+test('older Matches are behind "Load more", which goes away once they are all shown', async ({
+  browser,
+}) => {
+  const page = await (await browser.newContext()).newPage();
+  const listerPage = await (await browser.newContext()).newPage();
+  await fakeCardImages(page);
+
+  const city = await arrangeCity();
+  const lister = await signInAsNewTrader(listerPage, city, 'Lister');
+  const wanter = await signInAsNewTrader(page, city, 'Wanter');
+
+  // One Match more than a page holds, arranged through the API: Listings of
+  // Examplemon, and one Want that every one of them satisfies.
+  const { data: card, error: cardError } = await lister.client
+    .from('cards')
+    .select('id, card_variants (id, name)')
+    .eq('name', 'Examplemon')
+    .single();
+  if (cardError) throw cardError;
+  const holofoil = card.card_variants.find((v) => v.name === 'Holofoil');
+  await Promise.all(
+    Array.from({ length: MATCHES_PAGE_SIZE + 1 }, async () => {
+      const photo = {
+        path: `${lister.id}/${randomUUID()}.webp`,
+        thumbnail_path: `${lister.id}/${randomUUID()}-thumb.webp`,
+      };
+      for (const path of [photo.path, photo.thumbnail_path]) {
+        const { error } = await lister.client.storage
+          .from('listing-photos')
+          .upload(path, TINY_WEBP, { contentType: 'image/webp' });
+        if (error) throw error;
+      }
+      const { error } = await lister.client.rpc('create_listing', {
+        card_variant_id: holofoil?.id ?? 0,
+        condition: 'NM',
+        photos: [photo],
+      });
+      if (error) throw error;
+    }),
+  );
+  const { error: wantError } = await wanter.client.rpc('add_want', {
+    card_id: card.id,
+  });
+  if (wantError) throw wantError;
+
+  await page.goto('/');
+  const rows = page.getByRole('list', { name: 'Your matches' }).locator('li');
+  const loadMore = page.getByRole('button', { name: 'Load more' });
+  await expect(rows).toHaveCount(MATCHES_PAGE_SIZE);
+  await expectNoHorizontalOverflow(page);
+
+  await loadMore.click();
+
+  await expect(rows).toHaveCount(MATCHES_PAGE_SIZE + 1);
+  await expect(loadMore).toBeHidden();
 });
