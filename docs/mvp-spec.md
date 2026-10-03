@@ -253,6 +253,7 @@ What makes a good test here:
   Extended on [#96](https://github.com/KyleKDang/toploader/issues/96) to every seam-1 and seam-2 test file: its Traders are seeded into a City arranged for the file alone unless the test names another (`fileCity` in `tests/db/seed.ts`), and a test that needs a second City arranges one rather than borrowing Orange County or Test City.
   The reason is [#72](https://github.com/KyleKDang/toploader/issues/72)'s at seam 1: on a stack with thousands of leftover Listings and Wants for the seeded Card in Orange County and Test City, each Listing or Want a test wrote there made hundreds of Matches and notifications, and tests crossed Vitest's five-second timeout.
   An arranged City carries a Safe Spot of each kind, so a Trade can reach a Meetup in it.
+  This makes the arranged Cities #92 accepts about one per test file per run rather than a few, which its naming already keeps out of the launch City's way.
 - A scheduled job that runs inside the database, a `pg_cron` job such as the Meetup reminder sweep, is invoked at seam 2 the way `pg_cron` invokes it: its registered command, run as the database's owner through the superuser connection.
   Added on [#23](https://github.com/KyleKDang/toploader/issues/23): no client role may call such a job, so there is no Trader's seam to reach it through, and running the command the job is registered with proves the schedule is wired as well as what it does.
   Its effects are still asserted at the seam, on the outbound pushes and the outbox.
