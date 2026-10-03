@@ -42,8 +42,8 @@ const route = getRouteApi('/');
 export function MatchesScreen() {
   const { trader, traderId } = route.useLoaderData();
   const navigate = useNavigate();
-  const query = useInfiniteQuery(matchesQuery(traderId));
-  const matches = query.data?.pages.flatMap((page) => page.matches) ?? [];
+  const matchPages = useInfiniteQuery(matchesQuery(traderId));
+  const matches = matchPages.data?.pages.flatMap((page) => page.matches) ?? [];
   const cityName = trader.city.name;
 
   // A browser that already said yes stays subscribed under whoever is
@@ -80,18 +80,19 @@ export function MatchesScreen() {
               </li>
             ))}
           </ul>
-          {query.hasNextPage ? (
+          {matchPages.hasNextPage ? (
             <div className="flex flex-col gap-2 px-4 pt-3.5">
               <Button
-                disabled={query.isFetchingNextPage}
-                onClick={() => void query.fetchNextPage()}
+                disabled={matchPages.isFetchingNextPage}
+                onClick={() => void matchPages.fetchNextPage()}
               >
-                {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                {matchPages.isFetchingNextPage ? 'Loading…' : 'Load more'}
               </Button>
               <FormError
                 error={
-                  query.isFetchNextPageError && !query.isFetchingNextPage
-                    ? query.error
+                  matchPages.isFetchNextPageError &&
+                  !matchPages.isFetchingNextPage
+                    ? matchPages.error
                     : null
                 }
               />

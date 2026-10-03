@@ -32,7 +32,12 @@ import {
 /** More than one page, with a short last page. */
 const OVER_A_PAGE = MATCHES_PAGE_SIZE + 5;
 
-describe('The Matches page', () => {
+/*
+ * Each test arranges more than a page of Listings or Traders through the
+ * real RPCs, one at a time, which takes longer than the default five seconds
+ * on a busy stack.
+ */
+describe('The Matches page', { timeout: 60_000 }, () => {
   /**
    * A Trader who lists, a Trader who wants, and a foreign Trader, alone
    * together in a new City.
@@ -87,11 +92,7 @@ describe('The Matches page', () => {
 
   it('neither repeats nor skips Matches that share one time across a page boundary', async () => {
     const { lister, wanter, card, holofoil } = await seedPair();
-    const listed = await Promise.all(
-      Array.from({ length: OVER_A_PAGE }, () =>
-        createListing(lister, holofoil, 'NM'),
-      ),
-    );
+    const listed = await listInTurn(lister, holofoil, OVER_A_PAGE);
     // One Want pairs with every Listing at once, in one transaction, so
     // every Match carries the same time and only the tie-break orders them.
     await addWant(wanter, { card_id: card });
@@ -107,6 +108,34 @@ describe('The Matches page', () => {
       OVER_A_PAGE - MATCHES_PAGE_SIZE,
     ]);
     expect(listingIds(pages)).toEqual(listed.toSorted());
+  });
+
+  it('neither repeats nor skips Matches on one Listing that share one time', async () => {
+    const city = await arrangeCity();
+    const lister = await seedTrader('Lister', city);
+    const { card, holofoil } = await seededExamplemon(lister.client);
+    // One at a time: this many sign-ups at once take more connections than
+    // the stack shares out, and every other suite is running beside this.
+    const wanters: SeededTrader[] = [];
+    for (let seeded = 0; seeded < OVER_A_PAGE; seeded += 1) {
+      const wanter = await seedTrader('Wanter', city);
+      await addWant(wanter, { card_id: card });
+      wanters.push(wanter);
+    }
+    // One Listing pairs with every wanting Trader at once, so the Matches
+    // share their time and their Listing, and only the wanting Trader, the
+    // last key of the order, tells them apart.
+    await createListing(lister, holofoil, 'NM');
+
+    const pages = await readEveryPage(lister.client);
+
+    expect(pages.map((page) => page.matches.length)).toEqual([
+      MATCHES_PAGE_SIZE,
+      OVER_A_PAGE - MATCHES_PAGE_SIZE,
+    ]);
+    expect(
+      pages.flatMap((page) => page.matches.map((match) => match.wanter.id)),
+    ).toEqual(wanters.map((wanter) => wanter.id).toSorted());
   });
 
   it('neither repeats nor drops a row when a Match arrives between two page reads', async () => {
