@@ -13,7 +13,7 @@ The backup passphrase is kept in the shared venture inbox from #32, beside the a
 | `SUPABASE_DB_URL` | GitHub secret | CI `migrate`, nightly backup |
 | `SUPABASE_ACCESS_TOKEN` | GitHub secret | CI `migrate` (deploys the edge functions) |
 | `BACKUP_PASSPHRASE` | GitHub secret, and the shared inbox | nightly backup |
-| `SENTRY_DSN` | GitHub secret, and a Supabase function secret | the cron check-ins of the nightly backup, the Catalog sync, and the photo reaper; the notifier |
+| `SENTRY_DSN` | GitHub secret, and a Supabase function secret | the cron check-ins of the nightly backup, the Catalog sync, and the photo reaper; the notifier; account deletion |
 | `SUPABASE_SECRET_KEY` | GitHub secret | Catalog sync, photo reaper |
 | `SUPABASE_URL` | GitHub variable | nightly backup (reads the hosted service versions), Catalog sync, photo reaper |
 | `SUPABASE_PUBLISHABLE_KEY` | GitHub variable | nightly backup |
@@ -118,6 +118,20 @@ A request whose photos are already gone was interrupted halfway through an earli
 
 Who the Founders are is a migration (`supabase/migrations/20260928150000_seed_founders.sql`), per [ADR-0007](adr/0007-admin-authorization.md).
 Adding or removing one is a new migration, never a change made in the dashboard.
+
+## Account deletion
+
+A Trader deletes their own account from Settings, which calls the `delete_account` edge function ([ADR-0007](adr/0007-admin-authorization.md), amendment for #28).
+It needs no secret of its own: Supabase hands every function the project URL and the server-side key, and a function secret such as `SENTRY_DSN` is shared by all of them.
+A run that fails reports to Sentry as an error, and the Trader is told to try again; nothing in the database changes unless the account itself is deleted.
+
+Deleting an account from the Supabase dashboard (Authentication → Users) erases the same data, because the erasure is a trigger on the account's deletion.
+It does not delete the Trader's verification documents, which only the function does, so delete those from the `verification-documents` bucket first, under the folder named by the Trader's id.
+
+The database refuses to delete a Founder's account or a banned Trader's.
+A Founder is removed by migration first; a banned Trader's account stays, since deleting it would free its email address for a new account.
+
+The photos of a deleted Trader's Listings are reclaimed by the photo reaper on its next run, except those of a traded Listing, which stay as the other Trader's Trade Record.
 
 ## Recovering the database
 

@@ -100,3 +100,42 @@ Only self-approval is dangerous, but one guard shared by both answers is one pla
 **What this leaves open** is a document that never gets a review: uploaded, and never submitted.
 The upload has to come before the row that names it, as a Listing photo does ([ADR-0001](0001-supabase-write-discipline.md), amendment for #17), so an abandoned upload is possible.
 Reclaiming those is [#88](https://github.com/KyleKDang/toploader/issues/88).
+
+## Amendment, 2026-10-03 (ticket #28)
+
+How `delete_account` deletes, which this ADR required and did not say how.
+
+**The Trader's row outlives the account.**
+`traders` was tied to `auth.users` with a cascade, and `trades` names its two Traders without one, so deleting the account of any Trader with a Trade was refused by the database.
+The tie is dropped: the row stays, marked `deleted_at`, and every Trade keeps pointing at someone.
+A cascade that removed the Trades instead would have taken the other Trader's Trade Record with it, which [ADR-0005](0005-trade-single-aggregate.md) forbids.
+
+**The erasure is a trigger on the account's deletion, not steps in the edge function.**
+The function could have deleted the Trader's rows and then the account, as two calls.
+Whatever failed between them would leave either an account whose data is gone or data whose owner can no longer ask again.
+As a trigger on `auth.users`, the erasure and the account's deletion are one transaction, and it holds for a deletion from the Supabase dashboard as well.
+It is the counterpart of the trigger that makes a Trader for every new account.
+
+**So the edge function is thin.**
+It asks Auth whose session the request carries, deletes that Trader's verification documents through the Storage API, and deletes the account through the Auth admin API.
+The documents go first for the reason a review deletes them first: a failure after that leaves the account whole and the Trader able to ask again.
+It takes no Trader id, so a Trader can only delete their own account.
+
+**A deleted Trader's session is refused before every request.**
+Deleting an account ends its sessions, but an access token already issued is accepted on its signature until it expires, up to an hour later.
+PostgREST runs `refuse_deleted_trader()` before every request (`pgrst.db_pre_request`), which refuses a caller whose row is marked deleted.
+One check in front of every read and RPC replaces a check inside each, which the next RPC written would have had to remember.
+The ban in this ADR has the same hour to close, and this is the place to close it: the same function can refuse a caller whose row is marked banned.
+
+**What the cascade used to guarantee is now a list.**
+Every table holding a Trader's own data was emptied by the cascade from `traders`.
+With the row kept, the trigger deletes from each by name, so a new table of a Trader's own data has to be added to it.
+
+Considered and rejected:
+
+- **Deleting the Trader's row and pointing their Trades at nobody.**
+  Nullable Traders on a Trade would break every rule that reads them, and the Trade Record would stop saying who it was with.
+- **Keeping only completed Trades and deleting the rest.**
+  A Trade still open would vanish from under the other Trader with no trace, and the Listings on a declined or cancelled one could not be deleted while the Trade named them.
+- **Ending the account's sessions sooner by shortening the token's life.**
+  It shortens the hour without closing it, and costs every Trader more frequent token refreshes.
