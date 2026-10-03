@@ -58,7 +58,9 @@ import { startCaptureServer, type CaptureServer } from './capture-server.ts';
  *
  * The outbox is shared with every other test file and every earlier run, so
  * a run of the notifier drains more than this file queued. Every assertion
- * is about the endpoints and rows this file arranged.
+ * is about the endpoints and rows this file arranged, and a test runs the
+ * notifier until it has reached those rows, however many are ahead of them
+ * (`deliver`); only a test about what one run does runs it once.
  */
 
 const APP_URL = 'https://toploaderapp.com';
@@ -69,6 +71,12 @@ const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 // Test City's, from supabase/seed.sql.
 const TEST_CITY_TIME_ZONE = 'America/New_York';
+// How many runs `deliver` makes before giving up on a test's rows. A run
+// settles about a hundred thousand silent rows, so this reaches past any
+// backlog a local stack has held; and once nothing is left ahead, a run is
+// a moment, so a notifier that never reaches the rows fails here rather
+// than at the test's timeout.
+const MAX_RUNS = 20;
 
 interface PushPayload {
   title: string;
@@ -128,7 +136,8 @@ describe('The notifier', { timeout: 30_000 }, () => {
     resend.reset();
   });
 
-  const deliver = ({ batch }: { batch?: number } = {}) =>
+  /** One run of the notifier, the way one wake or the minute's sweep runs it. */
+  const runNotifier = ({ batch }: { batch?: number } = {}) =>
     deliverNotifications({
       supabaseUrl: inject('supabaseUrl'),
       supabaseSecretKey: inject('supabaseSecretKey'),
@@ -141,6 +150,47 @@ describe('The notifier', { timeout: 30_000 }, () => {
       appUrl: APP_URL,
       batch,
     });
+
+  /**
+   * The notifier, run until it has reached every row on the given topics:
+   * each one sent, or claimed by a run since this began. One run stops after
+   * a bounded number of claims, so behind a backlog of unsent rows from
+   * earlier runs and other sessions it can end before it reaches the rows a
+   * test queued last; in production the next wake sends them, and here the
+   * next run does. Bounded too, so a notifier that never reaches them fails
+   * the test rather than looping. Returns every run's failures.
+   */
+  async function deliver(...topics: string[]): Promise<string[]> {
+    const attemptsBefore = new Map(
+      (await outboxRows(topics)).map((row) => [row.id, row.attempts]),
+    );
+    const failures: string[] = [];
+    for (let runs = 0; runs < MAX_RUNS; runs += 1) {
+      failures.push(...(await runNotifier()).failures);
+      const rows = await outboxRows(topics);
+      if (
+        rows.every(
+          (row) =>
+            row.sent_at !== null ||
+            row.attempts > (attemptsBefore.get(row.id) ?? 0),
+        )
+      ) {
+        return failures;
+      }
+    }
+    throw new Error(
+      `${MAX_RUNS} runs of the notifier did not reach the rows on ${topics.join(', ')}`,
+    );
+  }
+
+  async function outboxRows(topics: string[]) {
+    const { data, error } = await service
+      .from('notifications')
+      .select('id, sent_at, attempts')
+      .in('topic', topics);
+    if (error) throw error;
+    return data;
+  }
 
   /**
    * A browser's subscription: a P-256 key pair and an auth secret it made,
@@ -433,7 +483,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const { lister, wanter, listerBrowser, wanterBrowser, listingId, topic } =
       await matchedPair();
 
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(wanterBrowser, topic)).toEqual([
       { ...listedPush(lister, listingId), tag: topic },
@@ -466,7 +516,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       (sql) =>
         sql`update public.listings set status = 'active' where id = ${listingId}`,
     );
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(wanterBrowser, topic)).toEqual([
       { ...listedPush(lister, listingId), tag: topic },
@@ -494,7 +544,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const topic = (listingId: string) => `match:${listingId}:${wanter.id}`;
 
     await addWant(wanter, { card_id: examplemon });
-    await deliver();
+    await deliver(...[firstA, firstB, secondA].map(topic));
 
     for (const [browser, listingId] of [
       [firstBrowser, firstA],
@@ -540,7 +590,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       attests_adult: true,
     });
     if (error) throw error;
-    await deliver();
+    await deliver(mineTopic, theirsTopic);
 
     expect(pushesTo(wanterBrowser, mineTopic)).toEqual([
       { ...listedPush(mover, moverListing), tag: mineTopic },
@@ -557,7 +607,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const { wanter, wanterBrowser, topic } = await matchedPair();
     const phone = await subscribe(wanter);
 
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(wanterBrowser, topic)).toHaveLength(1);
     expect(pushesTo(phone, topic)).toHaveLength(1);
@@ -566,7 +616,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
   it('does not push again when the pair is evaluated again, or the notifier runs again', async () => {
     const { lister, wanter, listerBrowser, wanterBrowser, listingId, topic } =
       await matchedPair();
-    await deliver();
+    await deliver(topic);
 
     // Every path that re-evaluates this pair (tests/db/matches.test.ts),
     // then the notifier once more.
@@ -580,7 +630,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       });
       if (error) throw error;
     }
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(wanterBrowser, topic)).toHaveLength(1);
     expect(pushesTo(listerBrowser, topic)).toEqual([]);
@@ -589,7 +639,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
   it('sends each notification once when two runs overlap', async () => {
     const { wanterBrowser, topic } = await matchedPair();
 
-    await Promise.all([deliver(), deliver()]);
+    await Promise.all([deliver(topic), deliver(topic)]);
 
     expect(pushesTo(wanterBrowser, topic)).toHaveLength(1);
   });
@@ -604,7 +654,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       topic,
     } = await proposedTrade();
 
-    await deliver();
+    await deliver(topic);
 
     const url = `/trades/${tradeId}`;
     expect(pushesTo(recipientBrowser, topic)).toEqual([
@@ -639,7 +689,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       tradeId,
       topic,
     } = await proposedTrade();
-    await deliver();
+    await deliver(topic);
     pushService.reset();
     resend.reset();
 
@@ -649,7 +699,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       requested_cash_cents: 2_000,
     });
     if (error) throw error;
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
@@ -675,7 +725,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       tradeId,
       topic,
     } = await proposedTrade();
-    await deliver();
+    await deliver(topic);
     pushService.reset();
     resend.reset();
 
@@ -683,7 +733,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       trade_id: tradeId,
     });
     if (error) throw error;
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
@@ -717,7 +767,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       requested_cash_cents: 2_000,
     });
     if (countered.error) throw countered.error;
-    await deliver();
+    await deliver(topic);
     pushService.reset();
     resend.reset();
 
@@ -725,7 +775,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       trade_id: tradeId,
     });
     if (error) throw error;
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       {
@@ -753,7 +803,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       tradeId,
       topic,
     } = await proposedTrade();
-    await deliver();
+    await deliver(topic);
     pushService.reset();
     resend.reset();
 
@@ -761,7 +811,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       trade_id: tradeId,
     });
     if (error) throw error;
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(proposerBrowser, topic)).toEqual([]);
     expect(pushesTo(recipientBrowser, topic)).toEqual([]);
@@ -790,7 +840,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     if (!spot || !otherSpot) {
       throw new Error('Fewer than two Safe Spots seeded in Test City');
     }
-    await deliver();
+    await deliver(trade.topic);
     pushService.reset();
     resend.reset();
     return { ...trade, spot, otherSpot };
@@ -832,7 +882,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       trade.spot,
       hoursAway,
     );
-    await deliver();
+    await deliver(trade.topic);
     pushService.reset();
     resend.reset();
     return { ...trade, spotName: trade.spot.name, meetupAt };
@@ -875,7 +925,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       trade_id: meetup.tradeId,
     });
     if (error) throw error;
-    await deliver();
+    await deliver(meetup.topic);
     pushService.reset();
     resend.reset();
     return meetup;
@@ -923,7 +973,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       trade_id: tradeId,
     });
     if (error) throw error;
-    await deliver();
+    await deliver(topic);
 
     const url = `/trades/${tradeId}`;
     expect(pushesTo(proposerBrowser, topic)).toEqual([
@@ -968,7 +1018,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     } = await acceptedTrade();
 
     const meetupAt = await putMeetupForward(proposer, tradeId, spot, 24);
-    await deliver();
+    await deliver(topic);
 
     const url = `/trades/${tradeId}`;
     const body = meetupProposedBody('Proposer', spot.name, meetupAt);
@@ -1000,7 +1050,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     } = await meetupPutForward(24);
 
     const meetupAt = await putMeetupForward(recipient, tradeId, otherSpot, 48);
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
@@ -1036,12 +1086,12 @@ describe('The notifier', { timeout: 30_000 }, () => {
     );
     // Moving the Meetup told the recipient of it, as any write to one does;
     // what is under test is the one put forward next.
-    await deliver();
+    await deliver(topic);
     pushService.reset();
     resend.reset();
 
     const meetupAt = await putMeetupForward(proposer, tradeId, spot, 48);
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       {
@@ -1079,7 +1129,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
 
     await sweepReminders();
     await sweepReminders();
-    await deliver();
+    await deliver(topic);
 
     const url = `/trades/${tradeId}`;
     expect(pushesTo(proposerBrowser, topic)).toEqual([
@@ -1125,7 +1175,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       tradeId,
       topic,
     } = await proposedTrade();
-    await deliver();
+    await deliver(topic);
     pushService.reset();
     resend.reset();
 
@@ -1134,11 +1184,11 @@ describe('The notifier', { timeout: 30_000 }, () => {
       body: 'Can we meet at the station Saturday?',
     });
     if (error) throw error;
-    await deliver();
-
     // The Trade's chat is a topic of its own: on the Trade's, a message
     // would replace the proposal the proposer may not have read yet.
     const chat = `chat:${tradeId}`;
+    await deliver(topic, chat);
+
     expect(pushesTo(proposerBrowser, chat)).toEqual([
       {
         title: 'New message',
@@ -1160,9 +1210,9 @@ describe('The notifier', { timeout: 30_000 }, () => {
   });
 
   it('cuts a long chat message short in its push', async () => {
-    const { proposer, proposerBrowser, recipient, tradeId } =
+    const { proposer, proposerBrowser, recipient, tradeId, topic } =
       await proposedTrade();
-    await deliver();
+    await deliver(topic);
     pushService.reset();
 
     // A push service caps what it carries at about 4 KB once encrypted,
@@ -1172,9 +1222,10 @@ describe('The notifier', { timeout: 30_000 }, () => {
       body: 'é'.repeat(2_000),
     });
     if (error) throw error;
-    await deliver();
+    const chat = `chat:${tradeId}`;
+    await deliver(chat);
 
-    const [push] = pushesTo(proposerBrowser, `chat:${tradeId}`);
+    const [push] = pushesTo(proposerBrowser, chat);
     expect(push.body).toBe(`Recipient: ${'é'.repeat(139)}…`);
     expect(emailsTo(proposer)).toEqual([]);
   });
@@ -1222,7 +1273,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       const { founder, trader, founderBrowser, traderBrowser, topic } =
         await reviewedVerification(answer);
 
-      await deliver();
+      await deliver(topic);
 
       expect(pushesTo(traderBrowser, topic)).toEqual([
         { title, body, url: '/verification', tag: topic },
@@ -1245,12 +1296,13 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const trader = await seedTrader('Asked');
     const browser = await subscribe(trader);
 
+    const topic = `verification:${trader.id}`;
     await submitVerification(trader);
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(browser)).toEqual([]);
     expect(emailsTo(trader)).toEqual([]);
-    expect(await outbox(`verification:${trader.id}`)).toEqual([]);
+    expect(await outbox(topic)).toEqual([]);
   });
 
   it('emails through Resend, and pushes too, for a kind the matrix emails', async () => {
@@ -1258,7 +1310,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const browser = await subscribe(trader);
     const topic = await queue(trader, 'new_proposal');
 
-    await deliver();
+    await deliver(topic);
 
     expect(emails().filter((email) => email.to.includes(trader.email))).toEqual(
       [
@@ -1294,9 +1346,9 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const topic = await queue(trader, 'new_proposal');
     resend.answer('/emails', 500);
 
-    const report = await deliver();
+    const failures = await deliver(topic);
 
-    expect(report.failures).toEqual(
+    expect(failures).toEqual(
       expect.arrayContaining([
         expect.stringMatching(new RegExp(`^${topic}: Resend answered 500`)),
       ]),
@@ -1319,7 +1371,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     );
     resend.reset();
     pushService.reset();
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(browser, topic)).toHaveLength(0);
     expect(
@@ -1335,7 +1387,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const oldPhone = await subscribe(wanter);
     pushService.answer(oldPhone.path, 410);
 
-    await deliver();
+    await deliver(topic);
 
     expect(pushesTo(wanterBrowser, topic)).toHaveLength(1);
     const { data, error } = await wanter.client
@@ -1354,7 +1406,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const trader = await seedTrader('Unsubscribed');
     const topic = await queue(trader, 'new_match');
 
-    await deliver();
+    await deliver(topic);
 
     // Nothing to push is the push channel done, not the row stuck: the row
     // is sent, without ever being handed to the notifier, and will not be
@@ -1371,12 +1423,12 @@ describe('The notifier', { timeout: 30_000 }, () => {
     const trader = await seedTrader('Unsubscribed');
     const backlog = await queueMatches(trader, 6_000, headOfTheDay());
 
-    await deliver({ batch: 1 });
+    await runNotifier({ batch: 1 });
 
     expect((await outboxByTopicPrefix(backlog)).unsent).toBeGreaterThan(0);
 
     for (let runs = 0; runs < 5; runs += 1) {
-      await deliver({ batch: 1 });
+      await runNotifier({ batch: 1 });
       if ((await outboxByTopicPrefix(backlog)).unsent === 0) break;
     }
     expect(await outboxByTopicPrefix(backlog)).toEqual({
@@ -1399,7 +1451,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       createdAt: new Date(Date.parse(head) + SECOND).toISOString(),
     });
 
-    await deliver({ batch: 2 });
+    await runNotifier({ batch: 2 });
 
     expect(await outboxByTopicPrefix(silentRows)).toEqual({
       rows: 300,
@@ -1420,7 +1472,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       createdAt: new Date(Date.now() - 25 * HOUR).toISOString(),
     });
 
-    await deliver();
+    await runNotifier();
 
     const [row] = await outbox(stale);
     expect(row?.sent_at).toBeNull();
@@ -1434,7 +1486,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
       createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
     });
 
-    await deliver();
+    await runNotifier();
 
     expect(pushesTo(browser)).toEqual([]);
     expect(emails().filter((email) => email.to.includes(trader.email))).toEqual(
