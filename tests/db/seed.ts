@@ -18,8 +18,8 @@ export const ORANGE_COUNTY = 'Orange County';
 
 /**
  * A second City that exists only on local and CI stacks, seeded by
- * supabase/seed.sql, so a test can put a Trader somewhere other than the
- * launch City.
+ * supabase/seed.sql. For a test about that seeded data; a test that only
+ * needs a second City arranges one (`arrangeCity` in tests/db/arrange.ts).
  */
 export const TEST_CITY = 'Test City';
 
@@ -74,7 +74,7 @@ export async function cityId(client: Client, name: string): Promise<string> {
   return data.id;
 }
 
-let ownCity: Promise<string> | undefined;
+let fileCityName: Promise<string> | undefined;
 
 /**
  * The City this test file's Traders are seeded into unless told otherwise:
@@ -91,8 +91,8 @@ let ownCity: Promise<string> | undefined;
  * file's and not the run's.
  */
 export function fileCity(): Promise<string> {
-  ownCity ??= arrangeCity();
-  return ownCity;
+  fileCityName ??= arrangeCity();
+  return fileCityName;
 }
 
 /** A Trader who has finished onboarding, in the file's own City unless told. */

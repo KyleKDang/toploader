@@ -12,7 +12,6 @@ import {
   LISTING_PHOTOS_BUCKET,
   seedAdversarialTraders,
   seedTrader,
-  TEST_CITY,
   TINY_WEBP,
   uploadListingPhoto,
   type Client,
@@ -36,7 +35,7 @@ describe('Listings', () => {
   beforeAll(async () => {
     [{ actor, counterparty, foreign }, outsider] = await Promise.all([
       seedAdversarialTraders(),
-      seedTrader('Outsider', TEST_CITY),
+      seedTrader('Outsider', await arrangeCity()),
     ]);
     holofoil = await variantId(actor.client, 'Examplemon', 'Holofoil');
   });

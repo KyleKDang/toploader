@@ -522,9 +522,9 @@ async function moveTo(trader: SeededTrader, city: string) {
 
 /*
  * Every read below names the wanting Trader as well as the Listing. The
- * City holds Wants for Examplemon from this file's other tests, so a new Listing
- * of it legitimately matches all of them from the lister's side; the pair a
- * test arranged is the only one it can speak for.
+ * City holds Wants for Examplemon from this file's other tests, so a new
+ * Listing of it legitimately matches all of them from the lister's side;
+ * the pair a test arranged is the only one it can speak for.
  */
 
 /** Every Match the caller can see between one Listing and one wanting Trader. */
