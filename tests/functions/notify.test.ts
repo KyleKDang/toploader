@@ -916,9 +916,9 @@ describe('The notifier', { timeout: 30_000 }, () => {
   }
 
   /**
-   * A time as a Trader in the Trades' City reads it on their clock, the way the
-   * notifications tell it: "Saturday, October 3 at 2:30 PM", or with only
-   * the time of day, "2:30 PM".
+   * A time as a Trader in the Trades' City reads it on their clock, the way
+   * the notifications tell it: "Saturday, October 3 at 2:30 PM", or with
+   * only the time of day, "2:30 PM".
    */
   function tradeCityTime(at: Date, { withDay }: { withDay: boolean }) {
     const parts = Object.fromEntries(

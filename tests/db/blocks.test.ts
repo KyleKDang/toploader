@@ -1,11 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { arrange, verifyTrader } from './arrange.ts';
+import { arrange, arrangeCity, verifyTrader } from './arrange.ts';
 import {
   addWant,
   anonClient,
   createListing,
   seededExamplemon,
-  ORANGE_COUNTY,
   seedTrader,
   serviceClient,
   type Client,
@@ -422,7 +421,7 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
     it('and to no Trader outside it', async () => {
       const { actor, counterparty, mine, theirs } = await proposedTrade();
       // Another City, so City browse cannot be what shows them.
-      const outsider = await seedTrader('Outsider', ORANGE_COUNTY);
+      const outsider = await seedTrader('Outsider', await arrangeCity());
       await arrangeBlock(actor, counterparty);
 
       expect(await canReadListing(counterparty.client, mine)).toBe(true);

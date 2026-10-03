@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { arrange, verifyTrader } from './arrange.ts';
+import { arrange, arrangeCity, verifyTrader } from './arrange.ts';
 import {
   anonClient,
   cityId,
   createListing,
-  ORANGE_COUNTY,
   seededExamplemon,
   seedTrader,
   type Client,
@@ -70,12 +69,12 @@ async function safeSpotIds(client: Client): Promise<string[]> {
 
 describe('Meetups', () => {
   let holofoil: number;
-  let orangeCountySpot: string;
+  let anotherCitySpot: string;
 
   beforeAll(async () => {
-    const reader = await seedTrader('Catalog reader', ORANGE_COUNTY);
+    const reader = await seedTrader('Catalog reader', await arrangeCity());
     ({ holofoil } = await seededExamplemon(reader.client));
-    [orangeCountySpot] = await safeSpotIds(reader.client);
+    [anotherCitySpot] = await safeSpotIds(reader.client);
   });
 
   /**
@@ -284,7 +283,7 @@ describe('Meetups', () => {
         actor,
         tradeId,
         hoursFromNow(24),
-        orangeCountySpot,
+        anotherCitySpot,
       );
 
       expect(unknown.error?.code).toBe('22023');
@@ -305,7 +304,7 @@ describe('Meetups', () => {
       const { actor, counterparty, tradeId, spot } = await acceptedTrade();
       const moved = await counterparty.client.rpc('set_trader_profile', {
         display_name: counterparty.displayName,
-        city_id: await cityId(counterparty.client, ORANGE_COUNTY),
+        city_id: await cityId(counterparty.client, await arrangeCity()),
         attests_adult: true,
       });
       if (moved.error) throw moved.error;
