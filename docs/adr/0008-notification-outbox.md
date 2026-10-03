@@ -57,3 +57,14 @@ That Trader is in the app, looking at the Matches the Want made, so their half i
 The other half is kept whole: each of those Traders is told about a pair of their own, which is the alert the notification matrix promises.
 The side is decided by whose row changed, not by who is signed in, so a Listing put back to active by a cancelled Trade alerts the Traders who want it and not its lister, whoever cancelled.
 An alert is still per pair: a Trader with three Listings of the wanted Card is told three times, and a pair still notifies once, because `match_events` keeps the first time each pair held.
+
+## Amendment, 2026-10-03 (ticket #83)
+
+`claim_notifications` hands each of its two updates the rows it took as an array of ids (`id = any(...)`), rather than joining them to the rows it took.
+It is a SQL function, so its statement is planned with `batch` unknown, and the planner could not see that a call takes at most fifty batches of rows.
+It planned both updates as hash joins over a sequential scan of the whole outbox, sent rows included, and of `auth.users`.
+So every call read every row the outbox had ever held to write at most a thousand of them.
+Measured on a local stack whose outbox held five million rows, a call took 600 ms to 1.3 s, against 12 ms for the same statement with the limit written in.
+A backlog of 600,000 silent rows took minutes to drain, where it now takes about 18 s.
+An array of ids is estimated as a handful of rows whatever `batch` is, so both updates look their rows up by primary key and a call's cost follows its batch, not the table.
+What a call takes, settles, claims and returns is unchanged, and so is the notifier: claim order, fifty batches a call, and a hundred calls a run.
