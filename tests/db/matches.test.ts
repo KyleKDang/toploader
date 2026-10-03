@@ -1,13 +1,17 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Condition } from '../../src/lib/conditions.ts';
-import { cancelTradeFor, commitToTrade, completeTradeFor } from './arrange.ts';
+import {
+  arrangeCity,
+  cancelTradeFor,
+  commitToTrade,
+  completeTradeFor,
+} from './arrange.ts';
 import {
   anonClient,
   cityId,
-  ORANGE_COUNTY,
+  fileCity,
   seedTrader,
   serviceClient,
-  TEST_CITY,
   uploadListingPhoto,
   type Client,
   type SeededTrader,
@@ -19,10 +23,10 @@ import {
  * each new pair is recorded exactly once so the notification for it (#20)
  * fires once.
  *
- * Every test seeds Traders of its own. The stack is shared with every other
- * test file and every earlier run, so the City is full of other Listings
- * and Wants for the same Cards; a test only ever asks about its own
- * Listing, never counts a whole Matches view.
+ * Every test seeds Traders of its own. They share the file's own City
+ * (tests/db/seed.ts) with every other test here, so the City holds other
+ * Listings and Wants for the same Cards; a test only ever asks about its
+ * own Listing, never counts a whole Matches view.
  */
 
 /** Cards from the made-up set supabase/seed.sql syncs. */
@@ -297,7 +301,7 @@ describe('Matches', () => {
     it('does not pair a Want in another City', async () => {
       const [lister, elsewhere] = await Promise.all([
         seedTrader('Lister'),
-        seedTrader('Elsewhere', TEST_CITY),
+        seedTrader('Elsewhere', await arrangeCity()),
       ]);
       await addWant(elsewhere, { card_id: examplemon });
 
@@ -313,12 +317,12 @@ describe('Matches', () => {
     it('pairs them once the wanting Trader moves into the City', async () => {
       const [lister, mover] = await Promise.all([
         seedTrader('Lister'),
-        seedTrader('Mover', TEST_CITY),
+        seedTrader('Mover', await arrangeCity()),
       ]);
       await addWant(mover, { card_id: examplemon });
       const listingId = await list(lister, holofoil, 'NM');
 
-      await moveTo(mover, ORANGE_COUNTY);
+      await moveTo(mover, await fileCity());
 
       expect(await matchFor(mover.client, listingId, mover.id)).toMatchObject({
         lister_id: lister.id,
@@ -332,7 +336,7 @@ describe('Matches', () => {
       await addWant(wanter, { card_id: examplemon });
       const listingId = await list(lister, holofoil, 'NM');
 
-      await moveTo(lister, TEST_CITY);
+      await moveTo(lister, await arrangeCity());
 
       expect(await matchFor(wanter.client, listingId, wanter.id)).toBeNull();
       expect(await matchFor(lister.client, listingId, wanter.id)).toBeNull();
@@ -397,8 +401,8 @@ describe('Matches', () => {
       });
       if (error) throw error;
       await addWant(wanter, { card_id: examplemon });
-      await moveTo(wanter, ORANGE_COUNTY);
-      await moveTo(lister, ORANGE_COUNTY);
+      await moveTo(wanter, await fileCity());
+      await moveTo(lister, await fileCity());
 
       expect(await matchEvents(listingId, wanter.id)).toEqual(before);
       expect(
@@ -518,7 +522,7 @@ async function moveTo(trader: SeededTrader, city: string) {
 
 /*
  * Every read below names the wanting Trader as well as the Listing. The
- * City holds Wants for Examplemon from every earlier run, so a new Listing
+ * City holds Wants for Examplemon from this file's other tests, so a new Listing
  * of it legitimately matches all of them from the lister's side; the pair a
  * test arranged is the only one it can speak for.
  */

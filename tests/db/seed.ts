@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { inject } from 'vitest';
 import type { Condition } from '../../src/lib/conditions.ts';
 import type { Database } from '../../src/lib/database.types.ts';
+import { arrangeCity } from './arrange.ts';
 
 export type Client = SupabaseClient<Database>;
 
@@ -73,15 +74,36 @@ export async function cityId(client: Client, name: string): Promise<string> {
   return data.id;
 }
 
-/** A Trader who has finished onboarding, in Orange County unless told. */
+let ownCity: Promise<string> | undefined;
+
+/**
+ * The City this test file's Traders are seeded into unless told otherwise:
+ * one arranged for the file alone, the first time the file asks.
+ *
+ * Matching pairs an active Listing with every Want for its Card in the
+ * City, and a long-lived stack keeps every Listing and Want each earlier run
+ * left behind. In a shared City a test's one Listing becomes a Match, and a
+ * notification, with each of those, so how long a test takes grows with how
+ * many runs came before (#96). In the file's own City it pairs only with
+ * the file's own rows.
+ *
+ * Vitest gives each test file its own module state, so the City is the
+ * file's and not the run's.
+ */
+export function fileCity(): Promise<string> {
+  ownCity ??= arrangeCity();
+  return ownCity;
+}
+
+/** A Trader who has finished onboarding, in the file's own City unless told. */
 export async function seedTrader(
   displayName: string,
-  city: string = ORANGE_COUNTY,
+  city?: string,
 ): Promise<SeededTrader> {
   const trader = await signUpTrader();
   const { error } = await trader.client.rpc('set_trader_profile', {
     display_name: displayName,
-    city_id: await cityId(trader.client, city),
+    city_id: await cityId(trader.client, city ?? (await fileCity())),
     attests_adult: true,
   });
   if (error) throw error;

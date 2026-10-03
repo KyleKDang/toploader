@@ -105,24 +105,37 @@ export async function makeFounder(traderId: string): Promise<void> {
 }
 
 /**
- * Makes a City no other test or earlier run has Traders in, and returns its
- * name. Cities are reference data written only by migrations, so no client
- * path makes one.
+ * Makes a City no other test or earlier run has Traders in, with a Safe Spot
+ * of each kind, and returns its name. Cities and Safe Spots are reference
+ * data written only by migrations, so no client path makes one.
  *
- * For a test that reads a City-wide list and expects its own rows in it,
- * per the spec's Testing decisions (#82); the browser tracers have their
- * own `arrangeCity` in tests/browser/session.ts (#72).
+ * Every seam-1 and seam-2 test file seeds its Traders into one of these
+ * unless told otherwise (`fileCity` in tests/db/seed.ts), per the spec's
+ * Testing decisions (#82, #96); the browser tracers have their own
+ * `arrangeCity` in tests/browser/session.ts (#72).
  *
  * Named to sort after Orange County, like the tracers' "Tracer City": the
  * stack keeps every run's arranged Cities, and the app's City picker reads
  * the first 1,000 by name, so a name sorting earlier would in time push the
  * launch City out of it (#92).
  */
-export async function arrangeCity(): Promise<string> {
+export async function arrangeCity(
+  timeZone = 'America/Los_Angeles',
+): Promise<string> {
   const name = `Test Run City ${randomUUID().slice(0, 8)}`;
   await arrange(
-    (sql) => sql`insert into public.cities (name, time_zone)
-                 values (${name}, 'America/Los_Angeles')`,
+    (sql) => sql`
+      with city as (
+        insert into public.cities (name, time_zone)
+          values (${name}, ${timeZone})
+          returning id
+      )
+      insert into public.safe_spots (city_id, name, address, kind)
+        select city.id, spot.name, spot.address, spot.kind::public.safe_spot_kind
+          from city, (values
+            ('Police Station', '1 Arranged Street', 'police_station'),
+            ('Library', '2 Arranged Street', 'monitored_site')
+          ) as spot (name, address, kind)`,
   );
   return name;
 }

@@ -10,7 +10,6 @@ import {
   seedTrader,
   serviceClient,
   submitVerification,
-  TEST_CITY,
   type Client,
   type SeededTrader,
 } from './seed.ts';
@@ -149,15 +148,15 @@ describe('Deleting an account', { timeout: 60_000 }, () => {
   });
 
   /**
-   * The adversarial trio in Test City, all three Verified Traders: the
+   * The adversarial trio, all three Verified Traders: the
    * actor, whose account will be deleted, the counterparty they trade with,
    * and a foreign Trader party to nothing.
    */
   async function traders() {
     const [actor, counterparty, foreign] = await Promise.all([
-      seedTrader(`Actor ${randomUUID().slice(0, 8)}`, TEST_CITY),
-      seedTrader('Counterparty', TEST_CITY),
-      seedTrader('Foreign', TEST_CITY),
+      seedTrader(`Actor ${randomUUID().slice(0, 8)}`),
+      seedTrader('Counterparty'),
+      seedTrader('Foreign'),
     ]);
     await Promise.all(
       [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),
@@ -232,8 +231,8 @@ describe('Deleting an account', { timeout: 60_000 }, () => {
     it('deletes every row of it with the account', async () => {
       // Not a Verified Trader, so that they have a request waiting.
       const [actor, counterparty] = await Promise.all([
-        seedTrader('Actor', TEST_CITY),
-        seedTrader('Counterparty', TEST_CITY),
+        seedTrader('Actor'),
+        seedTrader('Counterparty'),
       ]);
       // Something of everything a Trader holds: a Copy in their Collection,
       // a Want, a Match the counterparty's Listing then makes with it and
@@ -253,7 +252,7 @@ describe('Deleting an account', { timeout: 60_000 }, () => {
       });
       if (blocked.error) throw blocked.error;
       await submitVerification(actor);
-      // Test City holds the Listings of earlier tests too, so the Want
+      // The City holds this file's other Listings too, so the Want
       // makes more than the one Match; what matters is that each table
       // holds something to delete.
       const before = await ownRowsLeft(actor.id);

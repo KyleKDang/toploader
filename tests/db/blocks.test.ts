@@ -8,7 +8,6 @@ import {
   ORANGE_COUNTY,
   seedTrader,
   serviceClient,
-  TEST_CITY,
   type Client,
   type SeededTrader,
 } from './seed.ts';
@@ -62,8 +61,8 @@ async function canReadListing(client: Client, listingId: string) {
 
 /**
  * Whether one client sees the Match of one Listing and one wanting Trader.
- * Narrowed to the pair, because Test City holds every run's Traders, and
- * any of them may want the same Card.
+ * Narrowed to the pair, because the City holds this file's other Traders,
+ * and any of them may want the same Card.
  */
 async function hasMatch(client: Client, listingId: string, wanterId: string) {
   const { data, error } = await client
@@ -86,15 +85,14 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
   });
 
   /**
-   * The adversarial trio in Test City, for the reason
-   * tests/db/trades.test.ts gives, all three verified so that what refuses a
+   * The adversarial trio, all three verified so that what refuses a
    * proposal is the block and nothing else.
    */
   async function seedTrio() {
     const [actor, counterparty, foreign] = await Promise.all([
-      seedTrader('Actor', TEST_CITY),
-      seedTrader('Counterparty', TEST_CITY),
-      seedTrader('Foreign', TEST_CITY),
+      seedTrader('Actor'),
+      seedTrader('Counterparty'),
+      seedTrader('Foreign'),
     ]);
     await Promise.all(
       [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),

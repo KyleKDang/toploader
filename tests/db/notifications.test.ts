@@ -135,8 +135,8 @@ describe('The notification outbox', () => {
   });
 
   /**
-   * The outbox rows on one Match's topic. The City is full of other Traders'
-   * Wants and Listings for this Card from earlier runs, and every pair they
+   * The outbox rows on one Match's topic. The City holds this file's other
+   * Wants and Listings for this Card, and every pair they
    * make is legitimately notified too; the pair a test arranged is the only
    * one it can speak for.
    */

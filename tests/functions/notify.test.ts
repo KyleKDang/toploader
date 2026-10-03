@@ -26,6 +26,7 @@ import {
 } from '../../supabase/functions/_shared/vapid.ts';
 import {
   arrange,
+  arrangeCity,
   cancelTradeFor,
   commitToTrade,
   makeFounder,
@@ -34,14 +35,13 @@ import {
 import {
   addWant,
   cityId,
+  fileCity,
   createListing,
-  ORANGE_COUNTY,
   seededExamplemon,
   reviewVerification,
   seedTrader,
   serviceClient,
   submitVerification,
-  TEST_CITY,
   type SeededTrader,
 } from '../db/seed.ts';
 import { startCaptureServer, type CaptureServer } from './capture-server.ts';
@@ -70,8 +70,9 @@ const RESEND_API_KEY = 're_test_key';
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
-// Test City's, from supabase/seed.sql.
-const TEST_CITY_TIME_ZONE = 'America/New_York';
+// The Trades' City's: not the arranged default, so a time that reads right
+// can only have been told on the City's own clock.
+const TRADE_CITY_TIME_ZONE = 'America/New_York';
 // How many runs `deliver` makes before giving up on a test's rows. A run
 // settles about a hundred thousand silent rows, so this reaches past any
 // backlog a local stack has held; and once nothing is left ahead, a run is
@@ -107,6 +108,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
   let examplemon: number;
   let holofoil: number;
   let suiteLock: Sql;
+  let tradeCity: string;
 
   // Another session's run of this file shares the outbox, and its notifier
   // claims whatever rows are oldest: it would send this file's rows to its
@@ -124,6 +126,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     });
     await suiteLock`select pg_advisory_lock(hashtext(${SUITE_LOCK}))`;
 
+    tradeCity = await arrangeCity(TRADE_CITY_TIME_ZONE);
     [pushService, resend] = await Promise.all([
       startCaptureServer({ tls: true }),
       startCaptureServer(),
@@ -434,13 +437,11 @@ describe('The notifier', { timeout: 30_000 }, () => {
   /**
    * Two Verified Traders of one City, each with a Listing and a browser
    * subscribed, and a Trade proposal from one to the other of both Listings.
-   * Test City, for the reason tests/db/trades.test.ts gives: a Trade needs
-   * no Match, and in Orange County each Listing would make dozens.
    */
   async function proposedTrade() {
     const [proposer, recipient] = await Promise.all([
-      seedTrader('Proposer', TEST_CITY),
-      seedTrader('Recipient', TEST_CITY),
+      seedTrader('Proposer', tradeCity),
+      seedTrader('Recipient', tradeCity),
     ]);
     await Promise.all([verifyTrader(proposer.id), verifyTrader(recipient.id)]);
     const [proposerBrowser, recipientBrowser, mine, theirs] = await Promise.all(
@@ -589,10 +590,10 @@ describe('The notifier', { timeout: 30_000 }, () => {
   });
 
   it("pushes a Trader's move to the Traders they now match, and not to the Trader who moved", async () => {
-    // The mover lists and wants Examplemon in Test City, then moves to
-    // Orange County, where one Trader wants it and another lists it.
+    // The mover lists and wants Examplemon in a City of their own, then moves
+    // to the file's, where one Trader wants it and another lists it.
     const [mover, wanter, lister] = await Promise.all([
-      seedTrader('Mover', TEST_CITY),
+      seedTrader('Mover', await arrangeCity()),
       seedTrader('Wanter'),
       seedTrader('Lister'),
     ]);
@@ -612,7 +613,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
 
     const { error } = await mover.client.rpc('set_trader_profile', {
       display_name: mover.displayName,
-      city_id: await cityId(mover.client, ORANGE_COUNTY),
+      city_id: await cityId(mover.client, await fileCity()),
       attests_adult: true,
     });
     if (error) throw error;
@@ -651,7 +652,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     for (const trader of [lister, wanter]) {
       const { error } = await trader.client.rpc('set_trader_profile', {
         display_name: trader.displayName,
-        city_id: await cityId(trader.client, ORANGE_COUNTY),
+        city_id: await cityId(trader.client, await fileCity()),
         attests_adult: true,
       });
       if (error) throw error;
@@ -864,7 +865,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     if (error) throw error;
     const [spot, otherSpot] = spots;
     if (!spot || !otherSpot) {
-      throw new Error('Fewer than two Safe Spots seeded in Test City');
+      throw new Error("Fewer than two Safe Spots in the Trades' City");
     }
     await deliver(trade.topic);
     pushService.reset();
@@ -915,14 +916,14 @@ describe('The notifier', { timeout: 30_000 }, () => {
   }
 
   /**
-   * A time as a Trader in Test City reads it on their clock, the way the
+   * A time as a Trader in the Trades' City reads it on their clock, the way the
    * notifications tell it: "Saturday, October 3 at 2:30 PM", or with only
    * the time of day, "2:30 PM".
    */
-  function testCityTime(at: Date, { withDay }: { withDay: boolean }) {
+  function tradeCityTime(at: Date, { withDay }: { withDay: boolean }) {
     const parts = Object.fromEntries(
       new Intl.DateTimeFormat('en-US', {
-        timeZone: TEST_CITY_TIME_ZONE,
+        timeZone: TRADE_CITY_TIME_ZONE,
         weekday: 'long',
         month: 'long',
         day: 'numeric',
@@ -941,7 +942,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
 
   /** What a Meetup put forward is told as, naming who put it forward. */
   function meetupProposedBody(by: string, spotName: string, meetupAt: Date) {
-    return `${by} proposed a meetup at ${spotName} on ${testCityTime(meetupAt, { withDay: true })}.`;
+    return `${by} proposed a meetup at ${spotName} on ${tradeCityTime(meetupAt, { withDay: true })}.`;
   }
 
   /** A Meetup put forward and confirmed, as `meetupPutForward` leaves one. */
@@ -1005,7 +1006,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
         title: 'Meetup confirmed',
-        body: `Your meetup with Recipient at ${spotName} on ${testCityTime(meetupAt, { withDay: true })} is confirmed.`,
+        body: `Your meetup with Recipient at ${spotName} on ${tradeCityTime(meetupAt, { withDay: true })} is confirmed.`,
         url,
         tag: topic,
       },
@@ -1013,7 +1014,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       {
         title: 'Meetup confirmed',
-        body: `Your meetup with Proposer at ${spotName} on ${testCityTime(meetupAt, { withDay: true })} is confirmed.`,
+        body: `Your meetup with Proposer at ${spotName} on ${tradeCityTime(meetupAt, { withDay: true })} is confirmed.`,
         url,
         tag: topic,
       },
@@ -1024,7 +1025,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
         to: [proposer.email],
         reply_to: REPLY_TO,
         subject: 'Meetup confirmed',
-        text: `Your meetup with Recipient at ${spotName} on ${testCityTime(meetupAt, { withDay: true })} is confirmed.\n\n${APP_URL}${url}\n`,
+        text: `Your meetup with Recipient at ${spotName} on ${tradeCityTime(meetupAt, { withDay: true })} is confirmed.\n\n${APP_URL}${url}\n`,
       },
     ]);
     expect(emailsTo(recipient).map((email) => email.subject)).toEqual([
@@ -1161,7 +1162,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(proposerBrowser, topic)).toEqual([
       {
         title: 'Meetup coming up',
-        body: `Your meetup with Recipient at ${spotName} is at ${testCityTime(meetupAt, { withDay: false })}.`,
+        body: `Your meetup with Recipient at ${spotName} is at ${tradeCityTime(meetupAt, { withDay: false })}.`,
         url,
         tag: topic,
       },
@@ -1169,7 +1170,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
     expect(pushesTo(recipientBrowser, topic)).toEqual([
       {
         title: 'Meetup coming up',
-        body: `Your meetup with Proposer at ${spotName} is at ${testCityTime(meetupAt, { withDay: false })}.`,
+        body: `Your meetup with Proposer at ${spotName} is at ${tradeCityTime(meetupAt, { withDay: false })}.`,
         url,
         tag: topic,
       },
