@@ -16,6 +16,9 @@ import { arrangeCity, signInAsNewTrader } from './session.ts';
 test('a Trader deletes their account from Settings and is signed out', async ({
   page,
 }) => {
+  // Room for the 60 s cold-start wait below plus the steps around it, which
+  // the 30 s default would cut off before that wait ever ran out.
+  test.setTimeout(90_000);
   const trader = await signInAsNewTrader(page, await arrangeCity());
 
   await page.goto('/');
