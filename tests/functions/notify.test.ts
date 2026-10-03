@@ -7,6 +7,7 @@ import {
   type ECDH,
 } from 'node:crypto';
 import { decrypt } from 'http_ece';
+import postgres, { type Sql } from 'postgres';
 import {
   afterAll,
   beforeAll,
@@ -77,6 +78,8 @@ const TEST_CITY_TIME_ZONE = 'America/New_York';
 // a moment, so a notifier that never reaches the rows fails here rather
 // than at the test's timeout.
 const MAX_RUNS = 20;
+// The advisory lock that keeps two sessions' runs of this file apart.
+const SUITE_LOCK = 'tests/functions/notify.test.ts';
 
 interface PushPayload {
   title: string;
@@ -103,6 +106,25 @@ describe('The notifier', { timeout: 30_000 }, () => {
   let vapid: VapidKeys;
   let examplemon: number;
   let holofoil: number;
+  let suiteLock: Sql;
+
+  // Another session's run of this file shares the outbox, and its notifier
+  // claims whatever rows are oldest: it would send this file's rows to its
+  // own fake Resend, and push them to this file's fake push service under
+  // its own VAPID key. So the file holds an advisory lock for its whole run,
+  // and two sessions' runs of it take turns rather than overlapping. The lock
+  // belongs to this connection, so a run that dies releases it with the
+  // connection. The wait is for a whole run of the other session's file.
+  beforeAll(async () => {
+    suiteLock = postgres(inject('supabaseDbUrl'), { max: 1 });
+    await suiteLock`select pg_advisory_lock(hashtext(${SUITE_LOCK}))`;
+  }, 15 * MINUTE);
+
+  // Declared first, so it runs after every other afterAll.
+  afterAll(async () => {
+    await suiteLock`select pg_advisory_unlock(hashtext(${SUITE_LOCK}))`;
+    await suiteLock.end();
+  });
 
   beforeAll(async () => {
     [pushService, resend] = await Promise.all([
