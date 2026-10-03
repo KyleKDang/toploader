@@ -14,8 +14,16 @@ describe('Cities', () => {
     ({ client: trader } = await signUpTrader());
   });
 
+  /*
+   * Read by name, because the stack holds every run's arranged Cities and
+   * PostgREST returns at most 1,000 rows: past that, an unfiltered read
+   * returns an arbitrary 1,000 of them.
+   */
   it('includes Orange County, the launch City, for any signed-in Trader', async () => {
-    const { data, error } = await trader.from('cities').select('name');
+    const { data, error } = await trader
+      .from('cities')
+      .select('name')
+      .eq('name', ORANGE_COUNTY);
 
     expect(error).toBeNull();
     expect(data?.map((city) => city.name)).toContain(ORANGE_COUNTY);
