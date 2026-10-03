@@ -14,8 +14,8 @@ import { useTabs } from '../lib/tabs';
  * being told the address.
  *
  * Deleting is confirmed in a sheet, with the destructive action second. The
- * sheet says what goes and, as plainly, what stays: a completed trade is the
- * other trader's record of it, so it stays theirs with this Trader's name on
+ * sheet says what goes and, as plainly, what stays: a trade is the other
+ * trader's record of it too, so it stays theirs with this Trader's name on
  * it, and a Trader should hear that before they confirm rather than assume
  * that deleting takes everything.
  */
@@ -25,7 +25,7 @@ export function SettingsScreen() {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
-  const remove = useMutation({
+  const deletion = useMutation({
     mutationFn: deleteAccount,
     onSuccess: async () => {
       // Everything cached was read as the Trader who is now gone.
@@ -44,8 +44,9 @@ export function SettingsScreen() {
           Delete account
         </h2>
         <p className="text-sm leading-prose text-muted">
-          Removes your profile, collection, wants, and listings, and signs you
-          out. This cannot be undone.
+          Deletes your collection, wants, and listings, and signs you out.
+          Trades you were part of stay with the other trader. This cannot be
+          undone.
         </p>
         <div className="mt-2 flex">
           <Button onClick={() => setConfirming(true)}>Delete account</Button>
@@ -61,27 +62,27 @@ export function SettingsScreen() {
             <Button onClick={() => setConfirming(false)}>Cancel</Button>
             <Button
               variant="primary"
-              disabled={remove.isPending}
-              onClick={() => remove.mutate()}
+              disabled={deletion.isPending}
+              onClick={() => deletion.mutate()}
             >
-              {remove.isPending ? 'Deleting…' : 'Delete account'}
+              {deletion.isPending ? 'Deleting…' : 'Delete account'}
             </Button>
           </>
         }
       >
         <p className="text-base leading-prose text-ink">
-          Your profile, collection, wants, and listings will be deleted, and any
-          trade still open will be cancelled.
+          Your collection, wants, and listings will be deleted, and any trade
+          still open will be cancelled.
         </p>
         <p className="mt-2 text-base leading-prose text-ink">
-          Trades you completed stay with the traders you made them with,
-          including your display name and your messages. They are the other
+          Trades you were part of stay with the other trader, with your display
+          name, the cards you traded, and your messages. They are that
           trader&rsquo;s record of the trade.
         </p>
         <p className="mt-2 text-base leading-prose text-ink">
           This cannot be undone.
         </p>
-        <FormError error={remove.error} className="mt-2" />
+        <FormError error={deletion.error} className="mt-2" />
       </Sheet>
     </AppShell>
   );

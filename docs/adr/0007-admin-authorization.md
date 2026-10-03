@@ -117,8 +117,9 @@ As a trigger on `auth.users`, the erasure and the account's deletion are one tra
 It is the counterpart of the trigger that makes a Trader for every new account.
 
 **So the edge function is thin.**
-It asks Auth whose session the request carries, deletes that Trader's verification documents through the Storage API, and deletes the account through the Auth admin API.
-The documents go first for the reason a review deletes them first: a failure after that leaves the account whole and the Trader able to ask again.
+It asks Auth whose session the request carries, asks the database whether that account may be deleted, deletes that Trader's verification documents through the Storage API, and deletes the account through the Auth admin API.
+The documents go before the account for the reason a review deletes them first: a failure after that leaves the account whole and the Trader able to ask again.
+Whether the account may be deleted is one database function, `require_deletable_account`, which the erasure calls and so enforces; the edge function calls it first only so that a Founder or a banned Trader, whom the erasure will refuse, does not lose their documents on the way to being refused.
 It takes no Trader id, so a Trader can only delete their own account.
 
 **A deleted Trader's session is refused before every request.**

@@ -124,6 +124,7 @@ Adding or removing one is a new migration, never a change made in the dashboard.
 A Trader deletes their own account from Settings, which calls the `delete_account` edge function ([ADR-0007](adr/0007-admin-authorization.md), amendment for #28).
 It needs no secret of its own: Supabase hands every function the project URL and the server-side key, and a function secret such as `SENTRY_DSN` is shared by all of them.
 A run that fails reports to Sentry as an error, and the Trader is told to try again; nothing in the database changes unless the account itself is deleted.
+A run that failed after deleting the Trader's verification documents leaves a request waiting without them, which a Founder rejects as any interrupted review ([Reviewing verification requests](#reviewing-verification-requests)).
 
 Deleting an account from the Supabase dashboard (Authentication → Users) erases the same data, because the erasure is a trigger on the account's deletion.
 It does not delete the Trader's verification documents, which only the function does, so delete those from the `verification-documents` bucket first, under the folder named by the Trader's id.

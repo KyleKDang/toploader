@@ -158,9 +158,11 @@ Every way a Trade ends stays open, so a Trade already under way can still be dec
 Ending those Trades automatically instead would put a cancel on someone's Reputation for keeping themselves safe, or let a block dodge a no-show.
 Also settled on [#28](https://github.com/KyleKDang/toploader/issues/28): deleting an account deletes what was the Trader's alone and keeps every Trade they were party to, for the Trader on the other side.
 The Trader's row in `traders` outlives the account, marked with `deleted_at` and taken out of its City, because Trades name it; only the Traders of those Trades can still read it.
-Its display name is kept only when the Trader completed a Trade, since a Trade Record has to go on saying who it was with, and a scammer must not be able to wipe their name from a victim's record by deleting the account.
+Its display name is kept wherever a Trade names the Trader, since a Trade has to go on saying who it was with, and a scammer must not be able to wipe their name from a victim's record by deleting the account; that holds for a Trade that never completed too, which is what a Trader who took the cards and never tapped Complete leaves behind.
+A Trader on no Trade leaves no name.
 Collection, Wants, Matches, push subscriptions, notifications, blocks, verification requests and their documents, and the private half of the profile are deleted.
 A Trade still open is ended as the Trader would have had to end it: a proposal waiting on them is declined, anything else is cancelled in their name, and the other Trader's Listings go back on offer.
+The Trader leaves their City before any of that, so a Listing of theirs that a cancelled Trade hands back makes no Match and alerts nobody.
 Their own Listings are withdrawn, except a traded one, which stays with its photos as the Trade Record's evidence, and what was said on a Trade stays with the Trade.
 A Founder and a banned Trader are refused: a Founder's membership is removed by migration first, and deleting a banned account would free its email address for a new, unbanned one.
 The erasure runs in the database as a trigger on the account's own deletion, so the account and its data go in one transaction, and a deleted Trader's session is refused on every request for the hour its token still has ([ADR-0007](adr/0007-admin-authorization.md), amendment for #28).
