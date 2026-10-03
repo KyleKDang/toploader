@@ -69,10 +69,13 @@ async function safeSpotIds(client: Client): Promise<string[]> {
 
 describe('Meetups', () => {
   let holofoil: number;
+  /** A City other than the file's, with Safe Spots of its own. */
+  let otherCity: string;
   let anotherCitySpot: string;
 
   beforeAll(async () => {
-    const reader = await seedTrader('Catalog reader', await arrangeCity());
+    otherCity = await arrangeCity();
+    const reader = await seedTrader('Catalog reader', otherCity);
     ({ holofoil } = await seededExamplemon(reader.client));
     [anotherCitySpot] = await safeSpotIds(reader.client);
   });
@@ -304,7 +307,7 @@ describe('Meetups', () => {
       const { actor, counterparty, tradeId, spot } = await acceptedTrade();
       const moved = await counterparty.client.rpc('set_trader_profile', {
         display_name: counterparty.displayName,
-        city_id: await cityId(counterparty.client, await arrangeCity()),
+        city_id: await cityId(counterparty.client, otherCity),
         attests_adult: true,
       });
       if (moved.error) throw moved.error;
