@@ -29,8 +29,6 @@ export type TraderProfile = {
   city: { id: string; name: string } | null;
   verified_at: string | null;
   completed_trade_count: number;
-  /** Set once the Trader has deleted their account. */
-  deleted_at: string | null;
 };
 
 export function traderQuery(traderId: string) {
@@ -40,7 +38,7 @@ export function traderQuery(traderId: string) {
       const { data, error } = await supabase
         .from('traders')
         .select(
-          'display_name, verified_at, completed_trade_count, deleted_at, city:cities(id, name)',
+          'display_name, verified_at, completed_trade_count, city:cities(id, name)',
         )
         .eq('id', traderId)
         .single();
@@ -589,12 +587,8 @@ export type Match = Awaited<
  * RPC (ADR-0001), so nothing here filters or writes a table.
  */
 
-/**
- * A Trader as a Trade names them: who, their Reputation basics, and whether
- * they have deleted their account since.
- */
-const TRADE_TRADER =
-  'id, display_name, verified_at, completed_trade_count, deleted_at';
+/** A Trader as a Trade names them: who, and their Reputation basics. */
+const TRADE_TRADER = 'id, display_name, verified_at, completed_trade_count';
 
 /** A Listing as a Trade's terms show it: its Card, and its first thumbnail. */
 const TRADE_LISTING =

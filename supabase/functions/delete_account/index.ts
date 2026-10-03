@@ -68,6 +68,9 @@ Deno.serve(async (request) => {
     if (result === 'signed_out') {
       return respond({ error: 'Unauthorized' }, 401);
     }
+    if (result === 'refused') {
+      return respond({ error: 'This account cannot be deleted' }, 403);
+    }
     return respond({ deleted: true }, 200);
   } catch (error) {
     Sentry.captureException(error);

@@ -1144,6 +1144,10 @@ export type Database = {
         Returns: undefined
       }
       remove_want: { Args: { want_id: string }; Returns: undefined }
+      require_deletable_account: {
+        Args: { trader_id: string }
+        Returns: undefined
+      }
       require_trader: { Args: { verified: boolean }; Returns: string }
       require_turn: {
         Args: {

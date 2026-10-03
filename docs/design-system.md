@@ -242,6 +242,7 @@ The one exception is before a Trader is inside the app at all: sign up and setti
 The install step between setting up the profile and Matches is part of that same stretch of Onboarding, and has no bar either ([#29](https://github.com/KyleKDang/toploader/issues/29)).
 The Card page is not drilled into, so it has no back button: it is the Search tab's own screen, with the search picker open above the Card as the chosen mockup draws it, and the next Card is one search away rather than one step back ([#15](https://github.com/KyleKDang/toploader/issues/15)).
 A tab whose screen is not built yet stays on the bar, visibly inactive and disabled, rather than being left off.
+The Profile tab opens Settings until the profile has a screen of its own ([#27](https://github.com/KyleKDang/toploader/issues/27)), because deleting an account has to be somewhere a Trader can find ([#28](https://github.com/KyleKDang/toploader/issues/28)).
 
 **Empty state.**
 Centered in the content area: one line saying what would be here in `--text-base`, one line in `--color-muted` saying how to get there, and one primary button that does it.

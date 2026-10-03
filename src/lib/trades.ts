@@ -26,19 +26,10 @@ export type TradeTrader = TradeDetail['proposer'];
 
 /**
  * A Trader's name as a Trade screen says it. A profile with no display name
- * cannot be traded with (onboarding sets one), so "another trader" is a
- * fallback only. A Trader who has deleted their account since is the one
- * case that reaches a Trade without a name: it is kept only where a
- * completed Trade needs it.
+ * cannot be traded with (onboarding sets one), so this is a fallback only.
  */
-export function traderName(trader: {
-  display_name: string | null;
-  deleted_at?: string | null;
-}) {
-  return (
-    trader.display_name ??
-    (trader.deleted_at ? 'a deleted account' : 'another trader')
-  );
+export function traderName(trader: Pick<TradeTrader, 'display_name'>) {
+  return trader.display_name ?? 'another trader';
 }
 
 /** The other Trader of a Trade. */

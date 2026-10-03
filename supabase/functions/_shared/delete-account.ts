@@ -49,12 +49,15 @@ export interface DeleteAccountOptions {
 }
 
 /**
- * `deleted` once the account is gone, or `signed_out` where the request
- * carried no session Auth still honors, and so named nobody to delete.
- * Anything else is thrown: Storage or Auth failing, or the database
- * refusing the account, as it does a Founder's and a banned Trader's.
+ * `deleted` once the account is gone; `signed_out` where the request
+ * carried no session Auth still honors, and so named nobody to delete; or
+ * `refused` where the database will not delete this account, as it will not
+ * a Founder's or a banned Trader's. Storage or Auth failing is thrown.
  */
-export type DeleteAccountResult = 'deleted' | 'signed_out';
+export type DeleteAccountResult = 'deleted' | 'signed_out' | 'refused';
+
+/** What Postgres raises a refusal with: insufficient_privilege. */
+const REFUSED = '42501';
 
 export async function deleteAccount({
   supabaseUrl,
@@ -73,6 +76,17 @@ export async function deleteAccount({
   const { data, error } = await supabase.auth.getUser(accessToken);
   if (error || !data.user) return 'signed_out';
   const traderId = data.user.id;
+
+  // Asked before anything is deleted. The erasure asks the same question
+  // and is what enforces the answer, but by then the documents below would
+  // be gone from an account that is staying.
+  const deletable = await supabase.rpc('require_deletable_account', {
+    trader_id: traderId,
+  });
+  if (deletable.error) {
+    if (deletable.error.code === REFUSED) return 'refused';
+    throw deletable.error;
+  }
 
   // A Trader uploads under their own id (ADR-0001, amendment for #17), so
   // the prefix is everything of theirs in the bucket, whether a request

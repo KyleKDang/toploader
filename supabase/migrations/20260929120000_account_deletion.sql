@@ -58,32 +58,77 @@ create policy "A Trader can read public profiles, and a deleted Trader's from a 
 --
 -- What it does, in order:
 --
---   1. Ends every Trade still open, as the Trader would have had to: a
+--   1. Takes the Trader out of their City and deletes their Wants. This is
+--      first because Matching follows a Listing going back on offer: the
+--      next step hands Listings back, and with no City and no Wants the
+--      Trader makes no Match on the way out and nobody is alerted to one.
+--   2. Ends every Trade still open, as the Trader would have had to: a
 --      proposal waiting on them is declined, and anything else is cancelled
 --      in their name, which hands the Listings on it back. The other Trader
 --      keeps the Trade, ended, and gets their Listings back to trade again.
---   2. Withdraws the Trader's Listings. A traded one is left exactly as it
+--   3. Withdraws the Trader's Listings. A traded one is left exactly as it
 --      is, photos included: it is the Trade Record's evidence. A withdrawn
 --      one is out of everyone's sight at once, and the photo reaper
 --      reclaims its photos on its next run.
---   3. Deletes what was the Trader's alone: Collection, Wants, Matches'
---      history, push subscriptions, notifications, blocks from either side,
+--   4. Deletes what was the Trader's alone: Collection, Matches' history,
+--      push subscriptions, notifications, blocks from either side,
 --      verification requests, and the private half of the profile.
---   4. Marks the row deleted and takes it out of its City. The display name
---      is kept only where a Trade Record needs it to say who the Trade was
---      with; a Trader who never completed one leaves no name behind.
+--   5. Marks the row deleted. The display name stays wherever a Trade names
+--      the Trader, since its other Trader is the only one who can still read
+--      it and already knew it; a Trader on no Trade leaves no name behind.
+--      The name is not kept for completed Trades alone: a Trader who takes
+--      the cards at a Meetup and deletes the account before tapping
+--      Complete leaves a cancelled Trade, and that is the record the other
+--      Trader most needs to still say who it was with.
 --
 -- Messages stay, as the Trades they were said on do: an ended Trade is
 -- frozen whole, and what was said on it is the other Trader's to keep.
 --
 -- Every table that holds something of a Trader's used to be emptied by the
--- cascade from `traders`. That row now stays, so the list in step 3 is what
--- empties them: a new table of a Trader's own data is added to it.
---
+-- cascade from `traders`. That row now stays, so the lists in steps 1 and 4
+-- are what empty them: a new table of a Trader's own data is added there.
+
 -- Two accounts are refused. A Founder's membership is granted and removed
 -- only by migration (ADR-0007), so theirs is removed first. And a banned
 -- Trader keeps their account: deleting it would free the email address the
 -- ban is on, and a new account under it would start unbanned.
+--
+-- The rule is its own function because it is asked twice: by the erasure,
+-- which is what enforces it, and by the edge function before it deletes
+-- anything from Storage, so that an account the erasure will refuse does
+-- not lose its verification documents on the way to being refused. It runs
+-- as its owner, since neither table is open to its caller, and only
+-- service_role may call it: no Trader's session reaches it.
+create function public.require_deletable_account(trader_id uuid)
+  returns void
+  language plpgsql
+  stable
+  security definer
+  set search_path = ''
+as $$
+begin
+  if exists (
+    select 1 from public.founders
+    where founders.trader_id = require_deletable_account.trader_id
+  ) then
+    raise exception 'a Founder is removed by migration before their account is deleted'
+      using errcode = '42501';
+  end if;
+
+  if exists (
+    select 1 from public.traders
+    where traders.id = require_deletable_account.trader_id
+      and traders.banned_at is not null
+  ) then
+    raise exception 'a banned Trader''s account is not deleted'
+      using errcode = '42501';
+  end if;
+end;
+$$;
+
+grant execute on function public.require_deletable_account(uuid)
+  to service_role;
+
 create function public.erase_trader_for_deleted_account()
   returns trigger
   language plpgsql
@@ -93,20 +138,10 @@ as $$
 declare
   trade public.trades;
 begin
-  if exists (
-    select 1 from public.founders where founders.trader_id = old.id
-  ) then
-    raise exception 'a Founder is removed by migration before their account is deleted'
-      using errcode = '42501';
-  end if;
+  perform public.require_deletable_account(old.id);
 
-  if exists (
-    select 1 from public.traders
-    where traders.id = old.id and traders.banned_at is not null
-  ) then
-    raise exception 'a banned Trader''s account is not deleted'
-      using errcode = '42501';
-  end if;
+  update public.traders set city_id = null where traders.id = old.id;
+  delete from public.wants where wants.trader_id = old.id;
 
   -- Every open Trade is locked before any is ended, in one order, so that
   -- an answer landing on one of them at the same moment waits for this or
@@ -149,7 +184,6 @@ begin
 
   delete from public.match_events
     where match_events.lister_id = old.id or match_events.wanter_id = old.id;
-  delete from public.wants where wants.trader_id = old.id;
   delete from public.collection_entries
     where collection_entries.trader_id = old.id;
   delete from public.push_subscriptions
@@ -163,12 +197,10 @@ begin
 
   update public.traders
     set deleted_at = now(),
-        city_id = null,
         display_name = case
           when exists (
             select 1 from public.trades
-            where (trades.proposer_id = old.id or trades.recipient_id = old.id)
-              and trades.status = 'completed'
+            where trades.proposer_id = old.id or trades.recipient_id = old.id
           ) then traders.display_name
         end
     where traders.id = old.id;
