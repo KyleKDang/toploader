@@ -112,21 +112,18 @@ describe('The notifier', { timeout: 30_000 }, () => {
   // claims whatever rows are oldest: it would send this file's rows to its
   // own fake Resend, and push them to this file's fake push service under
   // its own VAPID key. So the file holds an advisory lock for its whole run,
-  // and two sessions' runs of it take turns rather than overlapping. The lock
-  // belongs to this connection, so a run that dies releases it with the
-  // connection. The wait is for a whole run of the other session's file.
+  // and two sessions' runs of it take turns rather than overlapping. The
+  // wait is for a whole run of the other session's file.
   beforeAll(async () => {
-    suiteLock = postgres(inject('supabaseDbUrl'), { max: 1 });
+    // The lock belongs to this one connection and is released by closing it,
+    // so it must not be recycled mid-run, as postgres.js otherwise does after
+    // half an hour or so.
+    suiteLock = postgres(inject('supabaseDbUrl'), {
+      max: 1,
+      max_lifetime: null,
+    });
     await suiteLock`select pg_advisory_lock(hashtext(${SUITE_LOCK}))`;
-  }, 15 * MINUTE);
 
-  // Declared first, so it runs after every other afterAll.
-  afterAll(async () => {
-    await suiteLock`select pg_advisory_unlock(hashtext(${SUITE_LOCK}))`;
-    await suiteLock.end();
-  });
-
-  beforeAll(async () => {
     [pushService, resend] = await Promise.all([
       startCaptureServer({ tls: true }),
       startCaptureServer(),
@@ -139,18 +136,25 @@ describe('The notifier', { timeout: 30_000 }, () => {
     ({ card: examplemon, holofoil } = await seededExamplemon(
       (await seedTrader('Catalog reader')).client,
     ));
-  });
+  }, 15 * MINUTE);
 
   afterAll(async () => {
-    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    // The stack outlives this run, and so would these subscriptions: the
-    // next run's Listings would queue pushes to a server that is gone.
-    const { error } = await service
-      .from('push_subscriptions')
-      .delete()
-      .like('endpoint', `${pushService.baseUrl}/%`);
-    if (error) throw error;
-    await Promise.all([pushService.close(), resend.close()]);
+    try {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      // The stack outlives this run, and so would these subscriptions: the
+      // next run's Listings would queue pushes to a server that is gone.
+      const { error } = await service
+        .from('push_subscriptions')
+        .delete()
+        .like('endpoint', `${pushService.baseUrl}/%`);
+      if (error) throw error;
+      await Promise.all([pushService.close(), resend.close()]);
+    } finally {
+      // Closing at once, rather than after pending queries, also abandons a
+      // lock request still waiting when the wait above timed out, so a run
+      // that has already failed does not go on to hold the lock.
+      await suiteLock.end({ timeout: 0 });
+    }
   });
 
   beforeEach(() => {
