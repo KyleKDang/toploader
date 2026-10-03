@@ -153,7 +153,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
 
   /**
    * The notifier, run until it has reached every row on the given topics:
-   * each one sent, or claimed by a run since this began. One run stops after
+   * each one sent, or held by a claim that has not lapsed. One run stops after
    * a bounded number of claims, so behind a backlog of unsent rows from
    * earlier runs and other sessions it can end before it reaches the rows a
    * test queued last; in production the next wake sends them, and here the
@@ -161,18 +161,18 @@ describe('The notifier', { timeout: 30_000 }, () => {
    * the test rather than looping. Returns every run's failures.
    */
   async function deliver(...topics: string[]): Promise<string[]> {
-    const attemptsBefore = new Map(
-      (await outboxRows(topics)).map((row) => [row.id, row.attempts]),
-    );
     const failures: string[] = [];
     for (let runs = 0; runs < MAX_RUNS; runs += 1) {
       failures.push(...(await runNotifier()).failures);
+      // A claim lapses after five minutes; one younger than that is a run
+      // holding the row, this one or another.
+      const lapsed = Date.now() - 5 * MINUTE;
       const rows = await outboxRows(topics);
       if (
         rows.every(
           (row) =>
             row.sent_at !== null ||
-            row.attempts > (attemptsBefore.get(row.id) ?? 0),
+            (row.claimed_at !== null && Date.parse(row.claimed_at) > lapsed),
         )
       ) {
         return failures;
@@ -186,7 +186,7 @@ describe('The notifier', { timeout: 30_000 }, () => {
   async function outboxRows(topics: string[]) {
     const { data, error } = await service
       .from('notifications')
-      .select('id, sent_at, attempts')
+      .select('sent_at, claimed_at')
       .in('topic', topics);
     if (error) throw error;
     return data;
