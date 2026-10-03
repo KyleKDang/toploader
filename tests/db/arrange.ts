@@ -112,9 +112,14 @@ export async function makeFounder(traderId: string): Promise<void> {
  * For a test that reads a City-wide list and expects its own rows in it,
  * per the spec's Testing decisions (#82); the browser tracers have their
  * own `arrangeCity` in tests/browser/session.ts (#72).
+ *
+ * Named to sort after Orange County, like the tracers' "Tracer City": the
+ * stack keeps every run's arranged Cities, and the app's City picker reads
+ * the first 1,000 by name, so a name sorting earlier would in time push the
+ * launch City out of it (#92).
  */
 export async function arrangeCity(): Promise<string> {
-  const name = `Arranged City ${randomUUID().slice(0, 8)}`;
+  const name = `Test Run City ${randomUUID().slice(0, 8)}`;
   await arrange(
     (sql) => sql`insert into public.cities (name, time_zone)
                  values (${name}, 'America/Los_Angeles')`,

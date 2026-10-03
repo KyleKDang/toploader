@@ -26,7 +26,7 @@ describe('Cities', () => {
       .eq('name', ORANGE_COUNTY);
 
     expect(error).toBeNull();
-    expect(data?.map((city) => city.name)).toContain(ORANGE_COUNTY);
+    expect(data).toEqual([{ name: ORANGE_COUNTY }]);
   });
 
   it('are not readable by a signed-out visitor', async () => {

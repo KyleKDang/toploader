@@ -244,10 +244,12 @@ What makes a good test here:
   A City is reference data that no client path writes, which is what makes making one an arrange step.
   Extended on [#82](https://github.com/KyleKDang/toploader/issues/82) to seam 1: a test that reads a City-wide list and expects its own rows in it seeds its Traders into a City of its own (`arrangeCity` in `tests/db/arrange.ts`).
   PostgREST returns at most 1,000 rows, so in a shared City which rows come back once the stack has accumulated more is arbitrary, and the test passes or fails on how many runs came before.
-  Arranged Cities are never deleted, so a long-lived local stack gains a few per run, and its onboarding City picker lists them.
-  That is accepted, on [#92](https://github.com/KyleKDang/toploader/issues/92): a City cannot be deleted while a Trader names it, and a Trader cannot be deleted while a Trade names them, because a Trade is the other side's record ([ADR-0005](adr/0005-trade-single-aggregate.md)); marking them for the picker to leave out would add a column that exists only for tests.
+  Extended on [#92](https://github.com/KyleKDang/toploader/issues/92): arranged Cities are never deleted, so a long-lived local stack gains a few per run, and its onboarding City picker lists them.
+  That is accepted.
+  A City cannot be deleted while a Trader or a Safe Spot names it, and a Trader's row is never deleted, because a Trade names its Traders and is the other side's record ([ADR-0005](adr/0005-trade-single-aggregate.md)); marking arranged Cities for the picker to leave out would add a column that exists only for tests.
   Production never runs the suites, and `npx supabase db reset` clears a local stack.
-  The same accumulation applies to Cities themselves: a test that reads one City reads it by name, never by finding it in an unfiltered read of every City.
+  An arranged City is named to sort after Orange County ("Tracer City …", "Test Run City …"), because the picker reads the first 1,000 Cities by name, and an earlier name would in time push the launch City out of it and break the onboarding tracer that picks it.
+  A seam-1 test that reads one City reads it by name, never by finding it in an unfiltered read of every City.
 - A scheduled job that runs inside the database, a `pg_cron` job such as the Meetup reminder sweep, is invoked at seam 2 the way `pg_cron` invokes it: its registered command, run as the database's owner through the superuser connection.
   Added on [#23](https://github.com/KyleKDang/toploader/issues/23): no client role may call such a job, so there is no Trader's seam to reach it through, and running the command the job is registered with proves the schedule is wired as well as what it does.
   Its effects are still asserted at the seam, on the outbound pushes and the outbox.
