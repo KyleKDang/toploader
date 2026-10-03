@@ -4,6 +4,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { MATCHES_PAGE_SIZE } from '../../src/lib/matches-page.ts';
 import { arrangeCity, signInAsNewTrader } from './session.ts';
 
+type TraderClient = Awaited<ReturnType<typeof signInAsNewTrader>>['client'];
+
 /*
  * Matching, end to end at 375px: one Trader lists a Copy, another Trader
  * wants that Card, and both of them see the Match in the Matches view, each
@@ -49,6 +51,45 @@ async function expectNoHorizontalOverflow(page: Page) {
   ).toBe(0);
 }
 
+/** Examplemon and its Holofoil Variant, read as a signed-in Trader. */
+async function readExamplemon(client: TraderClient) {
+  const { data: card, error } = await client
+    .from('cards')
+    .select('id, card_variants (id, name)')
+    .eq('name', 'Examplemon')
+    .single();
+  if (error) throw error;
+  const holofoil = card.card_variants.find((v) => v.name === 'Holofoil');
+  return { cardId: card.id, holofoilId: holofoil?.id ?? 0 };
+}
+
+/**
+ * A Near Mint Listing of one Variant with one photo, arranged through the
+ * API as its Trader: the Listing flow has a tracer of its own.
+ */
+async function listCopy(
+  lister: { id: string; client: TraderClient },
+  variantId: number,
+) {
+  const photo = {
+    path: `${lister.id}/${randomUUID()}.webp`,
+    thumbnail_path: `${lister.id}/${randomUUID()}-thumb.webp`,
+  };
+  for (const path of [photo.path, photo.thumbnail_path]) {
+    const { error } = await lister.client.storage
+      .from('listing-photos')
+      .upload(path, TINY_WEBP, { contentType: 'image/webp' });
+    if (error) throw error;
+  }
+  const { data: listingId, error } = await lister.client.rpc('create_listing', {
+    card_variant_id: variantId,
+    condition: 'NM',
+    photos: [photo],
+  });
+  if (error) throw error;
+  return { listingId, photo };
+}
+
 test('a Listing satisfies a Want, and both Traders see the Match', async ({
   browser,
 }) => {
@@ -64,28 +105,8 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
   await signInAsNewTrader(wanterPage, city, wanterName);
 
   // The Listing: a Near Mint Holofoil Examplemon, in the lister's City.
-  const { data: card, error: cardError } = await lister.client
-    .from('cards')
-    .select('id, card_variants (id, name)')
-    .eq('name', 'Examplemon')
-    .single();
-  if (cardError) throw cardError;
-  const holofoil = card.card_variants.find((v) => v.name === 'Holofoil');
-  const photo = {
-    path: `${lister.id}/${randomUUID()}.webp`,
-    thumbnail_path: `${lister.id}/${randomUUID()}-thumb.webp`,
-  };
-  for (const path of [photo.path, photo.thumbnail_path]) {
-    const { error } = await lister.client.storage
-      .from('listing-photos')
-      .upload(path, TINY_WEBP, { contentType: 'image/webp' });
-    if (error) throw error;
-  }
-  const { data: listingId, error: listingError } = await lister.client.rpc(
-    'create_listing',
-    { card_variant_id: holofoil?.id ?? 0, condition: 'NM', photos: [photo] },
-  );
-  if (listingError) throw listingError;
+  const { cardId, holofoilId } = await readExamplemon(lister.client);
+  const { listingId, photo } = await listCopy(lister, holofoilId);
 
   // The Want, through the screens: the Card from search, then its page's
   // "Add to wants", narrowed to Holofoil and at least Lightly Played, which
@@ -99,7 +120,7 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
     .getByRole('option', { name: /^Examplemon\b/ })
     .first()
     .click();
-  await expect(wanterPage).toHaveURL(new RegExp(`/cards/${card.id}$`));
+  await expect(wanterPage).toHaveURL(new RegExp(`/cards/${cardId}$`));
 
   // The card page's button pair has about 4px to spare at 375px, and a
   // Button does not truncate, so a label that outgrows it would push the
@@ -140,6 +161,10 @@ test('a Listing satisfies a Want, and both Traders see the Match', async ({
     name: new RegExp(`Listed by ${listerName}`),
   });
   await expect(theirs).toContainText('Examplemon');
+  // One Match is all there is, so there is nothing more to load.
+  await expect(
+    wanterPage.getByRole('button', { name: 'Load more' }),
+  ).toBeHidden();
   await expect(theirs).toContainText(
     'Holofoil · NM · Example Base Set 004/102',
   );
@@ -193,35 +218,14 @@ test('older Matches are behind "Load more", which goes away once they are all sh
 
   // One Match more than a page holds, arranged through the API: Listings of
   // Examplemon, and one Want that every one of them satisfies.
-  const { data: card, error: cardError } = await lister.client
-    .from('cards')
-    .select('id, card_variants (id, name)')
-    .eq('name', 'Examplemon')
-    .single();
-  if (cardError) throw cardError;
-  const holofoil = card.card_variants.find((v) => v.name === 'Holofoil');
+  const { cardId, holofoilId } = await readExamplemon(lister.client);
   await Promise.all(
-    Array.from({ length: MATCHES_PAGE_SIZE + 1 }, async () => {
-      const photo = {
-        path: `${lister.id}/${randomUUID()}.webp`,
-        thumbnail_path: `${lister.id}/${randomUUID()}-thumb.webp`,
-      };
-      for (const path of [photo.path, photo.thumbnail_path]) {
-        const { error } = await lister.client.storage
-          .from('listing-photos')
-          .upload(path, TINY_WEBP, { contentType: 'image/webp' });
-        if (error) throw error;
-      }
-      const { error } = await lister.client.rpc('create_listing', {
-        card_variant_id: holofoil?.id ?? 0,
-        condition: 'NM',
-        photos: [photo],
-      });
-      if (error) throw error;
-    }),
+    Array.from({ length: MATCHES_PAGE_SIZE + 1 }, () =>
+      listCopy(lister, holofoilId),
+    ),
   );
   const { error: wantError } = await wanter.client.rpc('add_want', {
-    card_id: card.id,
+    card_id: cardId,
   });
   if (wantError) throw wantError;
 
