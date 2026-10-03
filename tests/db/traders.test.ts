@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   anonClient,
   cityId,
+  fileCity,
   ORANGE_COUNTY,
   seedAdversarialTraders,
   seedTrader,
@@ -116,7 +117,7 @@ describe('A Trader profile', () => {
     expect(error).toBeNull();
     expect(data).toEqual({
       display_name: actor.displayName,
-      city_id: await cityId(foreign.client, ORANGE_COUNTY),
+      city_id: await cityId(foreign.client, await fileCity()),
     });
   });
 
