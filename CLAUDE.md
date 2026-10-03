@@ -42,11 +42,13 @@ So a merge is a production deploy, and a migration merged to `main` is applied t
 **Code review** means `mattpocock-skills:code-review`, named in full.
 The bare `code-review` is Claude Code's built-in, which fans out sub-agents at the session effort level and is not the review this flow asks for.
 
-**The frontier** is the map's lowest-numbered child that is open, unassigned, and has no open blocker.
+**The frontier** is the map's lowest-numbered direct child that is open, unassigned, and has no open blocker.
 Build-sequence order is spec order; do not jump ahead.
 
 **The map** at #31 holds only the tickets planned from the spec.
-A follow-up filed while shipping another ticket is standalone: no parent, off the frontier, and started by number when Kyle says to.
+A follow-up filed while shipping another ticket becomes a sub-issue of the feature ticket it belongs to, never of the map, so the map's own list stays the planned features.
+That is usually the ticket it was found on; when it is not, parent it to the feature it is part of and say "Found on #N" in the body.
+A follow-up is off the frontier whatever its parent, and is started by number when Kyle says to.
 
 ## Agent skills
 
