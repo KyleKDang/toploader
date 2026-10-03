@@ -232,6 +232,8 @@ What makes a good test here:
 - A tracer that makes a Match signs its Traders into a City of its own, arranged through the superuser connection (`arrangeCity` in `tests/browser/session.ts`).
   Added on [#72](https://github.com/KyleKDang/toploader/issues/72): every tracer and every earlier run lists and wants the same seeded Card, so in a shared City its Want or Listing pairs with everything the stack has accumulated, and how long the flow takes grows with how many runs came before.
   A City is reference data that no client path writes, which is what makes making one an arrange step.
+  Extended on [#82](https://github.com/KyleKDang/toploader/issues/82) to seam 1: a test that reads a City-wide list and expects its own rows in it seeds its Traders into a City of its own (`arrangeCity` in `tests/db/arrange.ts`).
+  PostgREST returns at most 1,000 rows, so in a shared City which rows come back once the stack has accumulated more is arbitrary, and the test passes or fails on how many runs came before.
 - A scheduled job that runs inside the database, a `pg_cron` job such as the Meetup reminder sweep, is invoked at seam 2 the way `pg_cron` invokes it: its registered command, run as the database's owner through the superuser connection.
   Added on [#23](https://github.com/KyleKDang/toploader/issues/23): no client role may call such a job, so there is no Trader's seam to reach it through, and running the command the job is registered with proves the schedule is wired as well as what it does.
   Its effects are still asserted at the seam, on the outbound pushes and the outbox.
