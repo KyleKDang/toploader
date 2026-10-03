@@ -125,7 +125,7 @@ Settled on [#36](https://github.com/KyleKDang/toploader/issues/36).
 
 Catalog tables (synced, read-only to clients): `card_sets`, `cards`, `card_variants` (each carrying its current Market Price), `price_snapshots` (per variant, changed-only, thinned to weekly after 90 days, per the runway plan in the delivery research).
 Every Catalog row has our own id, with TCGplayer's id beside it as a unique column, so the upstream stays swappable.
-Trader tables: `traders` (the public profile: display name, city_id, verified_at, `banned_at`, denormalized reputation counters, member-since), `trader_private` (fields only the owner reads: the 18-or-over attestation time), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
+Trader tables: `traders` (the public profile: display name, city_id, verified_at, `banned_at`, `deleted_at`, denormalized reputation counters, member-since), `trader_private` (fields only the owner reads: the 18-or-over attestation time), `cities`, `push_subscriptions`, `founders` (trader_id; membership granted only by migration, per [ADR-0007](adr/0007-admin-authorization.md)).
 A Trader's profile is split by audience because RLS scopes rows, not columns: a public field goes on `traders`, a private one on `trader_private`, so no column-level grant or RLS-bypassing view is ever a second place the rule can be wrong.
 Inventory: `collection_entries` (trader, variant, condition, qty), `listings` (trader, variant, condition, status: active / in_trade / traded / withdrawn; asking_price nullable), `listing_photos` (listing, position, the full-size path and the thumbnail path), `wants` (trader, card, variant nullable, min_condition nullable).
 The photos are their own table rather than a column on `listings`, decided on [#17](https://github.com/KyleKDang/toploader/issues/17): each one is two files in the bucket, they are ordered, and the reaper needs a list of what it may reclaim rather than an array it has to pick apart.
@@ -156,6 +156,16 @@ Its two Traders can read it and nobody else can; the blocked Trader is not notif
 Neither Trader sees the other's Listings or Matches, and nothing on a Trade between them moves forward: no proposal, counter, or accept, no Meetup put forward or confirmed, and no message.
 Every way a Trade ends stays open, so a Trade already under way can still be declined, cancelled, completed, or reported a no-show, and its two Traders keep reading its Listings until it ends.
 Ending those Trades automatically instead would put a cancel on someone's Reputation for keeping themselves safe, or let a block dodge a no-show.
+Also settled on [#28](https://github.com/KyleKDang/toploader/issues/28): deleting an account deletes what was the Trader's alone and keeps every Trade they were party to, for the Trader on the other side.
+The Trader's row in `traders` outlives the account, marked with `deleted_at` and taken out of its City, because Trades name it; only the Traders of those Trades can still read it.
+Its display name is kept wherever a Trade names the Trader, since a Trade has to go on saying who it was with, and a scammer must not be able to wipe their name from a victim's record by deleting the account; that holds for a Trade that never completed too, which is what a Trader who took the cards and never tapped Complete leaves behind.
+A Trader on no Trade leaves no name.
+Collection, Wants, Matches, push subscriptions, notifications, blocks, verification requests and their documents, and the private half of the profile are deleted.
+A Trade still open is ended as the Trader would have had to end it: a proposal waiting on them is declined, anything else is cancelled in their name, and the other Trader's Listings go back on offer.
+The Trader leaves their City before any of that, so a Listing of theirs that a cancelled Trade hands back makes no Match and alerts nobody.
+Their own Listings are withdrawn, except a traded one, which stays with its photos as the Trade Record's evidence, and what was said on a Trade stays with the Trade.
+A Founder and a banned Trader are refused: a Founder's membership is removed by migration first, and deleting a banned account would free its email address for a new, unbanned one.
+The erasure runs in the database as a trigger on the account's own deletion, so the account and its data go in one transaction, and a deleted Trader's session is refused on every request for the hour its token still has ([ADR-0007](adr/0007-admin-authorization.md), amendment for #28).
 
 RLS posture: every table deny-by-default.
 Reads are policy-scoped (own rows for private tables; city-scoped for listings/matches; participants-only for trades/messages; all rows for a Founder, via additive policies calling `is_founder()`).

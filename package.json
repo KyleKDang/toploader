@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit && deno check --config supabase/functions/notify/deno.json supabase/functions/notify/index.ts",
+    "typecheck": "tsc -b --noEmit && deno check --config supabase/functions/notify/deno.json supabase/functions/notify/index.ts && deno check --config supabase/functions/delete_account/deno.json supabase/functions/delete_account/index.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

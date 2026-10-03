@@ -657,6 +657,7 @@ export type Database = {
           city_id: string | null
           completed_trade_count: number
           created_at: string
+          deleted_at: string | null
           display_name: string | null
           feedback_down_count: number
           feedback_up_count: number
@@ -670,6 +671,7 @@ export type Database = {
           city_id?: string | null
           completed_trade_count?: number
           created_at?: string
+          deleted_at?: string | null
           display_name?: string | null
           feedback_down_count?: number
           feedback_up_count?: number
@@ -683,6 +685,7 @@ export type Database = {
           city_id?: string | null
           completed_trade_count?: number
           created_at?: string
+          deleted_at?: string | null
           display_name?: string | null
           feedback_down_count?: number
           feedback_up_count?: number
@@ -1133,6 +1136,7 @@ export type Database = {
         Returns: undefined
       }
       queue_meetup_reminders: { Args: never; Returns: undefined }
+      refuse_deleted_trader: { Args: never; Returns: undefined }
       reject_verification: { Args: { request_id: string }; Returns: undefined }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
       remove_push_subscription: {
@@ -1140,6 +1144,10 @@ export type Database = {
         Returns: undefined
       }
       remove_want: { Args: { want_id: string }; Returns: undefined }
+      require_deletable_account: {
+        Args: { trader_id: string }
+        Returns: undefined
+      }
       require_trader: { Args: { verified: boolean }; Returns: string }
       require_turn: {
         Args: {

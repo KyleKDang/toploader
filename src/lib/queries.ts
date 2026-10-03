@@ -495,6 +495,23 @@ export async function withdrawListing(listingId: string): Promise<void> {
 }
 
 /**
+ * Deletes the signed-in Trader's account, through the `delete_account` edge
+ * function (ADR-0007), and forgets the session this browser was holding.
+ *
+ * The session is dropped here rather than signed out of: Auth deleted it
+ * with the account, so there is nothing left on the server to sign out of,
+ * and asking would only be refused.
+ */
+export async function deleteAccount(): Promise<void> {
+  const result = await supabase.functions.invoke('delete_account', {
+    method: 'POST',
+  });
+  // supabase-js types a function's failure as `any`.
+  if (result.error) throw result.error as Error;
+  await supabase.auth.signOut({ scope: 'local' });
+}
+
+/**
  * Blocks another Trader. From then on neither sees the other's Listings or
  * Matches, and nothing between them moves forward but an ending.
  */
