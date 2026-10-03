@@ -9,12 +9,17 @@
 -- a call's cost grew with everything the outbox had ever held rather than
 -- with the batch: on a local stack of five million rows, 600 ms to 1.3 s a
 -- call against 12 ms for the same statement planned with the limit known,
--- and a backlog of half a million silent rows took minutes to drain where
--- it should take seconds.
+-- and a backlog of 600,000 silent rows took minutes to drain. It now takes
+-- about 18 s.
 --
 -- Now each update takes its rows as an array of ids, `id = any(...)`, which
 -- the planner estimates as a handful and looks up by primary key whatever
 -- `batch` is. What a call takes, settles, claims and returns is unchanged.
+
+-- Hands the notifier a batch of rows to send, settling the silent ones,
+-- exactly as 20260927190000_bounded_notification_claim.sql describes it:
+-- the day's oldest rows first, `for update skip locked`, fifty batches at
+-- most, and `{"settled": n, "claimed": [...]}` back. Its grant stands.
 create or replace function public.claim_notifications(batch integer default 20)
   returns jsonb
   language sql
