@@ -486,9 +486,10 @@ async function browse(client: Client, id: string) {
 }
 
 /**
- * A Card's Listings as the card page's browse asks for them, filter and all,
- * so a test can see what that screen would show rather than what the policy
- * alone allows.
+ * A Card's Listings filtered as the card page's browse filters them, so a
+ * test can see which that screen would show rather than which the policy
+ * alone allows. Unordered, unlike the screen: a test asks only which
+ * Listings are in it.
  */
 async function browseCard(client: Client, likeListing: string) {
   const { data: card, error: cardError } = await client

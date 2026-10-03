@@ -105,18 +105,16 @@ export async function makeFounder(traderId: string): Promise<void> {
 }
 
 /**
- * A City no other test or earlier run has Traders in, and its name. Cities
- * are reference data written only by migrations, so no client path makes
- * one.
+ * Makes a City no other test or earlier run has Traders in, and returns its
+ * name. Cities are reference data written only by migrations, so no client
+ * path makes one.
  *
- * For a test that reads a City-wide list and expects its own rows in it:
- * in a shared City the list holds every Listing the stack has accumulated,
- * and past PostgREST's 1,000-row cap which of them come back is arbitrary
- * (#82). The browser tracers do the same with `arrangeCity` in
- * tests/browser/session.ts (#72).
+ * For a test that reads a City-wide list and expects its own rows in it,
+ * per the spec's Testing decisions (#82); the browser tracers have their
+ * own `arrangeCity` in tests/browser/session.ts (#72).
  */
 export async function arrangeCity(): Promise<string> {
-  const name = `Test City ${randomUUID().slice(0, 8)}`;
+  const name = `Arranged City ${randomUUID().slice(0, 8)}`;
   await arrange(
     (sql) => sql`insert into public.cities (name, time_zone)
                  values (${name}, 'America/Los_Angeles')`,
