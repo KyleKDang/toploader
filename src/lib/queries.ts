@@ -521,6 +521,39 @@ export async function blockTrader(traderId: string): Promise<void> {
 }
 
 /**
+ * Takes back the signed-in Trader's block on another. What the block took
+ * comes back in both directions, unless the other Trader holds a block of
+ * their own.
+ */
+export async function unblockTrader(traderId: string): Promise<void> {
+  const { error } = await supabase.rpc('unblock_trader', {
+    trader_id: traderId,
+  });
+  if (error) throw error;
+}
+
+/**
+ * The Traders the signed-in Trader has blocked, most recent first, for
+ * Settings. Only the blocks they made: a block someone else holds on them
+ * is not theirs to take back. The Trader is named in the key for the reason
+ * wantsQuery names them.
+ */
+export function blockedTradersQuery(traderId: string) {
+  return queryOptions({
+    queryKey: ['blocked-traders', traderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blocks')
+        .select('blocked:traders!blocks_blocked_id_fkey (id, display_name)')
+        .eq('blocker_id', traderId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map((row) => row.blocked);
+    },
+  });
+}
+
+/**
  * Whether the signed-in Trader and another are in a block, from either
  * side. A Trader reads only the blocks they are party to, so any block
  * naming the other Trader is one between the two of them.

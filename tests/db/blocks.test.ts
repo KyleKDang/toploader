@@ -496,3 +496,249 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
     expect(said.error).toBeNull();
   });
 });
+
+/*
+ * Unblocking (#87): a Trader takes back a block they made, and what the
+ * block took away comes back in both directions, unless the other Trader
+ * holds a block of their own. A Match that first held while the block stood
+ * was never seen by either Trader, so it alerts both as a new one.
+ */
+describe('Unblocking a Trader', { timeout: 30_000 }, () => {
+  let card: number;
+  let holofoil: number;
+
+  beforeAll(async () => {
+    ({ card, holofoil } = await seededExamplemon(
+      (await seedTrader('Catalog reader')).client,
+    ));
+  });
+
+  async function seedTrio() {
+    const [actor, counterparty, foreign] = await Promise.all([
+      seedTrader('Actor'),
+      seedTrader('Counterparty'),
+      seedTrader('Foreign'),
+    ]);
+    await Promise.all(
+      [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),
+    );
+    return { actor, counterparty, foreign };
+  }
+
+  async function unblock(by: SeededTrader, trader: SeededTrader) {
+    return by.client.rpc('unblock_trader', { trader_id: trader.id });
+  }
+
+  async function arrangeUnblock(by: SeededTrader, trader: SeededTrader) {
+    const { error } = await unblock(by, trader);
+    if (error) throw error;
+  }
+
+  /** Who the outbox holds an alert for, on one Match's topic. */
+  async function alertedOn(listingId: string, wanter: SeededTrader) {
+    const { data, error } = await serviceClient()
+      .from('notifications')
+      .select('trader_id')
+      .eq('topic', `match:${listingId}:${wanter.id}`);
+    if (error) throw error;
+    return data.map((row) => row.trader_id).sort();
+  }
+
+  describe('the unblock itself', () => {
+    it("removes only the caller's own block", async () => {
+      const { actor, counterparty } = await seedTrio();
+      await arrangeBlock(actor, counterparty);
+      await arrangeBlock(counterparty, actor);
+
+      await arrangeUnblock(actor, counterparty);
+
+      expect(await readBlocks(actor.client)).toEqual([
+        { blocker_id: counterparty.id, blocked_id: actor.id },
+      ]);
+    });
+
+    it('cannot be done by the blocked Trader, a foreign Trader, or signed out', async () => {
+      const { actor, counterparty, foreign } = await seedTrio();
+      await arrangeBlock(actor, counterparty);
+
+      // Neither has a block of their own to take back, so each call is a
+      // no-op on their own account, never on the actor's.
+      await arrangeUnblock(counterparty, actor);
+      await arrangeUnblock(foreign, counterparty);
+      const signedOut = await anonClient().rpc('unblock_trader', {
+        trader_id: counterparty.id,
+      });
+      expect(signedOut.error).not.toBeNull();
+      // Nor is a block deleted around the RPC, by any of the three.
+      for (const trader of [actor, counterparty, foreign]) {
+        await trader.client
+          .from('blocks')
+          .delete()
+          .eq('blocker_id', actor.id)
+          .eq('blocked_id', counterparty.id);
+      }
+
+      expect(await readBlocks(actor.client)).toEqual([
+        { blocker_id: actor.id, blocked_id: counterparty.id },
+      ]);
+    });
+
+    it('changes nothing when the Trader is not blocked', async () => {
+      const { actor, counterparty, foreign } = await seedTrio();
+      await arrangeBlock(foreign, counterparty);
+
+      expect((await unblock(actor, counterparty)).error).toBeNull();
+
+      expect(await readBlocks(actor.client)).toEqual([]);
+      expect(await readBlocks(foreign.client)).toEqual([
+        { blocker_id: foreign.id, blocked_id: counterparty.id },
+      ]);
+    });
+
+    it('cannot name yourself or a Trader who does not exist', async () => {
+      const { actor } = await seedTrio();
+
+      expect((await unblock(actor, actor)).error?.code).toBe('22023');
+      expect(
+        (
+          await actor.client.rpc('unblock_trader', {
+            trader_id: '00000000-0000-0000-0000-000000000000',
+          })
+        ).error?.code,
+      ).toBe('22023');
+    });
+  });
+
+  describe('gives back what the block took', () => {
+    it.each(['blocker', 'blocked'] as const)(
+      "each Trader's Listings, and proposals from the %s",
+      async (who) => {
+        const { actor, counterparty } = await seedTrio();
+        const [actorListing, counterpartyListing] = await Promise.all([
+          createListing(actor, holofoil, 'NM'),
+          createListing(counterparty, holofoil, 'NM'),
+        ]);
+        await arrangeBlock(actor, counterparty);
+
+        await arrangeUnblock(actor, counterparty);
+
+        expect(await canReadListing(actor.client, counterpartyListing)).toBe(
+          true,
+        );
+        expect(await canReadListing(counterparty.client, actorListing)).toBe(
+          true,
+        );
+        const [from, to] =
+          who === 'blocker' ? [actor, counterparty] : [counterparty, actor];
+        const { error } = await from.client.rpc('create_trade', {
+          recipient_id: to.id,
+          listing_ids: [actorListing, counterpartyListing],
+        });
+        expect(error).toBeNull();
+      },
+    );
+
+    it('chat and the steps of a Trade that stood open through the block', async () => {
+      const { actor, counterparty } = await seedTrio();
+      const [mine, theirs] = await Promise.all([
+        createListing(actor, holofoil, 'NM'),
+        createListing(counterparty, holofoil, 'NM'),
+      ]);
+      const { data: tradeId, error } = await actor.client.rpc('create_trade', {
+        recipient_id: counterparty.id,
+        listing_ids: [mine, theirs],
+      });
+      if (error) throw error;
+      await arrangeBlock(counterparty, actor);
+
+      await arrangeUnblock(counterparty, actor);
+
+      for (const trader of [actor, counterparty]) {
+        const said = await trader.client.rpc('send_message', {
+          trade_id: tradeId,
+          body: 'Still on?',
+        });
+        expect(said.error).toBeNull();
+      }
+      const accepted = await counterparty.client.rpc('accept_trade', {
+        trade_id: tradeId,
+      });
+      expect(accepted.error).toBeNull();
+    });
+
+    it('a Match that held before the block, without alerting it again', async () => {
+      const { actor, counterparty } = await seedTrio();
+      await addWant(counterparty, { card_id: card });
+      const listing = await createListing(actor, holofoil, 'NM');
+      expect(await alertedOn(listing, counterparty)).toEqual([counterparty.id]);
+      await arrangeBlock(actor, counterparty);
+
+      await arrangeUnblock(actor, counterparty);
+
+      expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(true);
+      expect(
+        await hasMatch(counterparty.client, listing, counterparty.id),
+      ).toBe(true);
+      expect(await alertedOn(listing, counterparty)).toEqual([counterparty.id]);
+    });
+
+    it('a Match that first held during the block, alerted to both Traders as new', async () => {
+      const { actor, counterparty, foreign } = await seedTrio();
+      await arrangeBlock(actor, counterparty);
+      await Promise.all([
+        addWant(counterparty, { card_id: card }),
+        addWant(foreign, { card_id: card }),
+      ]);
+      const listing = await createListing(actor, holofoil, 'NM');
+      expect(await alertedOn(listing, counterparty)).toEqual([]);
+
+      await arrangeUnblock(actor, counterparty);
+
+      expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(true);
+      expect(
+        await hasMatch(counterparty.client, listing, counterparty.id),
+      ).toBe(true);
+      expect(await alertedOn(listing, counterparty)).toEqual(
+        [actor.id, counterparty.id].sort(),
+      );
+      // A Match with a Trader outside the block was alerted when it held,
+      // and the unblock does not alert it again.
+      expect(await alertedOn(listing, foreign)).toEqual([foreign.id]);
+    });
+  });
+
+  describe('while the other Trader still holds a block', () => {
+    it('gives back nothing, and alerts nothing until that block goes too', async () => {
+      const { actor, counterparty } = await seedTrio();
+      await arrangeBlock(actor, counterparty);
+      await arrangeBlock(counterparty, actor);
+      await addWant(counterparty, { card_id: card });
+      const [listing, counterpartyListing] = await Promise.all([
+        createListing(actor, holofoil, 'NM'),
+        createListing(counterparty, holofoil, 'NM'),
+      ]);
+
+      await arrangeUnblock(actor, counterparty);
+
+      expect(await canReadListing(actor.client, counterpartyListing)).toBe(
+        false,
+      );
+      expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(
+        false,
+      );
+      const proposed = await actor.client.rpc('create_trade', {
+        recipient_id: counterparty.id,
+        listing_ids: [listing, counterpartyListing],
+      });
+      expect(proposed.error?.code).toBe('42501');
+      expect(await alertedOn(listing, counterparty)).toEqual([]);
+
+      await arrangeUnblock(counterparty, actor);
+
+      expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(true);
+      expect(await alertedOn(listing, counterparty)).toEqual(
+        [actor.id, counterparty.id].sort(),
+      );
+    });
+  });
+});

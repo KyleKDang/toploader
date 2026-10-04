@@ -7,11 +7,11 @@ import { blockTrader } from '../lib/queries';
  * Blocking another Trader, from anywhere a Trader meets one: their Listing,
  * or a Trade with them.
  *
- * A block is confirmed in a sheet, with the destructive action second, since
- * it cannot be taken back until unblocking exists (#87). The sheet says what it does in the Trader's
- * terms, including what it leaves alone: a Trade already open between the
- * two can still be ended, so nobody is left holding cards on a Trade that
- * can never finish.
+ * A block is confirmed in a sheet, with the destructive action second. The
+ * sheet says what it does in the Trader's terms, including what it leaves
+ * alone - a Trade already open between the two can still be ended, so
+ * nobody is left holding cards on a Trade that can never finish - and where
+ * it is taken back: Settings lists the Traders a Trader has blocked (#87).
  */
 
 export function BlockTrader({
@@ -62,7 +62,7 @@ export function BlockTrader({
           completed.
         </p>
         <p className="mt-2 text-base leading-prose text-ink">
-          {trader.name} is not notified. There is no way to unblock yet.
+          {trader.name} is not notified. You can unblock them in Settings.
         </p>
         <FormError error={block.error} />
       </Sheet>

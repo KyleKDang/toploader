@@ -156,6 +156,8 @@ Its two Traders can read it and nobody else can; the blocked Trader is not notif
 Neither Trader sees the other's Listings or Matches, and nothing on a Trade between them moves forward: no proposal, counter, or accept, no Meetup put forward or confirmed, and no message.
 Every way a Trade ends stays open, so a Trade already under way can still be declined, cancelled, completed, or reported a no-show, and its two Traders keep reading its Listings until it ends.
 Ending those Trades automatically instead would put a cancel on someone's Reputation for keeping themselves safe, or let a block dodge a no-show.
+Settled on [#87](https://github.com/KyleKDang/toploader/issues/87): a Trader takes back a block from Settings, which lists the Traders they have blocked, and only their own, so a block the other Trader holds still keeps the two apart.
+A Match that first held while the block stood alerts both Traders as new once it lifts, since neither has seen it; one that held before the block comes back without a second alert.
 Also settled on [#28](https://github.com/KyleKDang/toploader/issues/28): deleting an account deletes what was the Trader's alone and keeps every Trade they were party to, for the Trader on the other side.
 The Trader's row in `traders` outlives the account, marked with `deleted_at` and taken out of its City, because Trades name it; only the Traders of those Trades can still read it.
 Its display name is kept wherever a Trade names the Trader, since a Trade has to go on saying who it was with, and a scammer must not be able to wipe their name from a victim's record by deleting the account; that holds for a Trade that never completed too, which is what a Trader who took the cards and never tapped Complete leaves behind.
