@@ -26,6 +26,7 @@ const PORT = 5199;
 
 export default defineConfig({
   testDir: 'tests/browser',
+  globalSetup: './tests/browser/global-setup.ts',
   forbidOnly: !!process.env.CI,
   retries: 0,
   use: {

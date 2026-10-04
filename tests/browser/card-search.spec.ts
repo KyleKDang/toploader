@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { signInAsNewTrader } from './session.ts';
+import { arrangeCity, signInAsNewTrader } from './session.ts';
 
 /*
  * Card search and the card page, end to end at 375px: a Trader goes to
@@ -25,7 +25,7 @@ test('a Trader searches the Catalog and opens a card page with its Market Price'
   await page.route('https://tcgplayer-cdn.tcgplayer.com/**', (route) =>
     route.fulfill({ contentType: 'image/svg+xml', body: CARD_IMAGE }),
   );
-  await signInAsNewTrader(page, 'Orange County');
+  await signInAsNewTrader(page, await arrangeCity());
   await page.goto('/');
 
   await page

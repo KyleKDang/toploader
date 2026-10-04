@@ -1,8 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { cameraPhoto } from './photo-fixture.ts';
-import { signInAsNewTrader } from './session.ts';
+import { arrangeCity, signInAsNewTrader } from './session.ts';
 
 /*
  * Creating a Listing, end to end at 375px: a Trader finds the Card, opens
@@ -25,16 +24,6 @@ const CARD_IMAGE = readFileSync(
 const PHOTO = cameraPhoto(1800, 2400);
 
 /**
- * A display name no other Trader has. The tracers share one stack, both with
- * each other in parallel and with whatever earlier runs left behind, and City
- * browse shows every Trader in the City - so the only way to point at "my own
- * Listing" is to be the only Trader called this.
- */
-function uniqueTrader(role: string) {
-  return `${role} ${randomUUID().slice(0, 8)}`;
-}
-
-/**
  * What the pipeline aims a full-size photo at. The bucket's own ceiling is
  * 512 KiB and seam 1 proves it; this is the browser path holding up its end,
  * which is the only place that can be checked.
@@ -47,8 +36,7 @@ test('a Trader photographs a Copy and the Listing goes active in their City', as
   await page.route('https://tcgplayer-cdn.tcgplayer.com/**', (route) =>
     route.fulfill({ contentType: 'image/svg+xml', body: CARD_IMAGE }),
   );
-  const name = uniqueTrader('Lister');
-  const trader = await signInAsNewTrader(page, 'Orange County', name);
+  const trader = await signInAsNewTrader(page, await arrangeCity(), 'Lister');
   await page.goto('/search');
 
   await page.getByRole('combobox', { name: 'Search the catalog' }).fill('exam');
@@ -60,11 +48,10 @@ test('a Trader photographs a Copy and the Listing goes active in their City', as
   await expect(page).toHaveURL(/\/cards\/\d+$/);
   const cardUrl = page.url();
 
-  // Not "nobody is listing this": other tracers run in parallel against the
-  // same stack and their Listings are legitimately in this Trader's City.
-  // What must not be here yet is this Trader's own.
-  const ownRow = page.getByRole('button', { name: new RegExp(name) });
-  await expect(ownRow).toHaveCount(0);
+  // The City is the tracer's own, so nobody is listing this yet.
+  await expect(
+    page.getByText('Nobody in your area is listing this card yet.'),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'List this card' }).click();
 
   await expect(
@@ -109,6 +96,9 @@ test('a Trader photographs a Copy and the Listing goes active in their City', as
 
   // Back on the Card, the Listing is in City browse, on its thumbnail.
   await page.goto(cardUrl);
+  const ownRow = page.getByRole('button', {
+    name: new RegExp(trader.displayName),
+  });
   await expect(ownRow).toContainText('$25.00');
   await expect(ownRow).toContainText('LP · Holofoil · Open to cash offers');
   // alt="" on purpose - the row already names the Trader and Condition -
@@ -147,8 +137,7 @@ test('a Trader withdraws a Listing and it leaves their area', async ({
   await page.route('https://tcgplayer-cdn.tcgplayer.com/**', (route) =>
     route.fulfill({ contentType: 'image/svg+xml', body: CARD_IMAGE }),
   );
-  const name = uniqueTrader('Withdrawer');
-  await signInAsNewTrader(page, 'Orange County', name);
+  await signInAsNewTrader(page, await arrangeCity(), 'Withdrawer');
   await page.goto('/search');
 
   await page.getByRole('combobox', { name: 'Search the catalog' }).fill('exam');
@@ -186,6 +175,6 @@ test('a Trader withdraws a Listing and it leaves their area', async ({
   // Gone from their area, for the Trader who listed it as much as anyone.
   await page.goto(cardUrl);
   await expect(
-    page.getByRole('button', { name: new RegExp(name) }),
-  ).toHaveCount(0);
+    page.getByText('Nobody in your area is listing this card yet.'),
+  ).toBeVisible();
 });
