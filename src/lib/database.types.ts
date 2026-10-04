@@ -1239,6 +1239,7 @@ export type Database = {
         Args: { status: Database["public"]["Enums"]["trade_status"] }
         Returns: boolean
       }
+      unblock_trader: { Args: { trader_id: string }; Returns: undefined }
       unreferenced_listing_photos: {
         Args: { uploaded_before: string }
         Returns: {

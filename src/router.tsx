@@ -8,6 +8,7 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import {
+  blockedTradersQuery,
   cardQuery,
   citiesQuery,
   cityListingsForCardQuery,
@@ -407,7 +408,9 @@ const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   loader: async ({ context: { queryClient } }) => {
-    await loadOnboardedTrader(queryClient);
+    const { traderId } = await loadOnboardedTrader(queryClient);
+    await queryClient.ensureQueryData(blockedTradersQuery(traderId));
+    return { traderId };
   },
   component: lazyRouteComponent(
     () => import('./screens/SettingsScreen'),

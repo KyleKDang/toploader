@@ -111,6 +111,7 @@ _Avoid_: review, star rating
 
 **Block**:
 One Trader cutting off another, which works in both directions: neither sees the other's Listings or Matches, and no proposal, Meetup step, or message goes between them, while any Trade already open between them can still end.
+Only the Trader who made a block can take it back, by unblocking.
 _Avoid_: mute, ignore
 
 ### Market data
