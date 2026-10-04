@@ -29,10 +29,10 @@ export function authStorageKey() {
  * their id, display name, and a client holding the same session, for a
  * tracer that has to check what the app stored as the Trader who stored it.
  *
- * A tracer that reads a City-scoped screen passes its own `displayName`.
- * Playwright runs these files in parallel against one stack, so another
- * tracer's Listing is legitimately in this Trader's City, and a name of
- * one's own is what tells the two apart.
+ * A tracer that reads a City-scoped screen signs in to a City of its own
+ * (`arrangeCity`). Playwright runs these files in parallel against one
+ * stack that keeps every earlier run's rows, so in a shared City the screen
+ * shows all of them, and grows until it outlasts the tracer's wait (#105).
  */
 export async function signInAsNewTrader(
   page: Page,
