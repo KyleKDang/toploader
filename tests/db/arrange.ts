@@ -7,7 +7,9 @@ import { inject } from 'vitest';
  * no client path can reach yet.
  *
  * Seam 1 is supabase-js signed in as a Trader, and that stays the seam every
- * assertion is made through: this is for the arrange step only. A Listing
+ * assertion is made through: this is for the arrange step only, and for
+ * the one act no client can perform, two writes that overlap
+ * (`overlapWrites` below). A Listing
  * reaches `traded`, and returns from `in_trade` to `active`, through the
  * completion and cancel steps of the Trade machine (#25), which take two
  * Verified Traders, a proposal, an accept, and a confirmed Meetup to reach.
@@ -142,4 +144,77 @@ export async function arrangeCity(
           ) as spot (name, address, kind)`,
   );
   return name;
+}
+
+/** One Trader's write, run on a connection that is acting as that Trader. */
+export interface TraderWrite<Result> {
+  as: { id: string };
+  write: (sql: Sql) => Promise<Result>;
+}
+
+/**
+ * Runs two Traders' writes in transactions that overlap, and returns what
+ * each wrote. The first writes and is held open; the second then runs until
+ * it has either finished or is waiting on a lock the first holds; only then
+ * does the first commit, and the second after it. So neither transaction
+ * can have seen the other's write committed when it started, which is the
+ * overlap two requests arriving together have, without leaving it to
+ * timing.
+ *
+ * PostgREST gives every request a transaction of its own and commits it, so
+ * no client can hold one open: this is a state only the superuser
+ * connection reaches. Each transaction takes the `authenticated` role and
+ * the Trader's claims, as PostgREST does for a signed-in request, so the
+ * write passes the same grants, policies, and `auth.uid()` checks.
+ */
+export async function overlapWrites<First, Second>(
+  first: TraderWrite<First>,
+  second: TraderWrite<Second>,
+): Promise<[First, Second]> {
+  const sql = postgres(inject('supabaseDbUrl'), { max: 3 });
+  const beginAs = async (trader: { id: string }) => {
+    const connection = await sql.reserve();
+    await connection`begin`;
+    await connection`
+      select
+        set_config('role', 'authenticated', true),
+        set_config('request.jwt.claims', ${JSON.stringify({
+          sub: trader.id,
+          role: 'authenticated',
+        })}, true)`;
+    return connection;
+  };
+  try {
+    const held = await beginAs(first.as);
+    const overlapping = await beginAs(second.as);
+    const [{ pid }] = await overlapping<
+      { pid: number }[]
+    >`select pg_backend_pid() as pid`;
+
+    const firstResult = await first.write(held);
+    let finished = false;
+    const pending = second.write(overlapping);
+    const watched = pending.then(
+      () => (finished = true),
+      () => (finished = true),
+    );
+    while (!finished) {
+      const [activity] = await sql`
+        select wait_event_type from pg_stat_activity where pid = ${pid}`;
+      if (activity?.wait_event_type === 'Lock') break;
+      await Promise.race([
+        watched,
+        new Promise((resolve) => setTimeout(resolve, 10)),
+      ]);
+    }
+
+    await held`commit`;
+    const secondResult = await pending;
+    await overlapping`commit`;
+    return [firstResult, secondResult];
+  } finally {
+    // Without waiting for the reserved connections to be handed back:
+    // closing them rolls back whatever a failure left open.
+    await sql.end({ timeout: 0 });
+  }
 }
