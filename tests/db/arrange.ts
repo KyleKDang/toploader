@@ -51,12 +51,16 @@ export async function completeTradeFor(listingId: string): Promise<void> {
  * file in the bucket, so a run told it is a day later would delete the
  * photos other test files had just uploaded and not yet listed.
  */
-export async function ageUpload(path: string, days: number): Promise<void> {
+export async function ageUpload(
+  path: string,
+  days: number,
+  bucket = 'listing-photos',
+): Promise<void> {
   await arrange(
     (sql) =>
       sql`update storage.objects
             set created_at = created_at - ${days} * interval '1 day'
-            where bucket_id = 'listing-photos' and name = ${path}`,
+            where bucket_id = ${bucket} and name = ${path}`,
   );
 }
 

@@ -105,6 +105,9 @@ The domain's DNS records, including SPF, DKIM and DMARC for `mail.`, are in Clou
   It can be run by hand from the Actions tab, and running it twice in a day is harmless.
 - **Daily, 08:41 UTC:** `.github/workflows/photo-reaper.yml` deletes the Listing photos of withdrawn Listings, and uploads more than a day old that never became a Listing, then checks in with the Sentry cron monitor `photo-reaper`.
   It never touches the photos of a Listing that went through a Trade: those are the Trade Record's evidence.
+  Before the photos, it deletes every verification document no waiting request names, once it is more than an hour old: an ID photo and selfie uploaded and never submitted, or left by an account deleted while its request waited.
+  So an abandoned document is gone within the hour's grace plus the wait for the next run, a little over a day even when GitHub starts the run late, and the Privacy Policy can safely promise deletion within two days.
+  A waiting request keeps its documents until a Founder reviews it, however long that takes.
   Running it twice in a day is harmless, and a run that reclaims nothing is the normal case.
 
 ## Reviewing verification requests
@@ -127,7 +130,7 @@ A run that fails reports to Sentry as an error, and the Trader is told to try ag
 A run that failed after deleting the Trader's verification documents leaves a request waiting without them, which a Founder rejects as any interrupted review ([Reviewing verification requests](#reviewing-verification-requests)).
 
 Deleting an account from the Supabase dashboard (Authentication → Users) erases the same data, because the erasure is a trigger on the account's deletion.
-It does not delete the Trader's verification documents, which only the function does, so delete those from the `verification-documents` bucket first, under the folder named by the Trader's id.
+It does not delete the Trader's verification documents, which only the function does; the photo reaper deletes them on its next run, or delete them from the `verification-documents` bucket first, under the folder named by the Trader's id.
 
 The database refuses to delete a Founder's account or a banned Trader's.
 A Founder is removed by migration first; a banned Trader's account stays, since deleting it would free its email address for a new account.
