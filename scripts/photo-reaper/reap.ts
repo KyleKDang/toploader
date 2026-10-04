@@ -1,5 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../../src/lib/database.types.ts';
+import {
+  deleteFiles,
+  MAX_PAGES,
+  PAGE,
+  reaperClient,
+  sweepUnreferenced,
+  type ReapOptions,
+} from './sweep.ts';
 
 /*
  * The Listing photo reaper: gives back the Storage that withdrawn Listings
@@ -28,33 +34,6 @@ const BUCKET = 'listing-photos';
 /** How long an upload has to become a Listing before it counts as abandoned. */
 const ORPHAN_GRACE_HOURS = 24;
 
-/** Storage takes a bounded list of paths per delete. */
-const DELETE_BATCH = 100;
-
-/**
- * How much of each work list a run takes at a time. PostgREST caps a
- * response at `max_rows` anyway (1000, in supabase/config.toml), so a run
- * that did not page would silently leave the rest of a backlog behind and
- * call itself done. Under this it just keeps asking until there is nothing
- * left.
- */
-export const PAGE = 500;
-
-/**
- * How many pages of each list one run will take. It is a stop, not a budget:
- * the loops end when a page comes back empty, and this is what keeps a run
- * that is somehow not making progress - a file Storage accepts a delete for
- * but keeps - from spinning until the job times out. Whatever is left is
- * still there tomorrow.
- */
-export const MAX_PAGES = 100;
-
-export interface ReapOptions {
-  supabaseUrl: string;
-  /** The server-side key: the reaper runs as service_role. */
-  supabaseSecretKey: string;
-}
-
 export interface ReapReport {
   /** Withdrawn Listings whose photos were reclaimed. */
   listings: number;
@@ -64,13 +43,10 @@ export interface ReapReport {
   orphans: number;
 }
 
-export async function reapListingPhotos({
-  supabaseUrl,
-  supabaseSecretKey,
-}: ReapOptions): Promise<ReapReport> {
-  const supabase = createClient<Database>(supabaseUrl, supabaseSecretKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+export async function reapListingPhotos(
+  options: ReapOptions,
+): Promise<ReapReport> {
+  const supabase = reaperClient(options);
 
   const report: ReapReport = { listings: 0, files: 0, orphans: 0 };
 
@@ -113,39 +89,13 @@ export async function reapListingPhotos({
   // Uploads no Listing ever named. A Trader may only write under their own
   // prefix, but nothing stops them writing and walking away, so without this
   // the bucket has a leak no policy can close.
-  const olderThan = new Date(Date.now() - ORPHAN_GRACE_HOURS * 60 * 60 * 1000);
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const { data: orphans, error } = await supabase
-      .rpc('unreferenced_listing_photos', {
-        uploaded_before: olderThan.toISOString(),
-      })
-      .limit(PAGE);
-    if (error) throw error;
-    if (orphans.length === 0) break;
-
-    await deleteFiles(
-      supabase,
-      BUCKET,
-      orphans.map(({ path }) => path),
-    );
-    report.files += orphans.length;
-    report.orphans += orphans.length;
-  }
+  const orphans = await sweepUnreferenced(supabase, {
+    bucket: BUCKET,
+    rpc: 'unreferenced_listing_photos',
+    graceHours: ORPHAN_GRACE_HOURS,
+  });
+  report.files += orphans;
+  report.orphans = orphans;
 
   return report;
-}
-
-export type Supabase = ReturnType<typeof createClient<Database>>;
-
-export async function deleteFiles(
-  supabase: Supabase,
-  bucket: string,
-  paths: string[],
-) {
-  for (let from = 0; from < paths.length; from += DELETE_BATCH) {
-    const { error } = await supabase.storage
-      .from(bucket)
-      .remove(paths.slice(from, from + DELETE_BATCH));
-    if (error) throw error;
-  }
 }

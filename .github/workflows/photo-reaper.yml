@@ -1,13 +1,13 @@
-# The daily Listing photo reaper: gives back the Storage that withdrawn
-# Listings and abandoned uploads are holding, which is what keeps the free
-# tier's 1 GB lasting (ADR-0006). Photos of a Listing that went through a
-# Trade are never touched; they are the Trade Record's evidence.
-# It first deletes the verification documents no waiting request names:
-# uploads abandoned for more than an hour, and those of an account deleted
-# while its request waited.
+# The daily photo reaper. It first deletes the verification documents no
+# waiting request names: uploads abandoned for more than an hour, and those
+# of an account deleted while its request waited. Then it gives back the
+# Storage that withdrawn Listings and abandoned Listing uploads are
+# holding, which is what keeps the free tier's 1 GB lasting (ADR-0006).
+# Photos of a Listing that went through a Trade are never touched; they are
+# the Trade Record's evidence.
 # Every run checks in with a Sentry cron monitor, so a failed or missing run
 # is an alert rather than silence.
-name: Listing photo reaper
+name: Photo reaper
 
 on:
   schedule:
@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   reap:
-    name: Reclaim withdrawn Listing photos
+    name: Delete abandoned documents and reclaim Listing photos
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

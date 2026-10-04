@@ -43,23 +43,23 @@ export async function completeTradeFor(listingId: string): Promise<void> {
 }
 
 /**
- * Backdates one uploaded file, so the reaper sees an upload that has sat
- * unclaimed past its grace period.
+ * Backdates one uploaded file, a Listing photo or a verification document,
+ * so the reaper sees an upload that has sat unclaimed for that long.
  *
  * Ageing the file rather than moving the run's clock forward is what keeps
- * the suite honest: the reaper's orphan sweep reclaims every unreferenced
- * file in the bucket, so a run told it is a day later would delete the
- * photos other test files had just uploaded and not yet listed.
+ * the suite honest: the reaper's sweeps reclaim every unreferenced file in
+ * the bucket, so a run told it is a day later would delete the files other
+ * test files had just uploaded and not yet named.
  */
 export async function ageUpload(
   path: string,
-  days: number,
+  hours: number,
   bucket = 'listing-photos',
 ): Promise<void> {
   await arrange(
     (sql) =>
       sql`update storage.objects
-            set created_at = created_at - ${days} * interval '1 day'
+            set created_at = created_at - ${hours} * interval '1 hour'
             where bucket_id = ${bucket} and name = ${path}`,
   );
 }
