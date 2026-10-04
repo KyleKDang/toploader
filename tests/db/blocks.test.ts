@@ -39,6 +39,32 @@ async function arrangeBlock(by: SeededTrader, trader: SeededTrader) {
   if (error) throw error;
 }
 
+async function unblock(by: SeededTrader, trader: SeededTrader) {
+  return by.client.rpc('unblock_trader', { trader_id: trader.id });
+}
+
+/** Unblocks a Trader a test needs unblocked, failing loudly where refused. */
+async function arrangeUnblock(by: SeededTrader, trader: SeededTrader) {
+  const { error } = await unblock(by, trader);
+  if (error) throw error;
+}
+
+/**
+ * The adversarial trio, all three verified so that what refuses a proposal
+ * is the block and nothing else.
+ */
+async function seedTrio() {
+  const [actor, counterparty, foreign] = await Promise.all([
+    seedTrader('Actor'),
+    seedTrader('Counterparty'),
+    seedTrader('Foreign'),
+  ]);
+  await Promise.all(
+    [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),
+  );
+  return { actor, counterparty, foreign };
+}
+
 /** The blocks one client can read. */
 async function readBlocks(client: Client) {
   const { data, error } = await client
@@ -73,32 +99,16 @@ async function hasMatch(client: Client, listingId: string, wanterId: string) {
   return data.length > 0;
 }
 
+let card: number;
+let holofoil: number;
+
+beforeAll(async () => {
+  ({ card, holofoil } = await seededExamplemon(
+    (await seedTrader('Catalog reader')).client,
+  ));
+});
+
 describe('Blocking a Trader', { timeout: 30_000 }, () => {
-  let card: number;
-  let holofoil: number;
-
-  beforeAll(async () => {
-    ({ card, holofoil } = await seededExamplemon(
-      (await seedTrader('Catalog reader')).client,
-    ));
-  });
-
-  /**
-   * The adversarial trio, all three verified so that what refuses a
-   * proposal is the block and nothing else.
-   */
-  async function seedTrio() {
-    const [actor, counterparty, foreign] = await Promise.all([
-      seedTrader('Actor'),
-      seedTrader('Counterparty'),
-      seedTrader('Foreign'),
-    ]);
-    await Promise.all(
-      [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),
-    );
-    return { actor, counterparty, foreign };
-  }
-
   /** ... with a proposal from the actor to the counterparty. */
   async function proposedTrade() {
     const trio = await seedTrio();
@@ -504,36 +514,6 @@ describe('Blocking a Trader', { timeout: 30_000 }, () => {
  * was never seen by either Trader, so it alerts both as a new one.
  */
 describe('Unblocking a Trader', { timeout: 30_000 }, () => {
-  let card: number;
-  let holofoil: number;
-
-  beforeAll(async () => {
-    ({ card, holofoil } = await seededExamplemon(
-      (await seedTrader('Catalog reader')).client,
-    ));
-  });
-
-  async function seedTrio() {
-    const [actor, counterparty, foreign] = await Promise.all([
-      seedTrader('Actor'),
-      seedTrader('Counterparty'),
-      seedTrader('Foreign'),
-    ]);
-    await Promise.all(
-      [actor, counterparty, foreign].map((trader) => verifyTrader(trader.id)),
-    );
-    return { actor, counterparty, foreign };
-  }
-
-  async function unblock(by: SeededTrader, trader: SeededTrader) {
-    return by.client.rpc('unblock_trader', { trader_id: trader.id });
-  }
-
-  async function arrangeUnblock(by: SeededTrader, trader: SeededTrader) {
-    const { error } = await unblock(by, trader);
-    if (error) throw error;
-  }
-
   /** Who the outbox holds an alert for, on one Match's topic. */
   async function alertedOn(listingId: string, wanter: SeededTrader) {
     const { data, error } = await serviceClient()
@@ -708,14 +688,24 @@ describe('Unblocking a Trader', { timeout: 30_000 }, () => {
   });
 
   describe('while the other Trader still holds a block', () => {
-    it('gives back nothing, and alerts nothing until that block goes too', async () => {
+    it('gives back nothing in either direction, and alerts nothing until that block goes too', async () => {
       const { actor, counterparty } = await seedTrio();
+      // A Trade opened before either block, for chat to be tried on.
+      const [mine, theirs] = await Promise.all([
+        createListing(actor, holofoil, 'NM'),
+        createListing(counterparty, holofoil, 'NM'),
+      ]);
+      const opened = await actor.client.rpc('create_trade', {
+        recipient_id: counterparty.id,
+        listing_ids: [mine, theirs],
+      });
+      if (opened.error) throw opened.error;
       await arrangeBlock(actor, counterparty);
       await arrangeBlock(counterparty, actor);
       await addWant(counterparty, { card_id: card });
       const [listing, counterpartyListing] = await Promise.all([
-        createListing(actor, holofoil, 'NM'),
-        createListing(counterparty, holofoil, 'NM'),
+        createListing(actor, holofoil, 'LP'),
+        createListing(counterparty, holofoil, 'LP'),
       ]);
 
       await arrangeUnblock(actor, counterparty);
@@ -723,17 +713,54 @@ describe('Unblocking a Trader', { timeout: 30_000 }, () => {
       expect(await canReadListing(actor.client, counterpartyListing)).toBe(
         false,
       );
-      expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(
-        false,
-      );
-      const proposed = await actor.client.rpc('create_trade', {
-        recipient_id: counterparty.id,
-        listing_ids: [listing, counterpartyListing],
-      });
-      expect(proposed.error?.code).toBe('42501');
+      expect(await canReadListing(counterparty.client, listing)).toBe(false);
+      for (const trader of [actor, counterparty]) {
+        expect(await hasMatch(trader.client, listing, counterparty.id)).toBe(
+          false,
+        );
+      }
+      for (const [from, to] of [
+        [actor, counterparty],
+        [counterparty, actor],
+      ] as const) {
+        const proposed = await from.client.rpc('create_trade', {
+          recipient_id: to.id,
+          listing_ids: [listing, counterpartyListing],
+        });
+        expect(proposed.error?.code).toBe('42501');
+        const said = await from.client.rpc('send_message', {
+          trade_id: opened.data,
+          body: 'Hello?',
+        });
+        expect(said.error?.code).toBe('42501');
+      }
       expect(await alertedOn(listing, counterparty)).toEqual([]);
 
       await arrangeUnblock(counterparty, actor);
+
+      for (const trader of [actor, counterparty]) {
+        expect(await hasMatch(trader.client, listing, counterparty.id)).toBe(
+          true,
+        );
+      }
+      expect(await alertedOn(listing, counterparty)).toEqual(
+        [actor.id, counterparty.id].sort(),
+      );
+    });
+
+    it('records the Matches when both Traders unblock at once', async () => {
+      const { actor, counterparty } = await seedTrio();
+      await arrangeBlock(actor, counterparty);
+      await arrangeBlock(counterparty, actor);
+      await addWant(counterparty, { card_id: card });
+      const listing = await createListing(actor, holofoil, 'NM');
+
+      // Side by side, each unblock would see the other's block still
+      // standing and record nothing; the RPC makes them take turns.
+      await Promise.all([
+        arrangeUnblock(actor, counterparty),
+        arrangeUnblock(counterparty, actor),
+      ]);
 
       expect(await hasMatch(actor.client, listing, counterparty.id)).toBe(true);
       expect(await alertedOn(listing, counterparty)).toEqual(
