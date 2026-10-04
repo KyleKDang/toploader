@@ -29,10 +29,8 @@ export function authStorageKey() {
  * their id, display name, and a client holding the same session, for a
  * tracer that has to check what the app stored as the Trader who stored it.
  *
- * A tracer that reads a City-scoped screen signs in to a City of its own
- * (`arrangeCity`). Playwright runs these files in parallel against one
- * stack that keeps every earlier run's rows, so in a shared City the screen
- * shows all of them, and grows until it outlasts the tracer's wait (#105).
+ * A tracer that reads a City-scoped screen signs in to a City of its own;
+ * see `arrangeCity`.
  */
 export async function signInAsNewTrader(
   page: Page,
@@ -98,7 +96,9 @@ async function arrange<T>(run: (sql: postgres.Sql) => Promise<T>): Promise<T> {
  * For a tracer whose screen shows what a City's other Traders did: in a
  * shared City the flow under test competes with every Listing and Want the
  * stack has accumulated, and how long it takes depends on how many earlier
- * runs there were (#72).
+ * runs there were (#72). That holds for any City-scoped screen, not only a
+ * Match: a card page in a City with a thousand leftover Listings loads a
+ * thumbnail for each, and outlasts the tracer's wait (#105).
  */
 export async function arrangeCity() {
   const name = `Tracer City ${randomUUID().slice(0, 8)}`;

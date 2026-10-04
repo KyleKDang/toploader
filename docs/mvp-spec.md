@@ -256,6 +256,9 @@ What makes a good test here:
   The reason is [#72](https://github.com/KyleKDang/toploader/issues/72)'s at seam 1: on a stack with thousands of leftover Listings and Wants for the seeded Card in Orange County and Test City, each Listing or Want a test wrote there made hundreds of Matches and notifications, and tests crossed Vitest's five-second timeout.
   An arranged City carries a Safe Spot of each kind, so a Trade can reach a Meetup in it.
   This makes the arranged Cities #92 accepts about one per test file per run rather than a few, which its naming already keeps out of the launch City's way.
+  Extended on [#105](https://github.com/KyleKDang/toploader/issues/105) to every seam-3 tracer that reads a City-scoped screen, not only one that makes a Match.
+  The card page loads a thumbnail for every Listing of the Card in the City, so in Orange County, holding over a thousand leftover Listings on a long-lived local stack, the card-search, collection, and listings tracers outlasted their waits whenever other tracers ran beside them.
+  A tracer stays in Orange County only where the launch City itself is the subject: onboarding picks it, and the Safe Spot directory reads its seeded Safe Spots.
 - A scheduled job that runs inside the database, a `pg_cron` job such as the Meetup reminder sweep, is invoked at seam 2 the way `pg_cron` invokes it: its registered command, run as the database's owner through the superuser connection.
   Added on [#23](https://github.com/KyleKDang/toploader/issues/23): no client role may call such a job, so there is no Trader's seam to reach it through, and running the command the job is registered with proves the schedule is wired as well as what it does.
   Its effects are still asserted at the seam, on the outbound pushes and the outbox.

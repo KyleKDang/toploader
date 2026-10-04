@@ -25,8 +25,12 @@ export default async function globalSetup() {
     const response = await fetch(`${API_URL}/functions/v1/${name}`, {
       method: 'OPTIONS',
     });
-    await response.body?.cancel();
-    if (response.status === 404) missing.push(name);
+    // The runtime's own answer for a function it does not know, told apart
+    // from a 404 a function's handler might give.
+    const body = await response.text();
+    if (response.status === 404 && body === 'Function not found') {
+      missing.push(name);
+    }
   }
   if (missing.length > 0) {
     throw new Error(

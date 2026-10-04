@@ -23,6 +23,9 @@ const CARD_IMAGE = readFileSync(
 /** Far larger than the 1600px the pipeline stores, as a phone's photo is. */
 const PHOTO = cameraPhoto(1800, 2400);
 
+/** What the card page says when no Listing of the Card is in the City. */
+const NOBODY_LISTING = 'Nobody in your area is listing this card yet.';
+
 /**
  * What the pipeline aims a full-size photo at. The bucket's own ceiling is
  * 512 KiB and seam 1 proves it; this is the browser path holding up its end,
@@ -49,9 +52,7 @@ test('a Trader photographs a Copy and the Listing goes active in their City', as
   const cardUrl = page.url();
 
   // The City is the tracer's own, so nobody is listing this yet.
-  await expect(
-    page.getByText('Nobody in your area is listing this card yet.'),
-  ).toBeVisible();
+  await expect(page.getByText(NOBODY_LISTING)).toBeVisible();
   await page.getByRole('button', { name: 'List this card' }).click();
 
   await expect(
@@ -174,7 +175,5 @@ test('a Trader withdraws a Listing and it leaves their area', async ({
 
   // Gone from their area, for the Trader who listed it as much as anyone.
   await page.goto(cardUrl);
-  await expect(
-    page.getByText('Nobody in your area is listing this card yet.'),
-  ).toBeVisible();
+  await expect(page.getByText(NOBODY_LISTING)).toBeVisible();
 });
