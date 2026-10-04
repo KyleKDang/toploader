@@ -68,3 +68,12 @@ Measured on a local stack whose outbox held five million rows, a call took 600 m
 A backlog of 600,000 silent rows took minutes to drain, where it now takes about 18 s.
 An array of ids is estimated as a handful of rows whatever `batch` is, so both updates look their rows up by primary key and a call's cost follows its batch, not the table.
 What a call takes, settles, claims and returns is unchanged, and so is the notifier: claim order, fifty batches a call, and a hundred calls a run.
+
+## Amendment, 2026-10-03 (ticket #87)
+
+Unblocking records the Matches that first held while the block stood, and alerts both Traders of each, not only the other side of the change.
+The 2026-09-27 rule drops the alert of the Trader who made the change because they are looking at what it made, and a Trader who unblocks has seen none of these Matches: `match_pairs` left out every pair between the two while the block stood, so neither Trader was ever told of them.
+A Match recorded before the block was already seen, so it comes back without a second alert.
+These rows are written by `unblock_trader` rather than a trigger on `blocks`, because a block row is also deleted when an account is, and that deletion must alert nobody.
+They are still written in the same transaction as the change they are about, which is what the outbox needs.
+The copy and links of a Match alert live in one function, `queue_match_alerts`, which both producers call.

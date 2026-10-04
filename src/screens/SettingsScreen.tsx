@@ -1,10 +1,18 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
-import { AppShell, Button, FormError, Sheet, TopBar } from '../components';
+import {
+  AppShell,
+  Button,
+  FormError,
+  ListRow,
+  Sheet,
+  TopBar,
+} from '../components';
 import {
   blockedTradersQuery,
   deleteAccount,
+  dropWhatABlockChanges,
   unblockTrader,
 } from '../lib/queries';
 import { useTabs } from '../lib/tabs';
@@ -40,12 +48,7 @@ export function SettingsScreen() {
   const unblock = useMutation({
     mutationFn: unblockTrader,
     onSuccess: async () => {
-      // Their Listings and the Matches with them come back to every other
-      // screen, so what those screens cached without them is dropped, for
-      // the reason a block drops it.
-      queryClient.removeQueries({ queryKey: ['listing'] });
-      queryClient.removeQueries({ queryKey: ['listings'] });
-      queryClient.removeQueries({ queryKey: ['matches'] });
+      dropWhatABlockChanges(queryClient);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['blocks'] }),
         queryClient.invalidateQueries({
@@ -80,23 +83,21 @@ export function SettingsScreen() {
         ) : (
           <ul>
             {blocked.map((trader) => (
-              <li
-                key={trader.id}
-                className="flex min-h-row items-center gap-3.5 border-b border-line px-4 py-2.5"
-              >
-                <span className="min-w-0 grow truncate font-bold text-ink">
-                  {trader.display_name}
-                </span>
-                <Button
-                  className="flex-none"
-                  aria-label={`Unblock ${trader.display_name}`}
-                  disabled={unblock.isPending}
-                  onClick={() => unblock.mutate(trader.id)}
-                >
-                  {unblock.isPending && unblock.variables === trader.id
-                    ? 'Unblocking…'
-                    : 'Unblock'}
-                </Button>
+              <li key={trader.id}>
+                <ListRow
+                  title={trader.display_name}
+                  trailing={
+                    <Button
+                      aria-label={`Unblock ${trader.display_name}`}
+                      disabled={unblock.isPending}
+                      onClick={() => unblock.mutate(trader.id)}
+                    >
+                      {unblock.isPending && unblock.variables === trader.id
+                        ? 'Unblocking…'
+                        : 'Unblock'}
+                    </Button>
+                  }
+                />
               </li>
             ))}
           </ul>

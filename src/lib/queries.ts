@@ -1,4 +1,8 @@
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  queryOptions,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type { Condition } from './conditions';
 import { readMatchesPage, type MatchesCursor } from './matches-page';
 import { PHOTO_MIME, type PreparedPhoto } from './photos';
@@ -518,6 +522,18 @@ export async function deleteAccount(): Promise<void> {
 export async function blockTrader(traderId: string): Promise<void> {
   const { error } = await supabase.rpc('block_trader', { trader_id: traderId });
   if (error) throw error;
+}
+
+/**
+ * Drops every cached read a block or an unblock changes: the Listings and
+ * the Matches that now leave, or come back to, the Trader's screens. Dropped
+ * rather than marked stale, since a loader reads through ensureQueryData,
+ * which hands back whatever is cached.
+ */
+export function dropWhatABlockChanges(queryClient: QueryClient) {
+  queryClient.removeQueries({ queryKey: ['listing'] });
+  queryClient.removeQueries({ queryKey: ['listings'] });
+  queryClient.removeQueries({ queryKey: ['matches'] });
 }
 
 /**

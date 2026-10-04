@@ -13,7 +13,7 @@ import {
 import { CONDITION_NAMES } from '../lib/conditions';
 import { formatPrice } from '../lib/format';
 import type { ListingDetail } from '../lib/queries';
-import { withdrawListing } from '../lib/queries';
+import { dropWhatABlockChanges, withdrawListing } from '../lib/queries';
 import { useTabs } from '../lib/tabs';
 import { BlockTrader } from './BlockTrader';
 
@@ -210,11 +210,7 @@ function Listing({
               name: listing.trader?.display_name ?? 'this trader',
             }}
             onBlocked={async () => {
-              // Everything that could still show their Listings or the
-              // Matches with them, dropped for the reason withdraw gives.
-              queryClient.removeQueries({ queryKey: ['listing'] });
-              queryClient.removeQueries({ queryKey: ['listings'] });
-              queryClient.removeQueries({ queryKey: ['matches'] });
+              dropWhatABlockChanges(queryClient);
               await navigate({ to: '/', replace: true });
             }}
           />
