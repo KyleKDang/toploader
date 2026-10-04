@@ -21,9 +21,9 @@ const options = {
 
 // The documents first: a government ID held past its time is the liability,
 // so a Listing pass that fails must not stand in front of them.
-const documents = await reapVerificationDocuments(options);
+const documentFiles = await reapVerificationDocuments(options);
 console.log(
-  `Deleted ${documents} verification documents no waiting request names.`,
+  `Deleted ${documentFiles} verification documents no waiting request names.`,
 );
 
 const report = await reapListingPhotos(options);

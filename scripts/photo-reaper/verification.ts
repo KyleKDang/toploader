@@ -1,9 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../../src/lib/database.types.ts';
-import { deleteFiles, MAX_PAGES, PAGE } from './reap.ts';
+import { reaperClient, sweepUnreferenced, type ReapOptions } from './sweep.ts';
 
 /*
- * The photo reaper's second pass: deletes the verification documents that
+ * The photo reaper's verification pass: deletes the verification documents that
  * no waiting request names (#88).
  *
  * A Trader's browser uploads the ID photo and the selfie and only then
@@ -18,8 +16,6 @@ import { deleteFiles, MAX_PAGES, PAGE } from './reap.ts';
  * Founder may not get to it for days.
  */
 
-const BUCKET = 'verification-documents';
-
 /**
  * How long an upload has to be named by a request before it counts as
  * abandoned. Submitting follows the uploads within seconds, so an hour is
@@ -29,39 +25,13 @@ const BUCKET = 'verification-documents';
  */
 const GRACE_HOURS = 1;
 
-export interface VerificationReapOptions {
-  supabaseUrl: string;
-  /** The server-side key: the reaper runs as service_role. */
-  supabaseSecretKey: string;
-}
-
 /** Deletes the abandoned documents, and returns how many files went. */
-export async function reapVerificationDocuments({
-  supabaseUrl,
-  supabaseSecretKey,
-}: VerificationReapOptions): Promise<number> {
-  const supabase = createClient<Database>(supabaseUrl, supabaseSecretKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+export async function reapVerificationDocuments(
+  options: ReapOptions,
+): Promise<number> {
+  return sweepUnreferenced(reaperClient(options), {
+    bucket: 'verification-documents',
+    rpc: 'unreferenced_verification_documents',
+    graceHours: GRACE_HOURS,
   });
-
-  let files = 0;
-  const olderThan = new Date(Date.now() - GRACE_HOURS * 60 * 60 * 1000);
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const { data: abandoned, error } = await supabase
-      .rpc('unreferenced_verification_documents', {
-        uploaded_before: olderThan.toISOString(),
-      })
-      .limit(PAGE);
-    if (error) throw error;
-    if (abandoned.length === 0) break;
-
-    await deleteFiles(
-      supabase,
-      BUCKET,
-      abandoned.map(({ path }) => path),
-    );
-    files += abandoned.length;
-  }
-
-  return files;
 }

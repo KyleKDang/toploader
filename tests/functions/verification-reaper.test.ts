@@ -12,7 +12,7 @@ import {
 } from '../db/seed.ts';
 
 /*
- * Seam 2: the photo reaper's second pass, which deletes the verification
+ * Seam 2: the photo reaper's verification pass, which deletes the verification
  * documents no waiting request names, run against the local stack.
  * Assertions are on what is left in the bucket, read as service_role through
  * the Storage API, since a file is only gone when Storage no longer serves
@@ -43,15 +43,17 @@ describe('Verification document reaper', () => {
     return error === null;
   }
 
-  async function age(documents: VerificationDocuments, days: number) {
+  async function age(documents: VerificationDocuments, hours: number) {
     for (const path of [documents.id_document_path, documents.selfie_path]) {
-      await ageUpload(path, days, VERIFICATION_DOCUMENTS_BUCKET);
+      await ageUpload(path, hours, VERIFICATION_DOCUMENTS_BUCKET);
     }
   }
 
+  // The grace period is an hour, and the Privacy Policy's promise rests on
+  // it, so both sides of it are pinned close.
   it('deletes documents that were uploaded and never submitted', async () => {
     const abandoned = await uploadVerificationDocuments(trader);
-    await age(abandoned, 1);
+    await age(abandoned, 2);
 
     await reap();
 
@@ -59,8 +61,9 @@ describe('Verification document reaper', () => {
     expect(await isStored(abandoned.selfie_path)).toBe(false);
   });
 
-  it('leaves a fresh upload alone: its request is still being sent', async () => {
+  it('leaves an upload inside the hour alone: its request may still be coming', async () => {
     const sending = await uploadVerificationDocuments(trader);
+    await age(sending, 0.5);
 
     await reap();
 
@@ -70,7 +73,7 @@ describe('Verification document reaper', () => {
 
   it('never deletes the documents of a waiting request, however old', async () => {
     const waiting = await submitVerification(trader);
-    await age(waiting, 30);
+    await age(waiting, 30 * 24);
 
     await reap();
 
@@ -80,7 +83,7 @@ describe('Verification document reaper', () => {
 
   it("deletes what a deleted account's waiting request left behind", async () => {
     const waiting = await submitVerification(trader);
-    await age(waiting, 1);
+    await age(waiting, 2);
     // The dashboard's path: the account and its request go, and nothing
     // deletes the files.
     const { error } = await service.auth.admin.deleteUser(trader.id);

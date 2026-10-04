@@ -102,7 +102,7 @@ describe('Listing photo reaper', () => {
       .upload(abandoned, TINY_WEBP, { contentType: 'image/webp' });
     if (error) throw error;
     // Left sitting past the grace period, no Listing ever coming for it.
-    await ageUpload(abandoned, 2);
+    await ageUpload(abandoned, 48);
 
     await reap();
 
