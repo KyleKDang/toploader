@@ -38,7 +38,7 @@ const DELETE_BATCH = 100;
  * call itself done. Under this it just keeps asking until there is nothing
  * left.
  */
-const PAGE = 500;
+export const PAGE = 500;
 
 /**
  * How many pages of each list one run will take. It is a stop, not a budget:
@@ -47,7 +47,7 @@ const PAGE = 500;
  * but keeps - from spinning until the job times out. Whatever is left is
  * still there tomorrow.
  */
-const MAX_PAGES = 100;
+export const MAX_PAGES = 100;
 
 export interface ReapOptions {
   supabaseUrl: string;
@@ -91,6 +91,7 @@ export async function reapListingPhotos({
     // Storage accepts; the other order would leave files nothing remembers.
     await deleteFiles(
       supabase,
+      BUCKET,
       withdrawn.flatMap(({ path, thumbnail_path }) => [path, thumbnail_path]),
     );
 
@@ -124,6 +125,7 @@ export async function reapListingPhotos({
 
     await deleteFiles(
       supabase,
+      BUCKET,
       orphans.map(({ path }) => path),
     );
     report.files += orphans.length;
@@ -133,12 +135,16 @@ export async function reapListingPhotos({
   return report;
 }
 
-type Supabase = ReturnType<typeof createClient<Database>>;
+export type Supabase = ReturnType<typeof createClient<Database>>;
 
-async function deleteFiles(supabase: Supabase, paths: string[]) {
+export async function deleteFiles(
+  supabase: Supabase,
+  bucket: string,
+  paths: string[],
+) {
   for (let from = 0; from < paths.length; from += DELETE_BATCH) {
     const { error } = await supabase.storage
-      .from(BUCKET)
+      .from(bucket)
       .remove(paths.slice(from, from + DELETE_BATCH));
     if (error) throw error;
   }

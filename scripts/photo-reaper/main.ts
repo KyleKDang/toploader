@@ -1,8 +1,9 @@
 import { reapListingPhotos } from './reap.ts';
+import { reapVerificationDocuments } from './verification.ts';
 
 /*
- * The daily Listing photo reaper, as .github/workflows/photo-reaper.yml runs
- * it:
+ * The daily photo reaper, verification documents and then Listing photos,
+ * as .github/workflows/photo-reaper.yml runs it:
  *
  *   SUPABASE_URL=... SUPABASE_SECRET_KEY=... node scripts/photo-reaper/main.ts
  */
@@ -13,10 +14,19 @@ function required(name: string): string {
   return value;
 }
 
-const report = await reapListingPhotos({
+const options = {
   supabaseUrl: required('SUPABASE_URL'),
   supabaseSecretKey: required('SUPABASE_SECRET_KEY'),
-});
+};
+
+// The documents first: a government ID held past its time is the liability,
+// so a Listing pass that fails must not stand in front of them.
+const documents = await reapVerificationDocuments(options);
+console.log(
+  `Deleted ${documents} verification documents no waiting request names.`,
+);
+
+const report = await reapListingPhotos(options);
 
 console.log(
   `Reclaimed ${report.files} files: ${report.listings} withdrawn Listings, ` +

@@ -2,6 +2,9 @@
 # Listings and abandoned uploads are holding, which is what keeps the free
 # tier's 1 GB lasting (ADR-0006). Photos of a Listing that went through a
 # Trade are never touched; they are the Trade Record's evidence.
+# It first deletes the verification documents no waiting request names:
+# uploads abandoned for more than an hour, and those of an account deleted
+# while its request waited.
 # Every run checks in with a Sentry cron monitor, so a failed or missing run
 # is an alert rather than silence.
 name: Listing photo reaper

@@ -1245,6 +1245,12 @@ export type Database = {
           path: string
         }[]
       }
+      unreferenced_verification_documents: {
+        Args: { uploaded_before: string }
+        Returns: {
+          path: string
+        }[]
+      }
       verification_document_exists: { Args: { path: string }; Returns: boolean }
       verification_request_for_review: {
         Args: { request_id: string }
