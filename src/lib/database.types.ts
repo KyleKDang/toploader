@@ -1114,6 +1114,14 @@ export type Database = {
         Args: { meetup_at: string; safe_spot_id: string; trade_id: string }
         Returns: undefined
       }
+      queue_match_alerts: {
+        Args: {
+          changed_by: string
+          listing_ids: string[]
+          wanter_ids: string[]
+        }
+        Returns: undefined
+      }
       queue_meetup_notification: {
         Args: {
           body_format: string
@@ -1203,6 +1211,10 @@ export type Database = {
       submit_verification: {
         Args: { id_document_path: string; selfie_path: string }
         Returns: string
+      }
+      take_matching_turn: {
+        Args: { card_id?: number; city_ids: string[]; trader_ids: string[] }
+        Returns: undefined
       }
       trade_for_participant: {
         Args: { caller: string; trade_id: string }

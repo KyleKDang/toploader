@@ -241,6 +241,9 @@ What makes a good test here:
   The alternative was granting a client role or a scheduled job a power it does not otherwise have, purely so a test could use it, which would have put the test's convenience into the production surface.
   Extended on [#26](https://github.com/KyleKDang/toploader/issues/26) to a Verified Trader, whom a client path can now make: that path takes a Founder's review, and a Founder is exactly such a state, since only a migration makes one.
   A test about what a Verified Trader may do sets `verified_at` directly, and the path that sets it for real is walked where it is the subject.
+  Extended on [#107](https://github.com/KyleKDang/toploader/issues/107) to two writes whose transactions overlap (`overlapWrites` in `tests/db/arrange.ts`).
+  PostgREST commits every request in a transaction of its own, so no client can hold one open, and two requests sent together overlap only by timing luck.
+  The superuser connection holds the two transactions open instead, each taking the `authenticated` role and the Trader's claims as PostgREST does, and calls the same RPCs the client calls; the assertions afterwards are still made as signed-in Traders.
 - A tracer that makes a Match signs its Traders into a City of its own, arranged through the superuser connection (`arrangeCity` in `tests/browser/session.ts`).
   Added on [#72](https://github.com/KyleKDang/toploader/issues/72): every tracer and every earlier run lists and wants the same seeded Card, so in a shared City its Want or Listing pairs with everything the stack has accumulated, and how long the flow takes grows with how many runs came before.
   A City is reference data that no client path writes, which is what makes making one an arrange step.
