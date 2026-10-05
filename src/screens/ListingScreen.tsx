@@ -16,6 +16,7 @@ import type { ListingDetail } from '../lib/queries';
 import { dropWhatABlockChanges, withdrawListing } from '../lib/queries';
 import { useTabs } from '../lib/tabs';
 import { BlockTrader } from './BlockTrader';
+import { Report } from './Report';
 
 /*
  * One Listing: the photographs of the actual Copy, what it is, and what the
@@ -203,7 +204,14 @@ function Listing({
       ) : null}
 
       {!isOwn ? (
-        <div className="px-4 pb-6">
+        <div className="flex flex-wrap items-center gap-3 px-4 pb-6">
+          <Report
+            subject={{
+              kind: 'listing',
+              id: listing.id,
+              traderName: listing.trader?.display_name ?? 'this trader',
+            }}
+          />
           <BlockTrader
             trader={{
               id: listing.trader_id,

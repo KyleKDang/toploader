@@ -109,6 +109,11 @@ The mutual thumbs up or down two Traders may leave for each other after a comple
 No free-text reviews exist in v1.
 _Avoid_: review, star rating
 
+**Report**:
+A Trader telling the Founders about another Trader, or one of their Listings, in their own words.
+Only a Founder reads it, so the reported Trader never learns who reported them.
+_Avoid_: flag, complaint
+
 **Block**:
 One Trader cutting off another, which works in both directions: neither sees the other's Listings or Matches, and no proposal, Meetup step, or message goes between them, while any Trade already open between them can still end.
 Only the Trader who made a block can take it back, by unblocking.

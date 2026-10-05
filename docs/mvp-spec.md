@@ -158,6 +158,11 @@ Every way a Trade ends stays open, so a Trade already under way can still be dec
 Ending those Trades automatically instead would put a cancel on someone's Reputation for keeping themselves safe, or let a block dodge a no-show.
 Settled on [#87](https://github.com/KyleKDang/toploader/issues/87): a Trader takes back a block from Settings, which lists the Traders they have blocked, and only their own, so a block the other Trader holds still keeps the two apart.
 A Match that first held while the block stood alerts both Traders as new once it lifts, since neither has seen it; one that held before the block comes back without a second alert.
+Also settled on [#28](https://github.com/KyleKDang/toploader/issues/28): a report names a Trader and, when it was made from one of their Listings, that Listing, with a reason in the reporter's own words of 1 to 1,000 characters.
+Only a Founder reads a report, its reporter included, so a reported Trader never learns who reported them.
+A Founder also reads every reported Listing, whatever has happened to it since, so one withdrawn the moment it was reported is still there to judge; not every Listing, since City browse is scoped by the policies rather than by its query.
+A Trader can report someone they are in a block with, or whose account is deleted, and a report outlives either account, since it is the Founders' record rather than the reporter's own data.
+Reports land in the admin view at `/admin/reports` and notify nobody.
 Also settled on [#28](https://github.com/KyleKDang/toploader/issues/28): deleting an account deletes what was the Trader's alone and keeps every Trade they were party to, for the Trader on the other side.
 The Trader's row in `traders` outlives the account, marked with `deleted_at` and taken out of its City, because Trades name it; only the Traders of those Trades can still read it.
 Its display name is kept wherever a Trade names the Trader, since a Trade has to go on saying who it was with, and a scammer must not be able to wipe their name from a victim's record by deleting the account; that holds for a Trade that never completed too, which is what a Trader who took the cards and never tapped Complete leaves behind.
@@ -171,7 +176,7 @@ The erasure runs in the database as a trigger on the account's own deletion, so 
 
 RLS posture: every table deny-by-default.
 Reads are policy-scoped (own rows for private tables; city-scoped for listings/matches; participants-only for trades/messages; all rows for a Founder, via additive policies calling `is_founder()`).
-All state changes go through named RPCs - `set_trader_profile`, `create_trade`, `counter_trade`, `accept_trade`, `decline_trade`, `propose_meetup`, `confirm_meetup`, `complete_trade`, `cancel_trade`, `mark_no_show`, `leave_feedback`, `submit_verification`, `approve_verification`, `reject_verification` - or edge functions when side effects leave the database.
+All state changes go through named RPCs - `set_trader_profile`, `create_trade`, `counter_trade`, `accept_trade`, `decline_trade`, `propose_meetup`, `confirm_meetup`, `complete_trade`, `cancel_trade`, `mark_no_show`, `leave_feedback`, `report_trader`, `report_listing`, `submit_verification`, `approve_verification`, `reject_verification` - or edge functions when side effects leave the database.
 Ban and account deletion are edge functions rather than RPCs, because both must write `auth.users` through the Auth admin API, which a function running as the calling Trader cannot reach ([ADR-0007](adr/0007-admin-authorization.md)).
 Every policy and RPC ships with a test proving what a foreign user cannot do.
 

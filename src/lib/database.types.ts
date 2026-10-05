@@ -552,6 +552,62 @@ export type Database = {
           },
         ]
       }
+      reports: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string | null
+          reason: string
+          reporter_id: string
+          trader_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason: string
+          reporter_id: string
+          trader_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason?: string
+          reporter_id?: string
+          trader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "match_pairs"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_trader_id_fkey"
+            columns: ["trader_id"]
+            isOneToOne: false
+            referencedRelation: "traders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       safe_spots: {
         Row: {
           address: string
@@ -1075,6 +1131,10 @@ export type Database = {
         Returns: string
       }
       decline_trade: { Args: { trade_id: string }; Returns: undefined }
+      file_report: {
+        Args: { listing_id: string; reason: string; reported_id: string }
+        Returns: undefined
+      }
       has_tapped_complete: {
         Args: {
           trade: Database["public"]["Tables"]["trades"]["Row"]
@@ -1152,6 +1212,14 @@ export type Database = {
         Returns: undefined
       }
       remove_want: { Args: { want_id: string }; Returns: undefined }
+      report_listing: {
+        Args: { listing_id: string; reason: string }
+        Returns: undefined
+      }
+      report_trader: {
+        Args: { reason: string; trader_id: string }
+        Returns: undefined
+      }
       require_deletable_account: {
         Args: { trader_id: string }
         Returns: undefined
