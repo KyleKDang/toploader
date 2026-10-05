@@ -18,6 +18,7 @@ export default tseslint.config([
       // the rest.
       'supabase/functions/notify/index.ts',
       'supabase/functions/delete_account/index.ts',
+      'supabase/functions/ban_trader/index.ts',
     ],
   },
 

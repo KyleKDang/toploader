@@ -17,6 +17,8 @@ const MESSAGES: Record<string, string> = {
   over_request_rate_limit:
     'Too many attempts. Wait a few minutes, then try again.',
   email_address_invalid: 'That email address does not look right.',
+  // A Founder banned the account (supabase/functions/ban_trader).
+  user_banned: 'This account has been banned.',
   validation_failed: 'That email address does not look right.',
   // Postgres error codes raised by set_trader_profile.
   '23502': 'Add a display name and choose your area.',
@@ -59,6 +61,9 @@ const REFUSALS: Record<string, string> = {
   // moving forward and its chat, and leaves every way of ending it open.
   "one of this Trade's Traders has blocked the other":
     'One of you has blocked the other, so this trade can only be ended now.',
+  // The request check (supabase/migrations/20261006120000_ban.sql), for the
+  // hour a banned Trader's session outlives the ban.
+  'this account has been banned': 'This account has been banned.',
   // Verification (supabase/migrations/20260928140000_verification.sql).
   'a verification request is already waiting on review':
     'Your ID and selfie are already in review.',

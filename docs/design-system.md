@@ -54,6 +54,8 @@ Nothing in the codebase refers to "green" or "grey"; it refers to `accent` or `m
 | `--color-alert` | `#D4552B` | `#FF8A5E` | Unread and attention markers only, never a decorative color |
 | `--color-ok-ink` | `#0B5D33` | `#7FE0A8` | Verified badge text |
 | `--color-ok-bg` | `#DDF2E5` | `#123A25` | Verified badge fill |
+| `--color-alert-ink` | `#9C3A17` | `#FFB59A` | Banned badge text |
+| `--color-alert-bg` | `#FBE5DC` | `#3D1A0E` | Banned badge fill |
 | `--color-scrim` | `rgb(0 0 0 / 0.40)` | `rgb(0 0 0 / 0.60)` | Behind a bottom sheet, and nothing else |
 
 `--color-scrim` was added in [#17](https://github.com/KyleKDang/toploader/issues/17), the ticket that first had to build the sheet primitive.
@@ -70,6 +72,10 @@ It clears 3:1 on white, the floor for a non-text indicator.
 
 `--color-ok-*` sits in the same hue family as the accent on purpose: "verified" and "go" being the same color is a help, not a collision.
 The Verified badge is always the shield icon plus the word, never the color alone.
+
+`--color-alert-*` was added in [#28](https://github.com/KyleKDang/toploader/issues/28) for the Banned badge, the public mark on a banned Trader's Reputation.
+It is the alert hue, darkened for text and paled for the fill as the ok pair is, because a ban is an attention marker about a Trader rather than a new kind of message: `--color-alert` itself clears 3:1 but not the 4.5:1 that 13px text needs.
+The ink clears 5.7:1 on its fill in light mode and 9.1:1 in dark.
 
 There is no success, warning, or info palette beyond this.
 If a screen needs one, that is a decision for the ticket that needs it, and it goes in this file before it goes in the code.
@@ -221,6 +227,7 @@ Rows never wrap; they truncate with an ellipsis.
 The one exception is line 3 in a short list where that line is instructions a Trader needs in full, such as a Safe Spot's notes: there it wraps, since a City has a handful of Safe Spots and cutting the directions short defeats the row.
 An unread row carries a 7px `--color-accent` dot before its title.
 A report in the Founders' admin view is not a row: its reason is shown whole, since it is what a Founder acts on, and a reported Listing hangs under it as a row of its own ([#28](https://github.com/KyleKDang/toploader/issues/28)).
+Under the reason sits a "Ban {name}" button, confirmed in a sheet; once the Trader is banned, every report about them shows the Banned badge in its place.
 
 **Card tile.**
 A 5:7 rectangle at `--size-thumb` wide, `--radius-sm`, with an inset hairline and an inset white highlight so a pale card still reads as an object against a white background.
@@ -231,6 +238,7 @@ Sizes are `.75x` in the search picker, `1x` in lists, and `2x` on the Card page.
 `--radius-full`, `--text-xs` bold, 3px by 9px padding.
 Verified is `--color-ok-ink` on `--color-ok-bg` with a shield icon and the word "Verified".
 Unverified is `--color-muted` on `--color-surface-2` and reads "Not verified".
+Banned is `--color-alert-ink` on `--color-alert-bg` with a barred-circle icon and the word "Banned", and it takes the place of the verification state, whatever that was.
 The same neutral badge labels a category on a row, such as a Safe Spot's kind.
 A badge never appears without its word.
 

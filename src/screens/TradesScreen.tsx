@@ -82,6 +82,7 @@ function TradeRow({
       relationTrailing={
         <ReputationPill
           verified={other.verified_at !== null}
+          banned={other.banned_at !== null}
           trades={other.completed_trade_count}
         />
       }

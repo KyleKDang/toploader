@@ -164,6 +164,12 @@ A Founder also reads every reported Listing, whatever has happened to it since, 
 The cost is that a reported Listing still live shows in a Founder's own browse when it is in another City or its Trader is in a block with them, which two Founders and one launch City make acceptable.
 A Trader can report someone they are in a block with, or whose account is deleted, and a report outlives either account, since it is the Founders' record rather than the reporter's own data.
 Reports land in the admin view at `/admin/reports` and notify nobody; a Trader whose account is deleted shows there as a deleted trader, since their profile is no longer readable but the report is.
+Also settled on [#28](https://github.com/KyleKDang/toploader/issues/28): a Founder bans a reported Trader from that screen, for good.
+A banned Trader cannot sign in or refresh a session, and the session they hold is refused on every request for the hour its token still has.
+They leave their City, so their Listings and Wants leave everyone's browse and Matches; their Listings are withdrawn; and every Trade still open is ended as a deletion ends it, a proposal waiting on them declined and anything else cancelled in their name, so nobody is left waiting on a Trader who can no longer answer.
+Their account and data otherwise stay, so the email address cannot start over and the Founders can still read every Trade and report it touched.
+Their Reputation pill reads "Banned" to every Trader, in place of the verification state, wherever their name appears, including on the Trade Records of Trades they completed.
+A Founder cannot be banned, and the app has no unban ([ADR-0007](adr/0007-admin-authorization.md), amendment for the ban).
 Also settled on [#28](https://github.com/KyleKDang/toploader/issues/28): deleting an account deletes what was the Trader's alone and keeps every Trade they were party to, for the Trader on the other side.
 The Trader's row in `traders` outlives the account, marked with `deleted_at` and taken out of its City, because Trades name it; only the Traders of those Trades can still read it.
 Its display name is kept wherever a Trade names the Trader, since a Trade has to go on saying who it was with, and a scammer must not be able to wipe their name from a victim's record by deleting the account; that holds for a Trade that never completed too, which is what a Trader who took the cards and never tapped Complete leaves behind.
