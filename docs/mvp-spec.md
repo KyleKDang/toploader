@@ -272,7 +272,9 @@ What makes a good test here:
   The runtime's two failures, a 404 for a function added since it started and a 503 `BOOT_ERROR` once the directory it started from is gone, come only from a long-lived local stack, so the real stack cannot serve them on demand.
 - A run of the seam-1 and seam-2 suite takes the shared local stack's turn before its first test and holds it to its last (`takeStackTurn` in `tests/stack-turn.ts`, a Postgres advisory lock on a connection of its own), so a second session's `npm test` waits for the first rather than overlapping it.
   Added on [#114](https://github.com/KyleKDang/toploader/issues/114): every session on the machine shares one local stack, and two runs at once failed 12 to 21 tests each, mostly at Vitest's five-second timeout in whichever files overlapped, where either run alone passed.
-  Leftover rows were not the cause: a lone run passed in about a minute with the outbox at 2.5 million rows and `match_events` at 3.3 million.
+  Leftover rows were not what made runs time out together: a lone run passed in about a minute with the outbox at 2.5 million rows and `match_events` at 3.3 million.
+  Two reads do grow with them, slowly: a new Listing or Want reads every City's Wants or Listings for its Card before keeping its own City's (`match_pairs`, about 25 ms at 26,000 leftover Listings of the seeded Card), and the photo reaper's orphan sweep reads every photo the bucket holds (`unreferenced_listing_photos`, about 340 ms at 44,000 objects).
+  The second outlasted five seconds once under a full run, so the reaper's suite has thirty, which holds until the bucket is many times larger.
   A run that waits says whose run it is waiting for, and one that waits ten minutes fails with that name rather than starting.
   The turn is tested against the real stack under a key of its own, since the run testing it already holds the suite's.
   CI starts one run on a fresh stack, so there the turn is always free.

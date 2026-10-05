@@ -13,7 +13,8 @@ import postgres from 'postgres';
  *
  * The turn is a Postgres advisory lock held by one connection of its own. A
  * run that ends any way at all, a crash included, closes that connection,
- * and Postgres hands the turn on.
+ * and Postgres hands the turn on. A watch session (`npx vitest` without
+ * `run`) holds it until it exits.
  */
 
 export type StackTurn = { release: () => Promise<void> };
@@ -24,11 +25,11 @@ export async function takeStackTurn(
   dbUrl: string,
   {
     // Which turn: the suite's, unless a test of this module names its own.
-    key = 'npm test',
+    key = 'test run',
     // Who is taking it, shown to a run that has to wait for it. Postgres
     // keeps 63 bytes of a connection's name, so the directory's own name
     // rather than its path: a worktree's names its ticket.
-    holder = `npm test in ${basename(process.cwd())} (pid ${process.pid})`,
+    holder = `test run in ${basename(process.cwd())} (pid ${process.pid})`,
     // A run takes about a minute alone, so ten is a queue of runs or one
     // that is stuck.
     waitMs = 10 * MINUTE,

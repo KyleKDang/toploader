@@ -7,7 +7,6 @@ import {
   type ECDH,
 } from 'node:crypto';
 import { decrypt } from 'http_ece';
-import postgres, { type Sql } from 'postgres';
 import {
   afterAll,
   beforeAll,
@@ -79,8 +78,6 @@ const TRADE_CITY_TIME_ZONE = 'America/New_York';
 // a moment, so a notifier that never reaches the rows fails here rather
 // than at the test's timeout.
 const MAX_RUNS = 20;
-// The advisory lock that keeps two sessions' runs of this file apart.
-const SUITE_LOCK = 'tests/functions/notify.test.ts';
 
 interface PushPayload {
   title: string;
@@ -107,25 +104,13 @@ describe('The notifier', { timeout: 30_000 }, () => {
   let vapid: VapidKeys;
   let examplemon: number;
   let holofoil: number;
-  let suiteLock: Sql;
   let tradeCity: string;
 
-  // Another session's run of this file shares the outbox, and its notifier
-  // claims whatever rows are oldest: it would send this file's rows to its
-  // own fake Resend, and push them to this file's fake push service under
-  // its own VAPID key. So the file holds an advisory lock for its whole run,
-  // and two sessions' runs of it take turns rather than overlapping. The
-  // wait is for a whole run of the other session's file.
+  // Another session's run of this file would share the outbox, and its
+  // notifier claims whatever rows are oldest, sending this file's rows to
+  // its own fakes. Two sessions' runs never overlap, though: each takes the
+  // stack's turn for its whole run (tests/stack-turn.ts).
   beforeAll(async () => {
-    // The lock belongs to this one connection and is released by closing it,
-    // so it must not be recycled mid-run, as postgres.js otherwise does after
-    // half an hour or so.
-    suiteLock = postgres(inject('supabaseDbUrl'), {
-      max: 1,
-      max_lifetime: null,
-    });
-    await suiteLock`select pg_advisory_lock(hashtext(${SUITE_LOCK}))`;
-
     tradeCity = await arrangeCity(TRADE_CITY_TIME_ZONE);
     [pushService, resend] = await Promise.all([
       startCaptureServer({ tls: true }),
@@ -139,25 +124,18 @@ describe('The notifier', { timeout: 30_000 }, () => {
     ({ card: examplemon, holofoil } = await seededExamplemon(
       (await seedTrader('Catalog reader')).client,
     ));
-  }, 15 * MINUTE);
+  }, 30 * SECOND);
 
   afterAll(async () => {
-    try {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      // The stack outlives this run, and so would these subscriptions: the
-      // next run's Listings would queue pushes to a server that is gone.
-      const { error } = await service
-        .from('push_subscriptions')
-        .delete()
-        .like('endpoint', `${pushService.baseUrl}/%`);
-      if (error) throw error;
-      await Promise.all([pushService.close(), resend.close()]);
-    } finally {
-      // Closing at once, rather than after pending queries, also abandons a
-      // lock request still waiting when the wait above timed out, so a run
-      // that has already failed does not go on to hold the lock.
-      await suiteLock.end({ timeout: 0 });
-    }
+    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    // The stack outlives this run, and so would these subscriptions: the
+    // next run's Listings would queue pushes to a server that is gone.
+    const { error } = await service
+      .from('push_subscriptions')
+      .delete()
+      .like('endpoint', `${pushService.baseUrl}/%`);
+    if (error) throw error;
+    await Promise.all([pushService.close(), resend.close()]);
   });
 
   beforeEach(() => {
