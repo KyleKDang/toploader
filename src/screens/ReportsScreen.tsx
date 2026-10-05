@@ -104,7 +104,9 @@ function ReportItem({
       <p className="px-4 pt-1 text-base leading-prose whitespace-pre-line text-ink">
         {report.reason}
       </p>
-      {trader ? (
+      {/* A Founder who traded with a deleted Trader still reads their row,
+          name and all, but there is no account left to ban. */}
+      {trader && trader.deleted_at === null ? (
         <div className="flex px-4 pt-2">
           {trader.banned_at !== null ? (
             <Badge tone="banned" icon={<BanIcon />}>

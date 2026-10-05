@@ -1,4 +1,5 @@
 import { describe, expect, inject, it } from 'vitest';
+import { FOR_GOOD } from '../../supabase/functions/_shared/ban-trader.ts';
 import { deleteAccount } from '../../supabase/functions/_shared/delete-account.ts';
 import { makeFounder } from '../db/arrange.ts';
 import {
@@ -133,7 +134,7 @@ describe('The delete_account function', { timeout: 60_000 }, () => {
     // dashboard.
     const { data } = await actor.client.auth.getSession();
     const banned = await serviceClient().auth.admin.updateUserById(actor.id, {
-      ban_duration: '876000h',
+      ban_duration: FOR_GOOD,
     });
     if (banned.error) throw banned.error;
 
