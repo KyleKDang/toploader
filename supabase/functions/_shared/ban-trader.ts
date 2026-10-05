@@ -22,7 +22,7 @@ import { createClient } from '@supabase/supabase-js';
  * hundred years stands in for it; the mark in the database does not expire
  * either way.
  */
-const FOR_GOOD = '876000h';
+export const FOR_GOOD = '876000h';
 
 export interface BanTraderOptions {
   supabaseUrl: string;
@@ -73,7 +73,7 @@ export async function banTrader({
   // refused before the Trader named is looked at, so the answer tells a
   // Trader nothing about who exists.
   const allowed = await supabase.rpc('require_ban_allowed', {
-    founder_id: data.user.id,
+    caller_id: data.user.id,
     trader_id: traderId,
   });
   if (allowed.error) {

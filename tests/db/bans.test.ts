@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { arrange, makeFounder, verifyTrader } from './arrange.ts';
+import { FOR_GOOD } from '../../supabase/functions/_shared/ban-trader.ts';
+import { makeFounder, verifyTrader } from './arrange.ts';
 import {
   addWant,
   anonClient,
@@ -27,9 +28,6 @@ import {
  */
 
 const HOUR = 60 * 60 * 1000;
-
-/** The ban the edge function gives: a hundred years, which is for good. */
-const FOR_GOOD = '876000h';
 
 /** Bans a Trader's account, as the Auth admin API does for any caller. */
 async function ban(trader: Pick<SeededTrader, 'id'>, duration = FOR_GOOD) {
@@ -260,6 +258,27 @@ describe('Banning a Trader', { timeout: 60_000 }, () => {
       expect(error?.code).toBe('user_banned');
     });
 
+    it('refuses them a new session from a sign-in code, as the app signs in', async () => {
+      const { actor } = await traders();
+      await ban(actor);
+      // The code the sign-in email would carry, read from Auth rather than
+      // from the inbox.
+      const { data, error: linkError } =
+        await serviceClient().auth.admin.generateLink({
+          type: 'magiclink',
+          email: actor.email,
+        });
+      if (linkError) throw linkError;
+
+      const { error } = await anonClient().auth.verifyOtp({
+        email: actor.email,
+        token: data.properties.email_otp,
+        type: 'email',
+      });
+
+      expect(error?.code).toBe('user_banned');
+    });
+
     it('leaves every other Trader’s session alone', async () => {
       const { actor, counterparty, foreign } = await traders();
 
@@ -387,7 +406,7 @@ describe('Banning a Trader', { timeout: 60_000 }, () => {
       await makeFounder(actor.id);
 
       const allowed = await actor.client.rpc('require_ban_allowed', {
-        founder_id: actor.id,
+        caller_id: actor.id,
         trader_id: foreign.id,
       });
       expect(allowed.error?.code).toBe('42501');
@@ -397,6 +416,22 @@ describe('Banning a Trader', { timeout: 60_000 }, () => {
       expect(bannable.error?.code).toBe('42501');
     });
 
+    it('lets no Trader take another off the market, which a ban and a deletion share', async () => {
+      const { actor, counterparty } = await traders();
+      await makeFounder(actor.id);
+      const { tradeId, offered } = await proposedTrade(counterparty, actor);
+
+      const { error } = await actor.client.rpc('take_off_the_market', {
+        trader_id: counterparty.id,
+      });
+
+      expect(error?.code).toBe('42501');
+      expect(await readTrade(counterparty.client, tradeId)).toMatchObject({
+        status: 'proposed',
+      });
+      expect(await listingStatus(actor.client, offered)).toBe('active');
+    });
+
     it('refuses a ban asked for by a Trader who is not a Founder, or of one who cannot be banned', async () => {
       const { actor, foreign } = await traders();
       const founder = await seedTrader('Founder');
@@ -404,7 +439,7 @@ describe('Banning a Trader', { timeout: 60_000 }, () => {
       await Promise.all([makeFounder(founder.id), makeFounder(other.id)]);
       const asked = (founderId: string, traderId: string) =>
         serviceClient().rpc('require_ban_allowed', {
-          founder_id: founderId,
+          caller_id: founderId,
           trader_id: traderId,
         });
 
@@ -412,10 +447,7 @@ describe('Banning a Trader', { timeout: 60_000 }, () => {
       expect((await asked(actor.id, foreign.id)).error?.code).toBe('42501');
       expect((await asked(founder.id, other.id)).error?.code).toBe('22023');
       expect((await asked(founder.id, randomUUID())).error?.code).toBe('22023');
-      await arrange(
-        (sql) =>
-          sql`update public.traders set deleted_at = now() where id = ${foreign.id}`,
-      );
+      await serviceClient().auth.admin.deleteUser(foreign.id);
       expect((await asked(founder.id, foreign.id)).error?.code).toBe('22023');
     });
   });

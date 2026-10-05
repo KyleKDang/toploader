@@ -1131,7 +1131,6 @@ export type Database = {
         Returns: string
       }
       decline_trade: { Args: { trade_id: string }; Returns: undefined }
-      end_open_trades_of: { Args: { trader_id: string }; Returns: undefined }
       file_report: {
         Args: { listing_id: string; reason: string; reported_id: string }
         Returns: undefined
@@ -1222,7 +1221,7 @@ export type Database = {
         Returns: undefined
       }
       require_ban_allowed: {
-        Args: { founder_id: string; trader_id: string }
+        Args: { caller_id: string; trader_id: string }
         Returns: undefined
       }
       require_bannable_trader: {
@@ -1293,6 +1292,7 @@ export type Database = {
         Args: { card_id?: number; city_ids: string[]; trader_ids: string[] }
         Returns: undefined
       }
+      take_off_the_market: { Args: { trader_id: string }; Returns: undefined }
       trade_for_participant: {
         Args: { caller: string; trade_id: string }
         Returns: {

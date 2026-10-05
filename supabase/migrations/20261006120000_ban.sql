@@ -17,13 +17,25 @@
 -- as a Trader can reach. The Auth ban is what stops the Trader signing in
 -- again or refreshing a session; everything else follows from the trigger.
 
--- How a departing Trader's open Trades end, shared by a deletion and a ban.
--- It is the deletion's step 2, moved here unchanged so the two cannot drift
--- (20260929120000_account_deletion.sql): a proposal waiting on the Trader
--- is declined, as decline_trade ends it, and anything else is cancelled in
--- their name, as cancel_trade ends it, which hands the other Trader's
--- Listings back. Not callable by a client.
-create function public.end_open_trades_of(trader_id uuid)
+-- Takes a departing Trader off the market, shared by a deletion and a ban,
+-- which both do exactly this first. It is the deletion's first three steps
+-- (20260929120000_account_deletion.sql), moved here so the two cannot
+-- drift:
+--
+--   1. The Trader leaves their City. City browse and Matching are both
+--      scoped by City, so their Listings and Wants leave everyone's screens
+--      at once; and this is first because the next step hands Listings
+--      back, and with no City the Trader makes no Match on the way out and
+--      nobody is alerted to one.
+--   2. Every Trade still open ends: a proposal waiting on the Trader is
+--      declined, as decline_trade ends it, and anything else is cancelled
+--      in their name, as cancel_trade ends it, which hands the other
+--      Trader's Listings back.
+--   3. Their active Listings are withdrawn. A traded one is left as it is,
+--      the Trade Record's evidence.
+--
+-- Not callable by a client.
+create function public.take_off_the_market(trader_id uuid)
   returns void
   language plpgsql
   security definer
@@ -32,25 +44,29 @@ as $$
 declare
   trade public.trades;
 begin
+  update public.traders
+    set city_id = null
+    where traders.id = take_off_the_market.trader_id;
+
   -- Every open Trade is locked before any is ended, in one order, so that
   -- an answer landing on one of them at the same moment waits for this or
   -- finishes first, and never holds what this is waiting on.
   perform 1 from public.trades
-    where (trades.proposer_id = end_open_trades_of.trader_id
-        or trades.recipient_id = end_open_trades_of.trader_id)
+    where (trades.proposer_id = take_off_the_market.trader_id
+        or trades.recipient_id = take_off_the_market.trader_id)
       and not public.trade_has_ended(trades.status)
     order by trades.id
     for update;
 
   for trade in
     select * from public.trades
-    where (trades.proposer_id = end_open_trades_of.trader_id
-        or trades.recipient_id = end_open_trades_of.trader_id)
+    where (trades.proposer_id = take_off_the_market.trader_id
+        or trades.recipient_id = take_off_the_market.trader_id)
       and not public.trade_has_ended(trades.status)
     order by trades.id
   loop
     if trade.status = 'proposed'
-      and trade.responder_id = end_open_trades_of.trader_id then
+      and trade.responder_id = take_off_the_market.trader_id then
       update public.trades
         set status = 'declined',
             responder_id = null
@@ -62,16 +78,23 @@ begin
         set status = 'cancelled',
             responder_id = null,
             cancelled_at = now(),
-            cancelled_by = end_open_trades_of.trader_id
+            cancelled_by = take_off_the_market.trader_id
         where trades.id = trade.id;
     end if;
   end loop;
+
+  update public.listings
+    set status = 'withdrawn'
+    where listings.trader_id = take_off_the_market.trader_id
+      and listings.status = 'active';
 end;
 $$;
 
 -- The erasure, as 20260929120000_account_deletion.sql wrote it, with its
--- step 2 now the shared function above. The comment there still describes
--- every step.
+-- first three steps now the shared function above. The comment there still
+-- describes every step; the Wants it deleted in step 1 are deleted with the
+-- rest of the Trader's own data, since leaving the City is what keeps them
+-- from making a Match on the way out.
 create or replace function public.erase_trader_for_deleted_account()
   returns trigger
   language plpgsql
@@ -81,16 +104,9 @@ as $$
 begin
   perform public.require_deletable_account(old.id);
 
-  update public.traders set city_id = null where traders.id = old.id;
+  perform public.take_off_the_market(old.id);
+
   delete from public.wants where wants.trader_id = old.id;
-
-  perform public.end_open_trades_of(old.id);
-
-  update public.listings
-    set status = 'withdrawn'
-    where listings.trader_id = old.id
-      and listings.status = 'active';
-
   delete from public.match_events
     where match_events.lister_id = old.id or match_events.wanter_id = old.id;
   delete from public.collection_entries
@@ -159,7 +175,7 @@ $$;
 -- Trader who may be banned. The edge function asks this with the caller
 -- Auth vouched for, since it runs as service_role, where is_founder() has
 -- no caller to ask about. Only service_role may call it.
-create function public.require_ban_allowed(founder_id uuid, trader_id uuid)
+create function public.require_ban_allowed(caller_id uuid, trader_id uuid)
   returns void
   language plpgsql
   stable
@@ -169,7 +185,7 @@ as $$
 begin
   if not exists (
     select 1 from public.founders
-    where founders.trader_id = require_ban_allowed.founder_id
+    where founders.trader_id = require_ban_allowed.caller_id
   ) then
     raise exception 'only a Founder bans a Trader'
       using errcode = '42501';
@@ -190,20 +206,10 @@ grant execute on function
 -- for every way an account is banned, the Supabase dashboard included, and
 -- whatever length the ban is given there: a ban is a ban.
 --
--- What it does, in order:
---
---   1. Takes the Trader out of their City. City browse and Matching are
---      both scoped by City, so their Listings and Wants leave everyone's
---      screens at once, and this is first for the reason the erasure does
---      it first: the next step hands Listings back, and with no City the
---      Trader makes no Match on the way out and nobody is alerted to one.
---   2. Ends every Trade still open, in the Trader's name where it is not
---      simply declined. The other Trader is not left waiting on someone who
---      can no longer answer, and gets their Listings back to trade again.
---      A cancellation in the banned Trader's name is theirs to carry.
---   3. Withdraws the Trader's Listings. A traded one is left as it is, the
---      Trade Record's evidence.
---   4. Marks the row banned, which is the public mark.
+-- It takes the Trader off the market, as a deletion does, and marks the
+-- row banned, which is the public mark. Ending their open Trades means the
+-- other Trader is not left waiting on someone who can no longer answer, and
+-- a cancellation in the banned Trader's name is theirs to carry.
 --
 -- Everything else of the Trader's stays. A banned account is not a deleted
 -- one: it stays so its email address cannot start over (the deletion
@@ -218,14 +224,7 @@ as $$
 begin
   perform public.require_bannable_trader(new.id);
 
-  update public.traders set city_id = null where traders.id = new.id;
-
-  perform public.end_open_trades_of(new.id);
-
-  update public.listings
-    set status = 'withdrawn'
-    where listings.trader_id = new.id
-      and listings.status = 'active';
+  perform public.take_off_the_market(new.id);
 
   update public.traders
     set banned_at = coalesce(traders.banned_at, now())
@@ -255,6 +254,10 @@ create trigger close_trader_for_banned_account
 -- refreshed, but an access token already issued is accepted on its
 -- signature for up to an hour (ADR-0007, amendment for #28), and in that
 -- hour a banned Trader could still list, propose, and message.
+--
+-- Storage does not pass through it, as the deletion's note says: a file a
+-- banned Trader uploads in that hour is named by no row, since naming one
+-- takes an RPC, so it is litter the reapers collect.
 --
 -- Renamed rather than replaced in place, since its name says what it
 -- refuses; PostgREST is pointed at the new one before the old one goes.

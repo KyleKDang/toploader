@@ -1027,7 +1027,7 @@ export function reportsQuery(founderId: string) {
       const { data, error } = await supabase
         .from('reports')
         .select(
-          'id, reason, created_at, trader:traders!reports_trader_id_fkey (id, display_name, banned_at), reporter:traders!reports_reporter_id_fkey (display_name), listing:listings (id, condition, card_variants (name, cards (name)))',
+          'id, reason, created_at, trader:traders!reports_trader_id_fkey (id, display_name, banned_at, deleted_at), reporter:traders!reports_reporter_id_fkey (display_name), listing:listings (id, condition, card_variants (name, cards (name)))',
         )
         .order('created_at', { ascending: false })
         .order('id');

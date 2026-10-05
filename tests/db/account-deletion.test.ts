@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { FOR_GOOD } from '../../supabase/functions/_shared/ban-trader.ts';
 import { arrange, makeFounder, verifyTrader } from './arrange.ts';
 import {
   addWant,
@@ -521,7 +522,7 @@ describe('Deleting an account', { timeout: 60_000 }, () => {
       const { actor } = await traders();
       await addToCollection(actor, holofoil);
       const banned = await serviceClient().auth.admin.updateUserById(actor.id, {
-        ban_duration: '876000h',
+        ban_duration: FOR_GOOD,
       });
       if (banned.error) throw banned.error;
 
