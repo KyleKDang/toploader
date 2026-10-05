@@ -22,8 +22,9 @@ import {
  *
  * Every reap sweeps the whole bucket for orphans, as the real job does, so
  * its cost grows with every photo the stack holds. On a long-lived local
- * stack that is every photo any earlier run uploaded, and under a full
- * parallel run a test outlasted vitest's five-second default (#114).
+ * stack that is every photo any earlier run uploaded, and with the rest of
+ * the suite running beside it a test outlasted Vitest's five-second default
+ * (#114).
  */
 describe('Listing photo reaper', { timeout: 30_000 }, () => {
   const service = serviceClient();
