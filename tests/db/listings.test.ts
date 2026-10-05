@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { readCardListingsPage } from '../../src/lib/card-listings-page.ts';
 import type { Condition } from '../../src/lib/conditions.ts';
 import {
   arrange,
@@ -485,10 +486,9 @@ async function browse(client: Client, id: string) {
 }
 
 /**
- * A Card's Listings filtered as the card page's browse filters them, so a
- * test can see which that screen would show rather than which the policy
- * alone allows. Unordered, unlike the screen: a test asks only which
- * Listings are in it.
+ * The first page of a Card's Listings as the card page reads it, so a test
+ * can see which that screen would show rather than which the policy alone
+ * allows. A test's own City holds less than a page, so the first is all.
  */
 async function browseCard(client: Client, likeListing: string) {
   const { data: card, error: cardError } = await client
@@ -498,13 +498,12 @@ async function browseCard(client: Client, likeListing: string) {
     .single();
   if (cardError) throw cardError;
 
-  const { data, error } = await client
-    .from('listings')
-    .select('id, status, card_variants!inner(card_id)')
-    .eq('card_variants.card_id', card.card_variants.card_id)
-    .in('status', ['active', 'in_trade']);
-  if (error) throw error;
-  return data;
+  const { listings } = await readCardListingsPage(
+    client,
+    card.card_variants.card_id,
+    null,
+  );
+  return listings;
 }
 
 async function readPhotos(client: Client, listingId: string) {
