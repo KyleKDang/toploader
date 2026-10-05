@@ -19,8 +19,13 @@ import {
  * The 1 GB free tier is the whole reason it exists (ADR-0006). What it must
  * never touch is the photos of a Listing that went through a Trade: those
  * are the Trade Record's evidence, and the Trade Record is immutable.
+ *
+ * Every reap sweeps the whole bucket for orphans, as the real job does, so
+ * its cost grows with every photo the stack holds. On a long-lived local
+ * stack that is every photo any earlier run uploaded, and under a full
+ * parallel run a test outlasted vitest's five-second default (#114).
  */
-describe('Listing photo reaper', () => {
+describe('Listing photo reaper', { timeout: 30_000 }, () => {
   const service = serviceClient();
   let trader: SeededTrader;
   let holofoil: number;
