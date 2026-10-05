@@ -28,6 +28,7 @@ import {
 } from '../lib/trades';
 import { useTabs } from '../lib/tabs';
 import { BlockTrader } from './BlockTrader';
+import { Report } from './Report';
 import {
   CashNote,
   CashRow,
@@ -254,8 +255,11 @@ function Trade({
         <p className="px-4 pt-4 text-sm leading-prose text-muted">
           One of you has blocked the other, so this trade can only be ended.
         </p>
-      ) : (
-        <div className="px-4 pt-6">
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-3 px-4 pt-6">
+        <Report subject={{ kind: 'trader', id: other.id, name }} />
+        {blocked ? null : (
           <BlockTrader
             trader={{ id: other.id, name }}
             onBlocked={async () => {
@@ -270,8 +274,8 @@ function Trade({
               ]);
             }}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       <Sheet
         open={confirmingDecline}

@@ -20,6 +20,7 @@ import {
   listingQuery,
   matchesQuery,
   pendingVerificationRequestsQuery,
+  reportsQuery,
   safeSpotsQuery,
   tradeListingsQuery,
   tradeQuery,
@@ -464,6 +465,20 @@ const reviewRoute = createRoute({
   ),
 });
 
+const reportsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin/reports',
+  loader: async ({ context: { queryClient } }) => {
+    const { founderId } = await loadFounder(queryClient);
+    await queryClient.fetchQuery(reportsQuery(founderId));
+    return { founderId };
+  },
+  component: lazyRouteComponent(
+    () => import('./screens/ReportsScreen'),
+    'ReportsScreen',
+  ),
+});
+
 /** Whether a value from the URL is a uuid, the form every row id takes. */
 function isUuid(value: unknown): value is string {
   return (
@@ -504,6 +519,7 @@ const routeTree = rootRoute.addChildren([
   settingsRoute,
   reviewQueueRoute,
   reviewRoute,
+  reportsRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

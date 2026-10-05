@@ -981,3 +981,59 @@ export async function reviewVerification(
   );
   if (error) throw error;
 }
+
+/**
+ * Reports another Trader to the Founders, with the reason the reporter
+ * gives. Nothing comes back: only a Founder reads a report, its reporter
+ * included.
+ */
+export async function reportTrader(
+  traderId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('report_trader', {
+    trader_id: traderId,
+    reason,
+  });
+  if (error) throw error;
+}
+
+/** Reports another Trader's Listing, which reports its Trader with it. */
+export async function reportListing(
+  listingId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('report_listing', {
+    listing_id: listingId,
+    reason,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Every report, newest first, as a Founder reads them. The Listing comes
+ * with its report whatever has happened to it since: a Founder reads a
+ * reported Listing through a policy of its own. Never cached past the
+ * screen, for the reason the review queue is not.
+ */
+export function reportsQuery(founderId: string) {
+  return queryOptions({
+    queryKey: ['reports', founderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reports')
+        .select(
+          'id, reason, created_at, trader:traders!reports_trader_id_fkey (display_name), reporter:traders!reports_reporter_id_fkey (display_name), listing:listings (id, condition, card_variants (name, cards (name)))',
+        )
+        .order('created_at', { ascending: false })
+        .order('id');
+      if (error) throw error;
+      return data;
+    },
+    gcTime: 0,
+  });
+}
+
+export type Report = Awaited<
+  ReturnType<NonNullable<ReturnType<typeof reportsQuery>['queryFn']>>
+>[number];
