@@ -14,6 +14,7 @@ import {
   EmptyState,
   FormError,
   ListRow,
+  LoadMore,
   PlusIcon,
   StatStrip,
   Stepper,
@@ -370,7 +371,8 @@ function OwnedCopies({
 
 /*
  * Who in the Trader's City is listing this Card. RLS is what makes it their
- * City and only live Listings; this just shows what came back.
+ * City, and the read is what keeps it to live Listings; this just shows what
+ * came back.
  *
  * Each row carries the thumbnail rather than the full-size photo, and the
  * list arrives a page at a time, newest first, with "Load more" under it
@@ -434,24 +436,7 @@ function CityListings({ cardId }: { cardId: number }) {
           ))}
         </ul>
       )}
-      {listingPages.hasNextPage ? (
-        <div className="flex flex-col gap-2 px-4 pt-3.5">
-          <Button
-            disabled={listingPages.isFetchingNextPage}
-            onClick={() => void listingPages.fetchNextPage()}
-          >
-            {listingPages.isFetchingNextPage ? 'Loading…' : 'Load more'}
-          </Button>
-          <FormError
-            error={
-              listingPages.isFetchNextPageError &&
-              !listingPages.isFetchingNextPage
-                ? listingPages.error
-                : null
-            }
-          />
-        </div>
-      ) : null}
+      <LoadMore pages={listingPages} />
     </section>
   );
 }

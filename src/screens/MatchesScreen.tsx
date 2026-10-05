@@ -3,11 +3,10 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import {
   AppShell,
-  Button,
   CardTile,
   EmptyState,
-  FormError,
   ListRow,
+  LoadMore,
   ReputationPill,
   TopBar,
 } from '../components';
@@ -32,9 +31,7 @@ import { useTabs } from '../lib/tabs';
  * own page, one tap away, carries the asking price.
  *
  * The list is read a page at a time, newest first (#76). "Load more" sits
- * under it only while older Matches exist, and adds the next page below the
- * rows already there. A page that fails to load leaves those rows where
- * they are, says so, and leaves the button to try again with.
+ * under it only while older Matches exist (src/components/LoadMore.tsx).
  */
 
 const route = getRouteApi('/');
@@ -80,24 +77,7 @@ export function MatchesScreen() {
               </li>
             ))}
           </ul>
-          {matchPages.hasNextPage ? (
-            <div className="flex flex-col gap-2 px-4 pt-3.5">
-              <Button
-                disabled={matchPages.isFetchingNextPage}
-                onClick={() => void matchPages.fetchNextPage()}
-              >
-                {matchPages.isFetchingNextPage ? 'Loading…' : 'Load more'}
-              </Button>
-              <FormError
-                error={
-                  matchPages.isFetchNextPageError &&
-                  !matchPages.isFetchingNextPage
-                    ? matchPages.error
-                    : null
-                }
-              />
-            </div>
-          ) : null}
+          <LoadMore pages={matchPages} />
           <p className="px-4 py-3 text-xs leading-prose text-muted">
             Prices are market prices, updated daily.
           </p>
