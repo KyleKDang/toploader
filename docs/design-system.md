@@ -184,6 +184,12 @@ Guidance a Trader needs while filling the field goes in a hint: a `--text-sm` `-
 A placeholder is never the only guidance, because it is gone after the first keystroke.
 A select is drawn the same way and takes a hint the same way.
 
+**Text area.**
+The text input's look - `--radius`, `--color-surface` fill, 2px border, the same focus treatment - four lines tall, for what a Trader writes in sentences: a report's reason.
+It scrolls inside itself past four lines rather than growing, so a sheet's buttons stay above the keyboard.
+Labelled and hinted the way the text input is.
+Added in [#28](https://github.com/KyleKDang/toploader/issues/28), the ticket that first asked for more than a line.
+
 **Stat strip.**
 The panel a screen's one big number sits in: the Market Price on the Card page, the total value on the Collection screen.
 `--color-surface` fill, a `--color-line` border and `--radius`, with an `--text-xs` `--color-muted` eyebrow over an `--text-xl` number in tabular figures.
@@ -214,6 +220,7 @@ Right: up to three lines - line 1 is the name with a price pushed to the right e
 Rows never wrap; they truncate with an ellipsis.
 The one exception is line 3 in a short list where that line is instructions a Trader needs in full, such as a Safe Spot's notes: there it wraps, since a City has a handful of Safe Spots and cutting the directions short defeats the row.
 An unread row carries a 7px `--color-accent` dot before its title.
+A report in the Founders' admin view is not a row: its reason is shown whole, since it is what a Founder acts on, and a reported Listing hangs under it as a row of its own ([#28](https://github.com/KyleKDang/toploader/issues/28)).
 
 **Card tile.**
 A 5:7 rectangle at `--size-thumb` wide, `--radius-sm`, with an inset hairline and an inset white highlight so a pale card still reads as an object against a white background.

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Button, FormError, Sheet, TextInput } from '../components';
+import { Button, FormError, Sheet, TextArea } from '../components';
 import { reportListing, reportTrader } from '../lib/queries';
 
 /*
@@ -16,31 +16,59 @@ import { reportListing, reportTrader } from '../lib/queries';
  *
  * Once sent, the button gives way to a line saying so. Nothing else comes
  * back: a report is the Founders' to read, its reporter's included.
+ *
+ * It takes its share of the row it sits in, beside Block, since buttons in
+ * a row are equal width.
  */
 
 const MAX_REASON = 1000;
 
-type Subject =
-  | { kind: 'trader'; id: string; name: string }
-  | { kind: 'listing'; id: string; traderName: string };
+type Kind = 'trader' | 'listing';
 
-export function Report({ subject }: { subject: Subject }) {
+/** What reporting each kind of thing sends, and how the sheet names it. */
+const KINDS: Record<
+  Kind,
+  {
+    send: (id: string, reason: string) => Promise<void>;
+    button: (name: string) => string;
+    title: (name: string) => string;
+  }
+> = {
+  trader: {
+    send: reportTrader,
+    button: (name) => `Report ${name}`,
+    title: (name) => `Report ${name}?`,
+  },
+  listing: {
+    send: reportListing,
+    button: () => 'Report listing',
+    title: () => 'Report this listing?',
+  },
+};
+
+export function Report({
+  kind,
+  id,
+  name,
+}: {
+  kind: Kind;
+  /** The Trader's id, or the Listing's. */
+  id: string;
+  /** The Trader reported, or the Trader whose Listing it is. */
+  name: string;
+}) {
   const [composing, setComposing] = useState(false);
   const [reason, setReason] = useState('');
+  const { send, button, title } = KINDS[kind];
 
-  const send = useMutation({
-    mutationFn: () =>
-      subject.kind === 'trader'
-        ? reportTrader(subject.id, reason)
-        : reportListing(subject.id, reason),
+  const report = useMutation({
+    mutationFn: () => send(id, reason),
     onSuccess: () => setComposing(false),
   });
 
-  const name = subject.kind === 'trader' ? subject.name : subject.traderName;
-
-  if (send.isSuccess) {
+  if (report.isSuccess) {
     return (
-      <p className="text-sm leading-prose text-muted">
+      <p className="flex-1 text-sm leading-prose text-muted">
         Reported. The founders will take a look.
       </p>
     );
@@ -48,32 +76,28 @@ export function Report({ subject }: { subject: Subject }) {
 
   return (
     <>
-      <div className="flex">
-        <Button onClick={() => setComposing(true)}>
-          {subject.kind === 'trader' ? `Report ${name}` : 'Report listing'}
-        </Button>
+      <div className="flex flex-1">
+        <Button onClick={() => setComposing(true)}>{button(name)}</Button>
       </div>
 
       <Sheet
         open={composing}
-        title={
-          subject.kind === 'trader' ? `Report ${name}?` : 'Report this listing?'
-        }
+        title={title(name)}
         onClose={() => setComposing(false)}
         actions={
           <>
             <Button onClick={() => setComposing(false)}>Cancel</Button>
             <Button
               variant="primary"
-              disabled={send.isPending || reason.trim() === ''}
-              onClick={() => send.mutate()}
+              disabled={report.isPending || reason.trim() === ''}
+              onClick={() => report.mutate()}
             >
-              {send.isPending ? 'Sending…' : 'Send report'}
+              {report.isPending ? 'Sending…' : 'Send report'}
             </Button>
           </>
         }
       >
-        <TextInput
+        <TextArea
           label="What happened?"
           value={reason}
           maxLength={MAX_REASON}
@@ -83,7 +107,7 @@ export function Report({ subject }: { subject: Subject }) {
           Only the founders read reports, and {name} is not told who reported
           them.
         </p>
-        <FormError error={send.error} />
+        <FormError error={report.error} />
       </Sheet>
     </>
   );

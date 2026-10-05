@@ -102,6 +102,7 @@ function Listing({
   const card = listing.card_variants?.cards;
   const condition = CONDITION_NAMES[listing.condition];
   const title = card?.name ?? 'This card';
+  const listerName = listing.trader?.display_name ?? 'this trader';
 
   const withdraw = useMutation({
     mutationFn: () => withdrawListing(listing.id),
@@ -204,19 +205,10 @@ function Listing({
       ) : null}
 
       {!isOwn ? (
-        <div className="flex flex-wrap items-center gap-3 px-4 pb-6">
-          <Report
-            subject={{
-              kind: 'listing',
-              id: listing.id,
-              traderName: listing.trader?.display_name ?? 'this trader',
-            }}
-          />
+        <div className="flex items-center gap-3 px-4 pb-6">
+          <Report kind="listing" id={listing.id} name={listerName} />
           <BlockTrader
-            trader={{
-              id: listing.trader_id,
-              name: listing.trader?.display_name ?? 'this trader',
-            }}
+            trader={{ id: listing.trader_id, name: listerName }}
             onBlocked={async () => {
               dropWhatABlockChanges(queryClient);
               await navigate({ to: '/', replace: true });

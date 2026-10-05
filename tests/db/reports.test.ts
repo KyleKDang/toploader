@@ -5,6 +5,7 @@ import {
   createListing,
   seededExamplemon,
   seedTrader,
+  serviceClient,
   type Client,
   type SeededTrader,
 } from './seed.ts';
@@ -139,6 +140,24 @@ describe('Reporting a Trader', () => {
     expect(await reportsAbout(founder.client, reported)).toEqual([]);
   });
 
+  it('outlives the reported Trader’s account', async () => {
+    const { reporter, reported, founder } = await seedCast();
+    const filed = await reportTrader(reporter, reported.id, 'Took my cards');
+    if (filed.error) throw filed.error;
+
+    const { error } = await serviceClient().auth.admin.deleteUser(reported.id);
+    if (error) throw error;
+
+    expect(await reportsAbout(founder.client, reported)).toEqual([
+      {
+        reporter_id: reporter.id,
+        trader_id: reported.id,
+        listing_id: null,
+        reason: 'Took my cards',
+      },
+    ]);
+  });
+
   it('cannot be written directly, in the reporter’s name or another’s', async () => {
     const { reporter, reported, founder, foreign } = await seedCast();
 
@@ -185,6 +204,19 @@ describe('Reporting a Listing', () => {
       expect(error?.code).toBe('22023');
     }
     expect(await reportsAbout(founder.client, reporter)).toEqual([]);
+  });
+
+  it('is refused while signed out', async () => {
+    const { reported, founder } = await seedCast();
+    const listingId = await createListing(reported, holofoil, 'NM');
+
+    const { error } = await anonClient().rpc('report_listing', {
+      listing_id: listingId,
+      reason: 'Counterfeit',
+    });
+
+    expect(error?.code).toBe('42501');
+    expect(await reportsAbout(founder.client, reported)).toEqual([]);
   });
 
   it('stays readable to a Founder once its Trader withdraws it', async () => {
