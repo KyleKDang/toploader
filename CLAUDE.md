@@ -45,6 +45,13 @@ The bare `code-review` is Claude Code's built-in, which fans out sub-agents at t
 **The frontier** is the map's lowest-numbered direct child that is open, unassigned, and has no open blocker.
 Build-sequence order is spec order; do not jump ahead.
 
+**What gets filed.**
+v1 launches in one City, Orange County, with hundreds of Traders at most, and that is the size to design and judge against.
+A follow-up is filed only when it is an actual problem at that size: a Trader would lose data, be unsafe, or be stuck, or it blocks the ticket in hand, CI, or a deploy.
+Anything else is left alone until it becomes a problem: slow at a scale v1 does not have, a cleaner structure, a hardening against a case nobody has hit.
+Park it as a one-line comment on #118 (what, where, and what would make it a problem) and move on.
+Nothing parked there is work until Kyle says so, and getting to v1 comes before all of it.
+
 **The map** at #31 holds only the tickets planned from the spec.
 A follow-up filed while shipping another ticket becomes a sub-issue of the feature ticket it belongs to, never of the map, so the map's own list stays the planned features.
 That is usually the ticket it was found on; when it is not, parent it to the feature it is part of and say "Found on #N" in the body.
