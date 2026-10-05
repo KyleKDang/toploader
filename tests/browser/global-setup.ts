@@ -19,7 +19,7 @@ export default async function globalSetup() {
   await checkEdgeRuntime(API_URL, functions);
 }
 
-const RESTART =
+const RESTART_ADVICE =
   'Restart the stack from the main checkout, never from a worktree ' +
   '(`npx supabase stop`, then `npx supabase start`), and run again.';
 
@@ -44,21 +44,25 @@ export async function checkEdgeRuntime(apiUrl: string, functions: string[]) {
     // The runtime loads a function's code from the directory `supabase start`
     // ran in, so once that directory is gone, as a removed worktree is, every
     // function answers 503 BOOT_ERROR (#113).
-    if (response.status === 503 && isBootError(body)) {
+    else if (response.status === 503 && isBootError(body)) {
       unbootable.push(name);
     }
   }
-  const problems = [
-    missing.length > 0 &&
-      `does not serve ${missing.join(', ')}: it predates them`,
-    unbootable.length > 0 &&
-      `cannot boot ${unbootable.join(', ')}: the directory it loads them ` +
-        'from is likely gone',
-  ].filter(Boolean);
-  if (problems.length > 0) {
-    throw new Error(
-      `The local edge runtime ${problems.join('; and it ')}. ${RESTART}`,
+  const problems: string[] = [];
+  if (missing.length > 0) {
+    problems.push(
+      `The local edge runtime does not serve ${missing.join(', ')}: it ` +
+        'predates them.',
     );
+  }
+  if (unbootable.length > 0) {
+    problems.push(
+      `The local edge runtime cannot boot ${unbootable.join(', ')}: the ` +
+        'directory it loads them from is likely gone.',
+    );
+  }
+  if (problems.length > 0) {
+    throw new Error([...problems, RESTART_ADVICE].join(' '));
   }
 }
 

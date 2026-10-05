@@ -268,6 +268,8 @@ What makes a good test here:
 - The test harness's wait for the stack to accept a fresh session (`tests/local-stack.ts`) is tested with PostgREST faked, through the `fetch` supabase-js is handed.
   Added on [#71](https://github.com/KyleKDang/toploader/issues/71): the refusal it waits out, PGRST303 "JWT issued at future", came once in forty CI runs and never locally, so the real stack cannot serve it on demand.
   The fake stands in for the harness's view of the stack, not for anything the app does, and no seam-1, seam-2 or seam-3 test uses it.
+  Extended on [#113](https://github.com/KyleKDang/toploader/issues/113) to the browser suite's check that the edge runtime serves every function (`checkEdgeRuntime` in `tests/browser/global-setup.ts`), tested against a local HTTP server answering as the runtime does.
+  The runtime's two failures, a 404 for a function added since it started and a 503 `BOOT_ERROR` once the directory it started from is gone, come only from a long-lived local stack, so the real stack cannot serve them on demand.
 - Test names use the domain vocabulary of [CONTEXT.md](../CONTEXT.md) so the suite reads as this spec.
 
 ## Build sequence

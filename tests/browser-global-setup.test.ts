@@ -30,8 +30,10 @@ const handlerError: Reply = {
 let server: Server | undefined;
 
 afterEach(async () => {
-  await new Promise((resolve) => server?.close(resolve));
+  const runtime = server;
+  if (!runtime) return;
   server = undefined;
+  await new Promise((resolve) => runtime.close(resolve));
 });
 
 /** A fake runtime's base URL, answering each function by name. */
@@ -77,5 +79,14 @@ describe('checking the local edge runtime before any tracer', () => {
     await expect(
       checkEdgeRuntime(apiUrl, ['delete_account', 'notify']),
     ).rejects.toThrow(/does not serve notify\b/);
+  });
+
+  it('names both at once, a function it does not know and one it cannot boot', async () => {
+    const apiUrl = await fakeRuntime({ delete_account: bootError });
+
+    const checked = checkEdgeRuntime(apiUrl, ['delete_account', 'notify']);
+
+    await expect(checked).rejects.toThrow(/does not serve notify\b/);
+    await expect(checked).rejects.toThrow(/cannot boot delete_account\b/);
   });
 });
