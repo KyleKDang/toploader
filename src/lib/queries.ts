@@ -3,6 +3,10 @@ import {
   queryOptions,
   type QueryClient,
 } from '@tanstack/react-query';
+import {
+  readCardListingsPage,
+  type CardListingsCursor,
+} from './card-listings-page';
 import type { Condition } from './conditions';
 import { readMatchesPage, type MatchesCursor } from './matches-page';
 import { PHOTO_MIME, type PreparedPhoto } from './photos';
@@ -310,9 +314,6 @@ export type Want = Awaited<
 
 const LISTING_PHOTOS_BUCKET = 'listing-photos';
 
-/** The states a Listing is still on offer in, and so still browsable in. */
-const LIVE_STATUSES = ['active', 'in_trade'] as const;
-
 /**
  * How long a photo's URL works for. The bucket is private, so a photo is
  * reached through a signed URL rather than by knowing its path; an hour is
@@ -340,40 +341,44 @@ async function signedPhotoUrls(paths: string[]): Promise<Map<string, string>> {
 }
 
 /**
- * The Listings of one Card in the Trader's City, newest first, each with the
- * thumbnail of its first photo.
+ * The live Listings of one Card in the Trader's City, newest first and a
+ * page at a time, each with the thumbnail of its first photo.
  *
- * The thumbnail, not the full-size photo: a card page can carry a dozen of
- * these, and full-size images in a feed are what actually spends the free
- * tier's egress (ADR-0006).
+ * The thumbnail, not the full-size photo, and a page of them rather than
+ * the whole City's: a popular Card's list runs long, and images in a feed
+ * are what actually spends the free tier's egress (ADR-0006).
+ *
+ * An infinite query, as matchesQuery is: each page's param is the cursor
+ * the page before it ended on (src/lib/card-listings-page.ts).
  */
 export function cityListingsForCardQuery(cardId: number) {
-  return queryOptions({
+  return infiniteQueryOptions({
     queryKey: ['listings', 'card', cardId],
-    queryFn: () => fetchCityListingsForCard(cardId),
+    queryFn: ({ pageParam }) => fetchCityListingsPage(cardId, pageParam),
+    initialPageParam: null as CardListingsCursor | null,
+    getNextPageParam: (page) => page.next,
   });
 }
 
-async function fetchCityListingsForCard(cardId: number) {
-  const { data, error } = await supabase
-    .from('listings')
-    .select(
-      'id, condition, asking_price_cents, open_to_cash_offers, status, created_at, trader:traders(id, display_name), card_variants!inner(name, card_id), listing_photos(position, thumbnail_path)',
-    )
-    .eq('card_variants.card_id', cardId)
-    // Without this a Trader's own withdrawn or traded Listing would still
-    // sit in their area's list, because RLS lets them read their own.
-    .in('status', LIVE_STATUSES)
-    .order('created_at', { ascending: false })
-    .order('position', { referencedTable: 'listing_photos' });
-  if (error) throw error;
-
-  return withThumbnailUrls(data, (listing) => listing);
+/** One page of a Card's Listings, its thumbnails signed for that page alone. */
+async function fetchCityListingsPage(
+  cardId: number,
+  after: CardListingsCursor | null,
+) {
+  const { listings, next } = await readCardListingsPage(
+    supabase,
+    cardId,
+    after,
+  );
+  return {
+    listings: await withThumbnailUrls(listings, (listing) => listing),
+    next,
+  };
 }
 
 /**
  * A feed's rows, each with a signed URL for the thumbnail of its Listing's
- * first photo, signed in one request for the whole feed. `listingOf` finds
+ * first photo, signed in one request for the page. `listingOf` finds
  * the Listing in a row, which is the row itself in City browse and an
  * embedded one in Matches.
  */
@@ -394,8 +399,8 @@ async function withThumbnailUrls<Row>(
 
 /** A Listing as City browse shows it in a row. */
 export type BrowsedListing = Awaited<
-  ReturnType<typeof fetchCityListingsForCard>
->[number];
+  ReturnType<typeof fetchCityListingsPage>
+>['listings'][number];
 
 /**
  * One Listing as its own page shows it: the Card it is of, the Trader who

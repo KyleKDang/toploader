@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import {
   AppShell,
@@ -18,8 +23,8 @@ import { CONDITION_NAMES, CONDITIONS, type Condition } from '../lib/conditions';
 import { formatDay, formatPrice } from '../lib/format';
 import {
   cardCollectionQuery,
+  cityListingsForCardQuery,
   collectionKey,
-  type BrowsedListing,
   type CardCollectionEntry,
   type CatalogCard,
 } from '../lib/queries';
@@ -67,7 +72,7 @@ const MAX_COPIES = 9999;
 const MAX_PER_ADD = 99;
 
 export function CardScreen() {
-  const { traderId, card, listings } = route.useLoaderData();
+  const { traderId, card } = route.useLoaderData();
 
   return (
     <AppShell
@@ -78,12 +83,7 @@ export function CardScreen() {
       {card ? (
         // Keyed on the Card, so opening another one starts on its own first
         // Variant rather than carrying over the last Card's choice.
-        <CardDetails
-          key={card.id}
-          card={card}
-          traderId={traderId}
-          listings={listings}
-        />
+        <CardDetails key={card.id} card={card} traderId={traderId} />
       ) : (
         <EmptyState
           title="That card is not in the catalog"
@@ -97,11 +97,9 @@ export function CardScreen() {
 function CardDetails({
   card,
   traderId,
-  listings,
 }: {
   card: CatalogCard;
   traderId: string;
-  listings: BrowsedListing[];
 }) {
   const navigate = useNavigate();
   const variants = card.card_variants;
@@ -188,7 +186,7 @@ function CardDetails({
         </Button>
       </div>
 
-      <CityListings listings={listings} />
+      <CityListings cardId={card.id} />
     </>
   );
 }
@@ -374,17 +372,22 @@ function OwnedCopies({
  * Who in the Trader's City is listing this Card. RLS is what makes it their
  * City and only live Listings; this just shows what came back.
  *
- * Each row carries the thumbnail rather than the full-size photo. A popular
- * Card can fill this list, and full-size images in a feed are what actually
- * spends the free tier's egress (ADR-0006).
+ * Each row carries the thumbnail rather than the full-size photo, and the
+ * list arrives a page at a time, newest first, with "Load more" under it
+ * while older Listings exist (#109). A popular Card can fill this list, and
+ * images in a feed are what actually spends the free tier's egress
+ * (ADR-0006).
  *
  * The thumbnails take empty alt text: the row beside them already says whose
  * card it is and what condition it is in, so naming it again is noise to a
  * screen reader. The alt text the design system asks for rides the full-size
  * photos on the Listing's own page, where nothing else carries it.
  */
-function CityListings({ listings }: { listings: BrowsedListing[] }) {
+function CityListings({ cardId }: { cardId: number }) {
   const navigate = useNavigate();
+  const listingPages = useInfiniteQuery(cityListingsForCardQuery(cardId));
+  const listings =
+    listingPages.data?.pages.flatMap((page) => page.listings) ?? [];
 
   return (
     <section aria-label="Listings in your area" className="mt-5">
@@ -431,6 +434,24 @@ function CityListings({ listings }: { listings: BrowsedListing[] }) {
           ))}
         </ul>
       )}
+      {listingPages.hasNextPage ? (
+        <div className="flex flex-col gap-2 px-4 pt-3.5">
+          <Button
+            disabled={listingPages.isFetchingNextPage}
+            onClick={() => void listingPages.fetchNextPage()}
+          >
+            {listingPages.isFetchingNextPage ? 'Loading…' : 'Load more'}
+          </Button>
+          <FormError
+            error={
+              listingPages.isFetchNextPageError &&
+              !listingPages.isFetchingNextPage
+                ? listingPages.error
+                : null
+            }
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

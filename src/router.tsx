@@ -198,14 +198,14 @@ const cardRoute = createRoute({
   loader: async ({ context: { queryClient }, params }) => {
     const { traderId } = await loadOnboardedTrader(queryClient);
     const cardId = catalogId(params.cardId);
-    if (cardId === null) return { traderId, card: null, listings: [] };
-    // The Listings come with the Card because the page shows them together;
-    // RLS is what keeps them to the Trader's own City.
-    const [card, listings] = await Promise.all([
+    if (cardId === null) return { traderId, card: null };
+    // The Listings' first page comes with the Card because the page shows
+    // them together; RLS is what keeps them to the Trader's own City.
+    const [card] = await Promise.all([
       queryClient.ensureQueryData(cardQuery(cardId)),
-      queryClient.ensureQueryData(cityListingsForCardQuery(cardId)),
+      queryClient.ensureInfiniteQueryData(cityListingsForCardQuery(cardId)),
     ]);
-    return { traderId, card, listings };
+    return { traderId, card };
   },
   component: lazyRouteComponent(
     () => import('./screens/CardScreen'),

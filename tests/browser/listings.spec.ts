@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { CARD_LISTINGS_PAGE_SIZE } from '../../src/lib/card-listings-page.ts';
 import { cameraPhoto } from './photo-fixture.ts';
 import { arrangeCity, signInAsNewTrader } from './session.ts';
 
@@ -22,6 +24,12 @@ const CARD_IMAGE = readFileSync(
 
 /** Far larger than the 1600px the pipeline stores, as a phone's photo is. */
 const PHOTO = cameraPhoto(1800, 2400);
+
+/** A real 1x1 WebP, the smallest thing the photo bucket accepts. */
+const TINY_WEBP = Buffer.from(
+  'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
+  'base64',
+);
 
 /** What the card page says when no Listing of the Card is in the City. */
 const NOBODY_LISTING = 'Nobody in your area is listing this card yet.';
@@ -176,4 +184,61 @@ test('a Trader withdraws a Listing and it leaves their area', async ({
   // Gone from their area, for the Trader who listed it as much as anyone.
   await page.goto(cardUrl);
   await expect(page.getByText(NOBODY_LISTING)).toBeVisible();
+});
+
+/*
+ * A card page's Listings a page at a time (#109): the first page, "Load
+ * more" under it while older Listings exist, and the next page added below.
+ * How a page is cut - its size, its order, what a Listing arriving mid-read
+ * does - is proven at seam 1 (tests/db/card-listings-page.test.ts).
+ */
+test('older Listings are behind "Load more", which goes away once they are all shown', async ({
+  page,
+}) => {
+  await page.route('https://tcgplayer-cdn.tcgplayer.com/**', (route) =>
+    route.fulfill({ contentType: 'image/svg+xml', body: CARD_IMAGE }),
+  );
+  const lister = await signInAsNewTrader(page, await arrangeCity(), 'Lister');
+
+  // One Listing more than a page holds, arranged through the API: the
+  // Listing flow is the tracer above, and nothing here needs its photo.
+  const { data: card, error } = await lister.client
+    .from('cards')
+    .select('id, card_variants (id, name)')
+    .eq('name', 'Examplemon')
+    .single();
+  if (error) throw error;
+  const holofoil = card.card_variants.find((v) => v.name === 'Holofoil');
+  await Promise.all(
+    Array.from({ length: CARD_LISTINGS_PAGE_SIZE + 1 }, async () => {
+      const photo = {
+        path: `${lister.id}/${randomUUID()}.webp`,
+        thumbnail_path: `${lister.id}/${randomUUID()}-thumb.webp`,
+      };
+      for (const path of [photo.path, photo.thumbnail_path]) {
+        const uploaded = await lister.client.storage
+          .from('listing-photos')
+          .upload(path, TINY_WEBP, { contentType: 'image/webp' });
+        if (uploaded.error) throw uploaded.error;
+      }
+      const listed = await lister.client.rpc('create_listing', {
+        card_variant_id: holofoil?.id ?? 0,
+        condition: 'NM',
+        photos: [photo],
+      });
+      if (listed.error) throw listed.error;
+    }),
+  );
+
+  await page.goto(`/cards/${card.id}`);
+  const rows = page
+    .getByRole('region', { name: 'Listings in your area' })
+    .getByRole('listitem');
+  const loadMore = page.getByRole('button', { name: 'Load more' });
+  await expect(rows).toHaveCount(CARD_LISTINGS_PAGE_SIZE);
+
+  await loadMore.click();
+
+  await expect(rows).toHaveCount(CARD_LISTINGS_PAGE_SIZE + 1);
+  await expect(loadMore).toBeHidden();
 });
