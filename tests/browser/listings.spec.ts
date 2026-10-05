@@ -209,6 +209,7 @@ test('older Listings are behind "Load more", which goes away once they are all s
     .single();
   if (error) throw error;
   const holofoil = card.card_variants.find((v) => v.name === 'Holofoil');
+  if (!holofoil) throw new Error('No Holofoil Variant in the seeded Catalog');
   await Promise.all(
     Array.from({ length: CARD_LISTINGS_PAGE_SIZE + 1 }, async () => {
       const photo = {
@@ -222,7 +223,7 @@ test('older Listings are behind "Load more", which goes away once they are all s
         if (uploaded.error) throw uploaded.error;
       }
       const listed = await lister.client.rpc('create_listing', {
-        card_variant_id: holofoil?.id ?? 0,
+        card_variant_id: holofoil.id,
         condition: 'NM',
         photos: [photo],
       });

@@ -18,6 +18,7 @@ export { Disclaimer } from './Disclaimer';
 export { EmptyState } from './EmptyState';
 export { FormError } from './FormError';
 export { ListRow } from './ListRow';
+export { LoadMore } from './LoadMore';
 export { SearchPicker } from './SearchPicker';
 export { Select } from './Select';
 export { Sheet } from './Sheet';
