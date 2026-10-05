@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { TestProject } from 'vitest/node';
 import type { Database } from '../../src/lib/database.types.ts';
 import { readLocalStackStatus, waitForSignedInReads } from '../local-stack.ts';
+import { takeStackTurn } from '../stack-turn.ts';
 
 /*
  * Reads the API URL and publishable key from the running local stack rather
@@ -11,7 +12,15 @@ import { readLocalStackStatus, waitForSignedInReads } from '../local-stack.ts';
  */
 export default async function setup(project: TestProject) {
   const status = readLocalStackStatus();
-  await waitForStackToAcceptSessions(status.API_URL, status.PUBLISHABLE_KEY);
+  // Held until the last test ends, so another session's run waits for this
+  // one rather than overlapping it; see tests/stack-turn.ts.
+  const turn = await takeStackTurn(status.DB_URL);
+  try {
+    await waitForStackToAcceptSessions(status.API_URL, status.PUBLISHABLE_KEY);
+  } catch (error) {
+    await turn.release();
+    throw error;
+  }
   project.provide('supabaseUrl', status.API_URL);
   project.provide('supabasePublishableKey', status.PUBLISHABLE_KEY);
   // The server-side key, for seam 2: the Catalog sync runs as service_role.
@@ -19,6 +28,7 @@ export default async function setup(project: TestProject) {
   // A superuser connection, for arranging states no client can reach; see
   // tests/db/arrange.ts.
   project.provide('supabaseDbUrl', status.DB_URL);
+  return turn.release;
 }
 
 /*
