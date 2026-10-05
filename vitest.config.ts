@@ -14,6 +14,8 @@ export default defineConfig({
       // The browser suite's check of the edge runtime, faked at the network
       // edge.
       'tests/browser-global-setup.test.ts',
+      // The run's turn on the shared local stack, against that stack.
+      'tests/stack-turn.test.ts',
     ],
     globalSetup: ['tests/db/global-setup.ts'],
     environment: 'node',

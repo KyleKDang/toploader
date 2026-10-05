@@ -270,6 +270,12 @@ What makes a good test here:
   The fake stands in for the harness's view of the stack, not for anything the app does, and no seam-1, seam-2 or seam-3 test uses it.
   Extended on [#113](https://github.com/KyleKDang/toploader/issues/113) to the browser suite's check that the edge runtime serves every function (`checkEdgeRuntime` in `tests/browser/global-setup.ts`), tested against a local HTTP server answering as the runtime does.
   The runtime's two failures, a 404 for a function added since it started and a 503 `BOOT_ERROR` once the directory it started from is gone, come only from a long-lived local stack, so the real stack cannot serve them on demand.
+- A run of the seam-1 and seam-2 suite takes the shared local stack's turn before its first test and holds it to its last (`takeStackTurn` in `tests/stack-turn.ts`, a Postgres advisory lock on a connection of its own), so a second session's `npm test` waits for the first rather than overlapping it.
+  Added on [#114](https://github.com/KyleKDang/toploader/issues/114): every session on the machine shares one local stack, and two runs at once failed 12 to 21 tests each, mostly at Vitest's five-second timeout in whichever files overlapped, where either run alone passed.
+  Leftover rows were not the cause: a lone run passed in about a minute with the outbox at 2.5 million rows and `match_events` at 3.3 million.
+  A run that waits says whose run it is waiting for, and one that waits ten minutes fails with that name rather than starting.
+  The turn is tested against the real stack under a key of its own, since the run testing it already holds the suite's.
+  CI starts one run on a fresh stack, so there the turn is always free.
 - Test names use the domain vocabulary of [CONTEXT.md](../CONTEXT.md) so the suite reads as this spec.
 
 ## Build sequence
