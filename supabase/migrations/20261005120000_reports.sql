@@ -48,13 +48,15 @@ create policy "A Founder can read every report"
 -- policies rather than by its query, so a Founder reading every Listing
 -- would browse every City.
 --
--- The subquery reads `reports` under its own policy, which hands a Trader
--- who is not a Founder nothing.
+-- The cost is that a reported Listing that is still live also shows in a
+-- Founder's own browse when it is in another City, or its Trader is in a
+-- block with the Founder. Founders are two, and the launch is one City.
 create policy "A Founder can read a reported Listing"
   on public.listings for select
   to authenticated
   using (
-    exists (
+    (select public.is_founder())
+    and exists (
       select 1 from public.reports
       where reports.listing_id = listings.id
     )
@@ -131,10 +133,12 @@ as $$
 declare
   owner uuid;
 begin
+  -- One's own Listing is refused as one that does not exist is, so the
+  -- call says nothing about which Listings exist.
   select listings.trader_id into owner
     from public.listings
     where listings.id = report_listing.listing_id;
-  if not found then
+  if not found or owner = auth.uid() then
     raise exception 'a Trader reports another Trader''s Listing'
       using errcode = '22023';
   end if;

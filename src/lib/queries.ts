@@ -1011,7 +1011,9 @@ export async function reportListing(
 }
 
 /**
- * Every report, newest first, as a Founder reads them. The Listing comes
+ * Every report, newest first, as a Founder reads them. A Trader whose
+ * account is deleted comes back as null, since only the Traders of their
+ * Trades can still read them, while the report stays. The Listing comes
  * with its report whatever has happened to it since: a Founder reads a
  * reported Listing through a policy of its own. Never cached past the
  * screen, for the reason the review queue is not.
@@ -1034,6 +1036,6 @@ export function reportsQuery(founderId: string) {
   });
 }
 
-export type Report = Awaited<
+export type FiledReport = Awaited<
   ReturnType<NonNullable<ReturnType<typeof reportsQuery>['queryFn']>>
 >[number];

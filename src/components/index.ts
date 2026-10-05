@@ -24,6 +24,7 @@ export { Select } from './Select';
 export { Sheet } from './Sheet';
 export { StatStrip } from './StatStrip';
 export { Stepper } from './Stepper';
+export { TextArea } from './TextArea';
 export { TextInput } from './TextInput';
 export { TopBar } from './TopBar';
 

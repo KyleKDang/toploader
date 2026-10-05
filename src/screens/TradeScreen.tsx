@@ -257,8 +257,8 @@ function Trade({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3 px-4 pt-6">
-        <Report subject={{ kind: 'trader', id: other.id, name }} />
+      <div className="flex items-center gap-3 px-4 pt-6">
+        <Report kind="trader" id={other.id} name={name} />
         {blocked ? null : (
           <BlockTrader
             trader={{ id: other.id, name }}

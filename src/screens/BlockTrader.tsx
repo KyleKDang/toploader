@@ -34,7 +34,7 @@ export function BlockTrader({
 
   return (
     <>
-      <div className="flex">
+      <div className="flex flex-1">
         <Button onClick={() => setConfirming(true)}>Block {trader.name}</Button>
       </div>
 
