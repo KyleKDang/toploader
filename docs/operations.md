@@ -139,6 +139,20 @@ A Founder is removed by migration first; a banned Trader's account stays, since 
 
 The photos of a deleted Trader's Listings are reclaimed by the photo reaper on its next run, except those of a traded Listing, which stay as the other Trader's Trade Record.
 
+## Banning
+
+A Founder bans a Trader from the reports screen at `/admin/reports`, which calls the `ban_trader` edge function ([ADR-0007](adr/0007-admin-authorization.md), amendment for the ban).
+Like `delete_account`, it needs no secret of its own.
+A run that fails reports to Sentry, and the Founder is told to try again; nothing changes unless the account is banned in Auth, and everything the ban does in the database happens with it.
+
+Banning an account from the Supabase dashboard (Authentication → Users → Ban user) does the same, for any length the dashboard offers, because the ban's effects are a trigger on the account's ban.
+The dashboard refuses to ban a Founder, as the app does.
+
+The app has no unban.
+Lifting a ban in the dashboard lets the Trader sign in again, but every request is still refused while `traders.banned_at` is set.
+To lift a ban by hand, do both: lift it in the dashboard, then clear the column in the SQL editor with `update public.traders set banned_at = null where id = '<trader id>';`.
+The Trader's Listings stay withdrawn and their City stays empty; they pick a City again from setup.
+
 ## Recovering the database
 
 The backups are artifacts on the nightly backup's runs in GitHub Actions.

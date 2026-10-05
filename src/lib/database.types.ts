@@ -1131,6 +1131,7 @@ export type Database = {
         Returns: string
       }
       decline_trade: { Args: { trade_id: string }; Returns: undefined }
+      end_open_trades_of: { Args: { trader_id: string }; Returns: undefined }
       file_report: {
         Args: { listing_id: string; reason: string; reported_id: string }
         Returns: undefined
@@ -1204,7 +1205,7 @@ export type Database = {
         Returns: undefined
       }
       queue_meetup_reminders: { Args: never; Returns: undefined }
-      refuse_deleted_trader: { Args: never; Returns: undefined }
+      refuse_deleted_or_banned_trader: { Args: never; Returns: undefined }
       reject_verification: { Args: { request_id: string }; Returns: undefined }
       remove_from_collection: { Args: { entry_id: string }; Returns: undefined }
       remove_push_subscription: {
@@ -1218,6 +1219,14 @@ export type Database = {
       }
       report_trader: {
         Args: { reason: string; trader_id: string }
+        Returns: undefined
+      }
+      require_ban_allowed: {
+        Args: { founder_id: string; trader_id: string }
+        Returns: undefined
+      }
+      require_bannable_trader: {
+        Args: { trader_id: string }
         Returns: undefined
       }
       require_deletable_account: {

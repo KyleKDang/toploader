@@ -520,20 +520,23 @@ describe('Deleting an account', { timeout: 60_000 }, () => {
     it('keeps a banned Trader’s account, so a ban is not shed by starting over', async () => {
       const { actor } = await traders();
       await addToCollection(actor, holofoil);
-      // No client path bans yet; the ban's own slice of #28 adds it.
-      await arrange(
-        (sql) =>
-          sql`update public.traders set banned_at = now() where id = ${actor.id}`,
-      );
+      const banned = await serviceClient().auth.admin.updateUserById(actor.id, {
+        ban_duration: '876000h',
+      });
+      if (banned.error) throw banned.error;
 
       const { error } = await deleteAccountOf(actor);
 
       expect(error).not.toBeNull();
       expect(await hasAccount(actor.id)).toBe(true);
-      expect(await collectionSize(actor.client)).toBe(1);
-      expect(await readProfile(actor.client, actor.id)).toMatchObject({
-        deleted_at: null,
-      });
+      // Counted past every policy: the banned Trader's own session is
+      // refused.
+      expect((await ownRowsLeft(actor.id)).collection_entries).toBe(1);
+      const [row] = await arrange(
+        (sql) =>
+          sql`select deleted_at from public.traders where id = ${actor.id}`,
+      );
+      expect(row.deleted_at).toBeNull();
     });
 
     it('lets no Trader ask whether an account can be deleted', async () => {

@@ -140,3 +140,31 @@ Considered and rejected:
   A Trade still open would vanish from under the other Trader with no trace, and the Listings on a declined or cancelled one could not be deleted while the Trade named them.
 - **Ending the account's sessions sooner by shortening the token's life.**
   It shortens the hour without closing it, and costs every Trader more frequent token refreshes.
+
+## Amendment, 2026-10-04 (ticket #28, the ban)
+
+How `ban_trader` bans, which this ADR required and did not say how.
+
+**The ban's effects are a trigger on the account's ban, as the erasure is a trigger on its deletion.**
+This ADR said the function sets `banned_until` through the Auth admin API "and `banned_at` on `traders` in one call".
+Two writes from the function would leave a gap between them for a failure: a Trader banned in Auth while still trading here, or marked banned while still able to sign in.
+So the function makes the one write, to Auth, and a trigger on `auth.users` does the rest in the same transaction: it takes the Trader out of their City, ends their open Trades as a deletion ends them, withdraws their Listings, and sets `banned_at`.
+It holds for a ban from the Supabase dashboard too, of whatever length.
+
+**The function checks who is asking in the database.**
+It runs as `service_role`, where `is_founder()` has no caller to ask about, so it asks `require_ban_allowed` with the caller Auth vouched for.
+That one function refuses a caller who is not a Founder before it looks at the Trader named, so the answer tells a Trader nothing about who exists.
+Whether a Trader may be banned is `require_bannable_trader`, which the trigger calls too, and so enforces: a Founder may not be, since their rights are removed by migration, and a deleted account has nothing left to ban.
+
+**A banned Trader's session is refused before every request**, closing the hour this ADR's deletion amendment left open.
+The request check is renamed `refuse_deleted_or_banned_trader` and refuses both.
+
+**A ban is not lifted in the app.**
+The trigger fires only when an account becomes banned, so lifting a ban in Auth leaves `banned_at` set and the Trader refused; lifting one is a deliberate two-step errand in `docs/operations.md`.
+
+Considered and rejected:
+
+- **Leaving a banned Trader's open Trades for the other Trader to end.**
+  The other Trader would wait on someone who can never answer, and ending it themselves would put the cancellation on their own Reputation rather than the banned Trader's.
+- **Deleting the banned Trader's data, as a deletion does.**
+  A ban keeps the account so its email address cannot start over, and so the Founders can still read every Trade and report it touched.

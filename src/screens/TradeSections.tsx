@@ -42,6 +42,7 @@ export function OtherTraderLine({
       </span>
       <ReputationPill
         verified={trader.verified_at !== null}
+        banned={trader.banned_at !== null}
         trades={trader.completed_trade_count}
       />
     </span>

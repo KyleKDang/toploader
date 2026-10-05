@@ -59,6 +59,7 @@ export function MatchesScreen() {
               {cityName} · You{' '}
               <ReputationPill
                 verified={trader.verified_at !== null}
+                banned={trader.banned_at !== null}
                 trades={trader.completed_trade_count}
                 className="align-middle"
               />
@@ -131,6 +132,7 @@ function MatchRow({ match, traderId }: { match: Match; traderId: string }) {
       relationTrailing={
         <ReputationPill
           verified={other.verified_at !== null}
+          banned={other.banned_at !== null}
           trades={other.completed_trade_count}
         />
       }

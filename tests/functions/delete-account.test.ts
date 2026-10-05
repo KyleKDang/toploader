@@ -1,6 +1,6 @@
 import { describe, expect, inject, it } from 'vitest';
 import { deleteAccount } from '../../supabase/functions/_shared/delete-account.ts';
-import { arrange, makeFounder } from '../db/arrange.ts';
+import { makeFounder } from '../db/arrange.ts';
 import {
   seedTrader,
   serviceClient,
@@ -124,16 +124,25 @@ describe('The delete_account function', { timeout: 60_000 }, () => {
     expect(await areStored(documents)).toEqual([true, true]);
   });
 
-  it('refuses a banned Trader, and leaves their verification documents where they are', async () => {
+  it('deletes nothing for a banned Trader, whose session Auth no longer honors', async () => {
     const actor = await seedTrader('Actor');
     const documents = await submitVerification(actor);
-    // No client path bans yet; the ban's own slice of #28 adds it.
-    await arrange(
-      (sql) =>
-        sql`update public.traders set banned_at = now() where id = ${actor.id}`,
-    );
+    // The session is still in hand, but Auth refuses it from the ban on.
+    // The database refuses the account too (require_deletable_account), as
+    // tests/db/account-deletion.test.ts proves for a deletion from the
+    // dashboard.
+    const { data } = await actor.client.auth.getSession();
+    const banned = await serviceClient().auth.admin.updateUserById(actor.id, {
+      ban_duration: '876000h',
+    });
+    if (banned.error) throw banned.error;
 
-    expect(await deleteAccountOf(actor)).toBe('refused');
+    expect(
+      await deleteAccount({
+        ...options(),
+        accessToken: data.session?.access_token ?? null,
+      }),
+    ).toBe('signed_out');
 
     expect(await hasAccount(actor.id)).toBe(true);
     expect(await areStored(documents)).toEqual([true, true]);

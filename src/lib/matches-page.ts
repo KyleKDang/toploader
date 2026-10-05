@@ -46,7 +46,7 @@ export async function readMatchesPage(
   let query = client
     .from('matches')
     .select(
-      'matched_at, listing:listings!inner(id, condition, card_variants(name, market_price_cents, cards(name, number, card_sets(name))), listing_photos(position, thumbnail_path)), lister:traders!lister_id!inner(id, display_name, verified_at, completed_trade_count), wanter:traders!wanter_id!inner(id, display_name, verified_at, completed_trade_count)',
+      'matched_at, listing:listings!inner(id, condition, card_variants(name, market_price_cents, cards(name, number, card_sets(name))), listing_photos(position, thumbnail_path)), lister:traders!lister_id!inner(id, display_name, verified_at, banned_at, completed_trade_count), wanter:traders!wanter_id!inner(id, display_name, verified_at, banned_at, completed_trade_count)',
     )
     .order('matched_at', { ascending: false })
     .order('listing_id')

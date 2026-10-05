@@ -119,6 +119,11 @@ One Trader cutting off another, which works in both directions: neither sees the
 Only the Trader who made a block can take it back, by unblocking.
 _Avoid_: mute, ignore
 
+**Ban**:
+A Founder shutting a Trader out for good: they can no longer sign in or act, their Listings come down, any Trade still open ends in their name, and their Reputation reads "Banned" to every Trader from then on.
+A Founder cannot be banned, and the app has no way to lift a ban.
+_Avoid_: suspend, kick
+
 ### Market data
 
 **Catalog**:

@@ -440,3 +440,9 @@ verify_jwt = false
 # gateway's check is off rather than a second answer to the same question.
 [functions.delete_account]
 verify_jwt = false
+
+# Banning (supabase/functions/ban_trader), called by a Founder from the
+# reports screen. Off for the reason delete_account's is: the function asks
+# Auth about the caller's session itself.
+[functions.ban_trader]
+verify_jwt = false

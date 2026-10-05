@@ -36,6 +36,7 @@ export type TraderProfile = {
   display_name: string | null;
   city: { id: string; name: string } | null;
   verified_at: string | null;
+  banned_at: string | null;
   completed_trade_count: number;
 };
 
@@ -46,7 +47,7 @@ export function traderQuery(traderId: string) {
       const { data, error } = await supabase
         .from('traders')
         .select(
-          'display_name, verified_at, completed_trade_count, city:cities(id, name)',
+          'display_name, verified_at, banned_at, completed_trade_count, city:cities(id, name)',
         )
         .eq('id', traderId)
         .single();
@@ -642,7 +643,8 @@ export type Match = Awaited<
  */
 
 /** A Trader as a Trade names them: who, and their Reputation basics. */
-const TRADE_TRADER = 'id, display_name, verified_at, completed_trade_count';
+const TRADE_TRADER =
+  'id, display_name, verified_at, banned_at, completed_trade_count';
 
 /** A Listing as a Trade's terms show it: its Card, and its first thumbnail. */
 const TRADE_LISTING =
@@ -1025,7 +1027,7 @@ export function reportsQuery(founderId: string) {
       const { data, error } = await supabase
         .from('reports')
         .select(
-          'id, reason, created_at, trader:traders!reports_trader_id_fkey (display_name), reporter:traders!reports_reporter_id_fkey (display_name), listing:listings (id, condition, card_variants (name, cards (name)))',
+          'id, reason, created_at, trader:traders!reports_trader_id_fkey (id, display_name, banned_at), reporter:traders!reports_reporter_id_fkey (display_name), listing:listings (id, condition, card_variants (name, cards (name)))',
         )
         .order('created_at', { ascending: false })
         .order('id');
@@ -1034,6 +1036,19 @@ export function reportsQuery(founderId: string) {
     },
     gcTime: 0,
   });
+}
+
+/**
+ * Bans a Trader, through the `ban_trader` edge function (ADR-0007). Only a
+ * Founder may; the function asks.
+ */
+export async function banTrader(traderId: string): Promise<void> {
+  const result = await supabase.functions.invoke('ban_trader', {
+    method: 'POST',
+    body: { trader_id: traderId },
+  });
+  // supabase-js types a function's failure as `any`.
+  if (result.error) throw result.error as Error;
 }
 
 export type FiledReport = Awaited<
